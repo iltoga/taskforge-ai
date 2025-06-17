@@ -2,6 +2,7 @@ import { Events } from '@/components/Events';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
 jest.mock('next-auth/react');
@@ -11,6 +12,15 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
+
+// Helper function to render component with required providers
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <DevelopmentProvider>
+      {component}
+    </DevelopmentProvider>
+  );
+};
 
 describe('Events Component', () => {
   beforeEach(() => {
@@ -24,7 +34,7 @@ describe('Events Component', () => {
       update: jest.fn(),
     });
 
-    render(<Events />);
+    renderWithProviders(<Events />);
 
     expect(screen.getByText('Please sign in to view your events')).toBeInTheDocument();
   });
@@ -52,7 +62,7 @@ describe('Events Component', () => {
       }),
     });
 
-    render(<Events />);
+    renderWithProviders(<Events />);
 
     expect(screen.getByText('Upcoming Events')).toBeInTheDocument();
     expect(screen.getByText('New Event')).toBeInTheDocument();
@@ -86,7 +96,7 @@ describe('Events Component', () => {
       }),
     });
 
-    render(<Events />);
+    renderWithProviders(<Events />);
 
     await waitFor(() => {
       expect(screen.getByText('No upcoming events')).toBeInTheDocument();
@@ -112,7 +122,7 @@ describe('Events Component', () => {
     // Mock the fetch to fail
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-    render(<Events />);
+    renderWithProviders(<Events />);
 
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeInTheDocument();

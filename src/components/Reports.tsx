@@ -72,7 +72,7 @@ Statistics:
 Events:
 ${report.events.map(event => `- ${event.title} (${event.duration}) - ${event.type}`).join('\n')}
 
-Generated on: ${new Date().toLocaleDateString()}
+Generated on: ${new Date().toLocaleDateString('en-GB')}
 `;
 
     const blob = new Blob([reportText], { type: 'text/plain' });
@@ -155,7 +155,7 @@ Generated on: ${new Date().toLocaleDateString()}
               <div>
                 <h3 className="text-xl font-semibold">Report for {report.period}</h3>
                 <p className="text-base-content/70 text-sm">
-                  Generated on {new Date().toLocaleDateString()}
+                  Generated on {new Date().toLocaleDateString('en-GB')}
                 </p>
               </div>
               <button

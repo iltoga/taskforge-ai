@@ -20,6 +20,7 @@ export interface CalendarEvent {
   location?: string;
   attendees?: Attendee[];
   htmlLink?: string;
+  status?: 'confirmed' | 'tentative' | 'cancelled';
 }
 
 export interface Reminder {

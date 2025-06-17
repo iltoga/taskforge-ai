@@ -4,6 +4,7 @@ import { Chat } from '@/components/Chat';
 import { Events } from '@/components/Events';
 import { Reports } from '@/components/Reports';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { useDevelopment } from '@/contexts/DevelopmentContext';
 import {
     BarChart3,
     Calendar,
@@ -25,11 +26,12 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'CalendarGPT';
 export default function Home() {
   const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState<'chat' | 'events' | 'reports'>('chat');
+  const { isDevelopmentMode, isDebugPanelCollapsed, toggleDevelopmentMode } = useDevelopment();
 
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
-        <div className="loading loading-spinner loading-lg text-primary"></div>
+        <div className="loading loading-spinner loading-lg text-primary" role="status"></div>
       </div>
     );
   }
@@ -117,6 +119,17 @@ export default function Home() {
           </div>
 
           <div className="navbar-end gap-2">
+            {/* Development Mode Toggle */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                className={`btn btn-sm ${isDevelopmentMode ? 'btn-warning' : 'btn-ghost'}`}
+                onClick={() => toggleDevelopmentMode()}
+                title="Toggle development mode"
+              >
+                <span className="text-xs">DEV</span>
+              </button>
+            )}
+
             <ThemeSwitcher />
 
             <div className="dropdown dropdown-end">
@@ -155,7 +168,7 @@ export default function Home() {
             </div>
           </div>
         </div>        {/* Main content */}
-        <main className="flex-1 p-4">
+        <main className={`flex-1 p-4 ${isDevelopmentMode && !isDebugPanelCollapsed ? 'pb-[540px]' : ''}`}>
           {/* Welcome section */}
           <div className="mb-4">
             <div className="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-box">

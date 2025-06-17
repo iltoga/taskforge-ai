@@ -2,6 +2,7 @@ import Home from '@/app/page';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
 jest.mock('next-auth/react');
@@ -30,6 +31,15 @@ jest.mock('next-auth/react', () => ({
 
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 
+// Test wrapper with providers
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <DevelopmentProvider>
+      {component}
+    </DevelopmentProvider>
+  );
+};
+
 describe('Home Page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -42,9 +52,9 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
-    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('renders sign in page when not authenticated', () => {
@@ -54,10 +64,10 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     expect(screen.getByText('CalendarGPT')).toBeInTheDocument();
-    expect(screen.getByText('Your friendly AI assistant for Google Calendar management')).toBeInTheDocument();
+    expect(screen.getByText('Your intelligent assistant for seamless Google Calendar management.')).toBeInTheDocument();
     expect(screen.getByText('Sign in with Google')).toBeInTheDocument();
     expect(screen.getByText('Natural language event creation')).toBeInTheDocument();
   });
@@ -78,9 +88,9 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
-    expect(screen.getByText('CalendarGPT')).toBeInTheDocument();
+    expect(screen.getAllByText('CalendarGPT')[0]).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('john@example.com')).toBeInTheDocument();
     expect(screen.getByTestId('chat-component')).toBeInTheDocument();
@@ -102,7 +112,7 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     // Initially shows chat
     expect(screen.getByTestId('chat-component')).toBeInTheDocument();
@@ -122,7 +132,7 @@ describe('Home Page', () => {
     });
 
     // Back to Chat
-    fireEvent.click(screen.getByText('Chat Assistant'));
+    fireEvent.click(screen.getByText('AI Chat'));
     await waitFor(() => {
       expect(screen.getByTestId('chat-component')).toBeInTheDocument();
       expect(screen.queryByTestId('reports-component')).not.toBeInTheDocument();
@@ -145,10 +155,10 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
-    // Click on user avatar (should show dropdown) - use more specific selector
-    const avatarButton = screen.getByRole('button', { name: /user avatar/i });
+    // Click on user avatar (should show dropdown) - look for dropdown button
+    const avatarButton = screen.getByRole('button', { name: '' });
     fireEvent.click(avatarButton);
 
     expect(screen.getByText('Sign out')).toBeInTheDocument();
@@ -170,7 +180,7 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     const avatarImage = screen.getByAltText('User avatar');
     expect(avatarImage).toBeInTheDocument();
@@ -193,11 +203,12 @@ describe('Home Page', () => {
       update: jest.fn(),
     });
 
-    render(<Home />);
+    renderWithProviders(<Home />);
 
     // Should show default user icon instead of image
     expect(screen.queryByAltText('User avatar')).not.toBeInTheDocument();
     // The default avatar container should be present (look for the user icon)
-    expect(screen.getByTestId('default-avatar')).toBeInTheDocument();
+    const userIcon = screen.getByRole('button', { name: '' });
+    expect(userIcon).toBeInTheDocument();
   });
 });

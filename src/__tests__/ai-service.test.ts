@@ -1,40 +1,27 @@
 import { AIService } from '@/services/ai-service';
 import { CalendarEvent } from '@/types/calendar';
-import OpenAI from 'openai';
 
-// Mock OpenAI
-jest.mock('openai', () => ({
-  __esModule: true,
-  default: jest.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: jest.fn(),
-      },
-    },
-  })),
+// Mock Vercel AI SDK
+jest.mock('@ai-sdk/openai', () => ({
+  openai: jest.fn(),
 }));
 
-const mockOpenAI = OpenAI as jest.MockedClass<typeof OpenAI>;
+jest.mock('ai', () => ({
+  generateText: jest.fn(),
+}));
+
+import { openai } from '@ai-sdk/openai';
+import { generateText } from 'ai';
+
+const mockOpenAI = jest.mocked(openai);
+const mockGenerateText = jest.mocked(generateText);
 
 describe('AIService', () => {
   let aiService: AIService;
-  let mockOpenAIInstance: {
-    chat: {
-      completions: {
-        create: jest.Mock;
-      };
-    };
-  };
 
   beforeEach(() => {
-    mockOpenAIInstance = {
-      chat: {
-        completions: {
-          create: jest.fn(),
-        },
-      },
-    };
-    mockOpenAI.mockReturnValue(mockOpenAIInstance as never);
+    mockOpenAI.mockReturnValue({} as never);
+    jest.clearAllMocks();
     aiService = new AIService('test-api-key');
   });
 
@@ -43,22 +30,18 @@ describe('AIService', () => {
       // Arrange
       const userMessage = 'Create a meeting with John tomorrow at 2 PM about project review';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              type: 'create',
-              event: {
-                summary: 'Meeting with John - Project Review',
-                description: 'Project review meeting',
-                start: { dateTime: '2024-06-16T14:00:00+08:00' },
-                end: { dateTime: '2024-06-16T15:00:00+08:00' }
-              }
-            })
+        text: JSON.stringify({
+          type: 'create',
+          event: {
+            summary: 'Meeting with John - Project Review',
+            description: 'Project review meeting',
+            start: { dateTime: '2024-06-16T14:00:00+08:00' },
+            end: { dateTime: '2024-06-16T15:00:00+08:00' }
           }
-        }]
-      };
+        })
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -66,9 +49,9 @@ describe('AIService', () => {
       // Assert
       expect(result.type).toBe('create');
       expect(result.event?.summary).toBe('Meeting with John - Project Review');
-      expect(mockOpenAIInstance.chat.completions.create).toHaveBeenCalledWith(
+      expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o-mini',
+          model: expect.anything(),
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
@@ -87,20 +70,16 @@ describe('AIService', () => {
       // Arrange
       const userMessage = 'Show me my events for next week';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              type: 'list',
-              timeRange: {
-                start: '2024-06-17T00:00:00+08:00',
-                end: '2024-06-23T23:59:59+08:00'
-              }
-            })
+        text: JSON.stringify({
+          type: 'list',
+          timeRange: {
+            start: '2024-06-17T00:00:00+08:00',
+            end: '2024-06-23T23:59:59+08:00'
           }
-        }]
-      };
+        })
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -115,22 +94,18 @@ describe('AIService', () => {
       // Arrange
       const userMessage = 'Create daily report for TechCorp: worked on API integration, fixed bugs in payment system';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              type: 'create',
-              event: {
-                summary: 'daily report - TechCorp',
-                description: '• Worked on API integration\n• Fixed bugs in payment system',
-                start: { date: '2024-06-15' },
-                end: { date: '2024-06-16' }
-              }
-            })
+        text: JSON.stringify({
+          type: 'create',
+          event: {
+            summary: 'daily report - TechCorp',
+            description: '• Worked on API integration\n• Fixed bugs in payment system',
+            start: { date: '2024-06-15' },
+            end: { date: '2024-06-16' }
           }
-        }]
-      };
+        })
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -156,20 +131,16 @@ describe('AIService', () => {
       ];
 
       const mockResponse = {
-        choices: [{
-          message: {
-            content: JSON.stringify({
-              type: 'update',
-              eventId: 'daily-report-1',
-              event: {
-                description: '• Worked on API integration\n• Fixed bugs in payment system\n• Added code review session with team'
-              }
-            })
+        text: JSON.stringify({
+          type: 'update',
+          eventId: 'daily-report-1',
+          event: {
+            description: '• Worked on API integration\n• Fixed bugs in payment system\n• Added code review session with team'
           }
-        }]
-      };
+        })
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage, existingEvents);
@@ -183,7 +154,7 @@ describe('AIService', () => {
     it('should handle errors in AI response gracefully', async () => {
       // Arrange
       const userMessage = 'Create a meeting';
-      mockOpenAIInstance.chat.completions.create.mockRejectedValue(new Error('OpenAI API Error'));
+      mockGenerateText.mockRejectedValue(new Error('OpenAI API Error'));
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow('OpenAI API Error');
@@ -193,14 +164,10 @@ describe('AIService', () => {
       // Arrange
       const userMessage = 'Create a meeting';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: 'Invalid JSON response'
-          }
-        }]
-      };
+        text: 'Invalid JSON response'
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow();
@@ -226,9 +193,7 @@ describe('AIService', () => {
       ];
 
       const mockResponse = {
-        choices: [{
-          message: {
-            content: `Stefano's Weekly WorkLog for TechCorp - June 10-16, 2024
+        text: `Stefano's Weekly WorkLog for TechCorp - June 10-16, 2024
 
 **Monday, June 10:**
 • API development
@@ -240,11 +205,9 @@ describe('AIService', () => {
 
 **Summary:**
 This week focused primarily on API development and code quality improvements. Successfully completed bug fixes and enhanced documentation.`
-          }
-        }]
-      };
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16');
@@ -253,9 +216,9 @@ This week focused primarily on API development and code quality improvements. Su
       expect(result).toContain('Stefano\'s Weekly WorkLog for TechCorp');
       expect(result).toContain('API development');
       expect(result).toContain('Summary:');
-      expect(mockOpenAIInstance.chat.completions.create).toHaveBeenCalledWith(
+      expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o-mini',
+          model: expect.anything(),
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
@@ -272,23 +235,19 @@ This week focused primarily on API development and code quality improvements. Su
       // Arrange
       const italianText = 'Riunione con il team di sviluppo domani alle 15:00';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: 'Meeting with the development team tomorrow at 3:00 PM'
-          }
-        }]
-      };
+        text: 'Meeting with the development team tomorrow at 3:00 PM'
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.translateToEnglish(italianText);
 
       // Assert
       expect(result).toBe('Meeting with the development team tomorrow at 3:00 PM');
-      expect(mockOpenAIInstance.chat.completions.create).toHaveBeenCalledWith(
+      expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'gpt-4o-mini',
+          model: expect.anything(),
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
@@ -303,14 +262,10 @@ This week focused primarily on API development and code quality improvements. Su
       // Arrange
       const englishText = 'Meeting with the team tomorrow at 3 PM';
       const mockResponse = {
-        choices: [{
-          message: {
-            content: englishText
-          }
-        }]
-      };
+        text: englishText
+      } as any;
 
-      mockOpenAIInstance.chat.completions.create.mockResolvedValue(mockResponse);
+      mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.translateToEnglish(englishText);

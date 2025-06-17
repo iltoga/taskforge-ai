@@ -76,8 +76,14 @@ describe('CalendarService', () => {
       expect(result).toEqual(mockEvents);
       expect(mockCalendarAPI.events.list).toHaveBeenCalledWith({
         calendarId: 'primary',
+        timeMin: undefined,
+        timeMax: undefined,
+        maxResults: 2500,
+        q: undefined,
+        showDeleted: false,
         orderBy: 'startTime',
         singleEvents: true,
+        timeZone: 'Asia/Makassar',
       });
     });
 
@@ -97,8 +103,12 @@ describe('CalendarService', () => {
         calendarId: 'primary',
         timeMin,
         timeMax,
+        maxResults: 2500,
+        q: undefined,
+        showDeleted: false,
         orderBy: 'startTime',
         singleEvents: true,
+        timeZone: 'Asia/Makassar',
       });
     });
 

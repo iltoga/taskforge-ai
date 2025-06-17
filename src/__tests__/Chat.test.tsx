@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSession } from 'next-auth/react';
 import { Chat } from '../components/Chat';
+import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
 jest.mock('next-auth/react');
@@ -10,6 +11,15 @@ const mockUseSession = useSession as jest.MockedFunction<typeof useSession>;
 // Mock fetch
 global.fetch = jest.fn();
 const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+
+// Test wrapper with providers
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <DevelopmentProvider>
+      {component}
+    </DevelopmentProvider>
+  );
+};
 
 describe('Chat Component', () => {
   beforeEach(() => {
@@ -26,7 +36,7 @@ describe('Chat Component', () => {
   });
 
   it('should render chat interface', () => {
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     expect(screen.getByPlaceholderText(/type your message/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument();
@@ -44,7 +54,7 @@ describe('Chat Component', () => {
       }),
     } as Response);
 
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     const input = screen.getByPlaceholderText(/type your message/i);
     const sendButton = screen.getByRole('button', { name: /send/i });
@@ -60,6 +70,7 @@ describe('Chat Component', () => {
         },
         body: JSON.stringify({
           message: 'Create a meeting tomorrow at 2 PM',
+          model: 'gpt-4o-mini',
         }),
       });
     });
@@ -77,7 +88,7 @@ describe('Chat Component', () => {
       }),
     } as Response);
 
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     const input = screen.getByPlaceholderText(/type your message/i);
 
@@ -100,7 +111,7 @@ describe('Chat Component', () => {
       }),
     } as Response);
 
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     const input = screen.getByPlaceholderText(/type your message/i);
 
@@ -124,7 +135,7 @@ describe('Chat Component', () => {
       }),
     } as Response);
 
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     const input = screen.getByPlaceholderText(/type your message/i) as HTMLInputElement;
 
@@ -143,7 +154,7 @@ describe('Chat Component', () => {
       update: jest.fn(),
     });
 
-    render(<Chat />);
+    renderWithProviders(<Chat />);
 
     expect(screen.getByText(/please sign in/i)).toBeInTheDocument();
   });

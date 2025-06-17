@@ -4,9 +4,11 @@ import { CalendarEvent } from '@/types/calendar';
 import { Calendar, Clock, Edit, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
+import { useDevelopment } from '../contexts/DevelopmentContext';
 
 export function Events() {
   const { data: session } = useSession();
+  const { addAPILog } = useDevelopment();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +19,19 @@ export function Events() {
     setIsLoading(true);
     setError(null);
 
+    const startTime = Date.now();
+
     try {
+      // Log the API call
+      addAPILog({
+        service: 'calendar',
+        method: 'POST',
+        endpoint: '/api/chat',
+        payload: {
+          message: 'List my upcoming events for the next 7 days',
+        },
+      });
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -29,20 +43,52 @@ export function Events() {
       });
 
       const data = await response.json();
+      const duration = Date.now() - startTime;
 
       if (!response.ok) {
+        // Log the error
+        addAPILog({
+          service: 'calendar',
+          method: 'POST',
+          endpoint: '/api/chat',
+          error: data.error || 'Failed to fetch events',
+          duration,
+        });
         throw new Error(data.error || 'Failed to fetch events');
       }
+
+      // Log successful response
+      addAPILog({
+        service: 'calendar',
+        method: 'POST',
+        endpoint: '/api/chat',
+        response: data, // Log the full response
+        duration,
+      });
 
       if (data.data && Array.isArray(data.data)) {
         setEvents(data.data);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch events');
+      const duration = Date.now() - startTime;
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch events';
+
+      // Log the error if not already logged
+      if (!(err instanceof Error && err.message.includes('Failed to fetch events'))) {
+        addAPILog({
+          service: 'calendar',
+          method: 'POST',
+          endpoint: '/api/chat',
+          error: errorMessage,
+          duration,
+        });
+      }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, [session, addAPILog]);
 
   useEffect(() => {
     fetchEvents();
@@ -52,13 +98,13 @@ export function Events() {
     if (!dateTime) return 'All day';
 
     const date = new Date(dateTime);
-    return date.toLocaleString('en-US', {
+    return date.toLocaleString('en-GB', {
       weekday: 'short',
-      month: 'short',
       day: 'numeric',
+      month: 'short',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true,
+      hour12: false,
     });
   };
 
@@ -66,10 +112,10 @@ export function Events() {
     if (!date) return '';
 
     const dateObj = new Date(date);
-    return dateObj.toLocaleDateString('en-US', {
+    return dateObj.toLocaleDateString('en-GB', {
       weekday: 'short',
-      month: 'short',
       day: 'numeric',
+      month: 'short',
     });
   };
 
@@ -84,10 +130,10 @@ export function Events() {
 
     const startTime = formatDateTime(event.start?.dateTime);
     const endTime = event.end?.dateTime
-      ? new Date(event.end.dateTime).toLocaleTimeString('en-US', {
+      ? new Date(event.end.dateTime).toLocaleTimeString('en-GB', {
           hour: 'numeric',
           minute: '2-digit',
-          hour12: true,
+          hour12: false,
         })
       : '';
 

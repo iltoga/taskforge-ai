@@ -3,7 +3,11 @@
 import { CalendarEvent } from '@/types/calendar';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
-import { ModelSelector, ModelType } from './ModelSelector';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import { ModelType } from '../config/models';
+import { useDevelopment } from '../contexts/DevelopmentContext';
+import { ModelSelector } from './ModelSelector';
 
 interface ChatMessage {
   id: string;
@@ -13,8 +17,43 @@ interface ChatMessage {
   data?: CalendarEvent | CalendarEvent[];
 }
 
+// Utility function to detect and render formatted text (HTML/Markdown)
+function FormattedText({ content }: { content: string }) {
+  // Detect if content contains HTML tags
+  const hasHTMLTags = /<[^>]*>/g.test(content);
+
+  // Detect if content contains common Markdown patterns
+  const hasMarkdownPatterns = /[*_#`[\]]/g.test(content) || /^\s*[>\-+*]\s/m.test(content);
+
+  if (hasHTMLTags) {
+    // Render as HTML with react-markdown
+    return (
+      <div className="text-xs markdown-content">
+        <ReactMarkdown
+          rehypePlugins={[rehypeRaw]}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
+  } else if (hasMarkdownPatterns) {
+    // Render as Markdown
+    return (
+      <div className="text-xs markdown-content">
+        <ReactMarkdown>
+          {content}
+        </ReactMarkdown>
+      </div>
+    );
+  } else {
+    // Render as plain text with line breaks preserved
+    return <div className="whitespace-pre-wrap">{content}</div>;
+  }
+}
+
 export function Chat() {
   const { data: session, status } = useSession();
+  const { addAPILog } = useDevelopment();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +75,20 @@ export function Chat() {
     setInput('');
     setIsLoading(true);
 
+    const startTime = Date.now();
+
     try {
+      // Log the client-side API call
+      addAPILog({
+        service: 'ai',
+        method: 'POST',
+        endpoint: '/api/chat',
+        payload: {
+          message: userMessage.content,
+          model: selectedModel,
+        },
+      });
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -49,6 +101,16 @@ export function Chat() {
       });
 
       const result = await response.json();
+      const duration = Date.now() - startTime;
+
+      // Log the response
+      addAPILog({
+        service: 'ai',
+        method: 'POST',
+        endpoint: '/api/chat',
+        response: result, // Log the full response instead of truncating
+        duration,
+      });
 
       // Handle different response scenarios
       let assistantContent = '';
@@ -84,6 +146,17 @@ export function Chat() {
 
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
+      const duration = Date.now() - startTime;
+
+      // Log the error
+      addAPILog({
+        service: 'ai',
+        method: 'POST',
+        endpoint: '/api/chat',
+        error: error instanceof Error ? error.message : 'Network error',
+        duration,
+      });
+
       // More detailed error handling for network/parsing errors
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -120,7 +193,16 @@ export function Chat() {
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-8">
-            <div className="text-6xl mb-4">📅</div>
+            <div className="relative inline-block mb-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-lg flex flex-col items-center justify-center text-primary">
+                <div className="text-xs font-semibold uppercase">
+                  {new Date().toLocaleDateString('en-GB', { month: 'short' })}
+                </div>
+                <div className="text-xl font-bold">
+                  {new Date().getDate()}
+                </div>
+              </div>
+            </div>
             <h1 className="text-3xl font-bold mb-2">Welcome to CalendarGPT</h1>
             <p className="text-gray-600 mb-4">
               I&apos;m your friendly, professional assistant for calendar management.
@@ -158,7 +240,7 @@ export function Chat() {
             <div className="chat-header">
               {message.type === 'user' ? 'You' : 'CalendarGPT'}
               <time className="text-xs opacity-50 ml-1">
-                {message.timestamp.toLocaleTimeString()}
+                {message.timestamp.toLocaleTimeString('en-GB')}
               </time>
             </div>
             <div
@@ -189,26 +271,66 @@ export function Chat() {
               {/* Display event data if available */}
               {message.data && Array.isArray(message.data) && message.data.length > 0 && (
                 <div className="mt-2 space-y-2">
-                  {message.data.slice(0, 5).map((event: CalendarEvent) => (
-                    <div key={event.id} className="bg-base-100 p-2 rounded text-sm">
-                      <div className="font-semibold">{event.summary}</div>
-                      {event.start?.dateTime && (
-                        <div className="text-xs opacity-70">
-                          {new Date(event.start.dateTime).toLocaleString()}
+                  {message.data.map((event: CalendarEvent) => (
+                    <div key={event.id} className="bg-base-100 p-3 rounded text-sm border border-base-300">
+                      <div className="font-semibold text-base mb-1">{event.summary}</div>
+
+                      {/* Date and Time */}
+                      <div className="text-xs text-base-content/70 mb-2">
+                        {event.start?.dateTime ? (
+                          <>
+                            <div>📅 {new Date(event.start.dateTime).toLocaleDateString('en-GB')}</div>
+                            <div>🕐 {new Date(event.start.dateTime).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            })}{event.end?.dateTime ? ` - ${new Date(event.end.dateTime).toLocaleTimeString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            })}` : ''}</div>
+                          </>
+                        ) : event.start?.date ? (
+                          <div>📅 All day - {new Date(event.start.date).toLocaleDateString('en-GB')}</div>
+                        ) : null}
+                      </div>
+
+                      {/* Description */}
+                      {event.description && (
+                        <div className="text-xs text-base-content/80 mb-2 p-2 bg-base-200 rounded">
+                          <div className="font-semibold mb-1">Description:</div>
+                          <FormattedText content={event.description} />
                         </div>
                       )}
-                      {event.start?.date && (
-                        <div className="text-xs opacity-70">
-                          All day - {new Date(event.start.date).toLocaleDateString()}
+
+                      {/* Location */}
+                      {event.location && (
+                        <div className="text-xs text-base-content/70 mb-1">
+                          📍 {event.location}
+                        </div>
+                      )}
+
+                      {/* Attendees */}
+                      {event.attendees && event.attendees.length > 0 && (
+                        <div className="text-xs text-base-content/70 mb-1">
+                          👥 {event.attendees.length} attendee{event.attendees.length > 1 ? 's' : ''}
+                        </div>
+                      )}
+
+                      {/* Status */}
+                      {event.status && (
+                        <div className="text-xs">
+                          <span className={`badge badge-xs ${
+                            event.status === 'confirmed' ? 'badge-success' :
+                            event.status === 'tentative' ? 'badge-warning' :
+                            'badge-neutral'
+                          }`}>
+                            {event.status}
+                          </span>
                         </div>
                       )}
                     </div>
                   ))}
-                  {message.data.length > 5 && (
-                    <div className="text-xs opacity-70">
-                      ... and {message.data.length - 5} more events
-                    </div>
-                  )}
                 </div>
               )}
             </div>

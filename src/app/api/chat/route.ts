@@ -56,6 +56,10 @@ export async function POST(request: Request) {
     // Process the message with AI
     const action = await aiService.processMessage(englishMessage, existingEvents.items, model);
 
+    // Debug logging
+    console.log('Original message:', message);
+    console.log('Processed action:', JSON.stringify(action, null, 2));
+
     let result: CalendarEvent | CalendarEvent[] | void = undefined;
     let responseMessage = '';
 
@@ -85,9 +89,64 @@ export async function POST(request: Request) {
         const timeMin = action.timeRange?.start || new Date().toISOString();
         const timeMax = action.timeRange?.end || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        const events = await calendarService.getEvents(timeMin, timeMax);
-        result = events.items;
-        responseMessage = `📅 Found ${events.items.length} event(s)`;
+        // Extract filter keywords from the original message
+        const messageLower = message.toLowerCase();
+        const filterKeywords: string[] = [];
+
+        // Common patterns to extract filter terms (company names, project names, etc.)
+        const patterns = [
+          /(?:for|about|regarding|related to|relative to)\s+([a-zA-Z\-_]+)/gi,
+          /(?:activities for|events for|meetings for)\s+([a-zA-Z\-_]+)/gi,
+          /([a-zA-Z\-_]+)\s+(?:activities|events|meetings|work|project)/gi,
+          /(?:list|show|find)\s+([a-zA-Z\-_]+)\s+(?:activities|events|meetings)/gi
+        ];
+
+        patterns.forEach(pattern => {
+          const matches = messageLower.matchAll(pattern);
+          for (const match of matches) {
+            if (match[1] && match[1].length > 2 && match[1] !== 'all' && match[1] !== 'events') { // Avoid short words and generic terms
+              filterKeywords.push(match[1].toLowerCase().trim());
+            }
+          }
+        });
+
+        // Get all events without server-side filtering for better transparency
+        const events = await calendarService.getEvents(
+          timeMin,
+          timeMax,
+          2500, // maxResults
+          undefined, // No server-side search query
+          false, // showDeleted
+          'startTime', // orderBy
+          'Asia/Makassar' // timeZone
+        );
+
+        // Apply client-side filtering if we have filter keywords
+        let filteredEvents = events.items;
+        if (filterKeywords.length > 0) {
+          filteredEvents = events.items.filter(event => {
+            const eventText = `${event.summary || ''} ${event.description || ''}`.toLowerCase();
+            return filterKeywords.some(keyword => eventText.includes(keyword));
+          });
+        }
+
+        result = filteredEvents;
+
+        if (filterKeywords.length > 0) {
+          responseMessage = `📅 Found ${filteredEvents.length} event(s) matching "${filterKeywords.join(', ')}"`;
+        } else {
+          responseMessage = `📅 Found ${filteredEvents.length} event(s)`;
+        }
+
+        // Add time range info to response
+        const startDate = new Date(timeMin).toLocaleDateString();
+        const endDate = new Date(timeMax).toLocaleDateString();
+        if (startDate !== endDate) {
+          responseMessage += ` from ${startDate} to ${endDate}`;
+        } else {
+          responseMessage += ` for ${startDate}`;
+        }
+
         break;
 
       default:
@@ -98,6 +157,7 @@ export async function POST(request: Request) {
       success: true,
       message: responseMessage,
       action: action.type,
+      events: result, // Always include events for list operations
       data: result,
     });
 

@@ -3,7 +3,17 @@
 
 // Used for __tests__/testing-library.js
 // Learn more: https://github.com/testing-library/jest-dom
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom';
+
+// Add fetch polyfill for Vercel AI SDK
+import 'whatwg-fetch';
+
+// Add structuredClone polyfill for Node.js (required by Vercel AI SDK)
+if (!global.structuredClone) {
+  global.structuredClone = (obj) => {
+    return JSON.parse(JSON.stringify(obj));
+  };
+}
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
