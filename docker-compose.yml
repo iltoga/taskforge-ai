@@ -1,5 +1,5 @@
 services:
-    calendar-gpt:
+    calendar-assistant:
         build:
             context: .
             dockerfile: Dockerfile
@@ -9,7 +9,7 @@ services:
                 - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://calendar-assistant.revisbali.com}
                 - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
                 - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-$(date +%s)}
-        container_name: calendar-gpt
+        container_name: calendar-assistant
         restart: unless-stopped
         ports:
             - '3000:3000'

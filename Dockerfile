@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Upgrade npm *BEFORE* installing dependencies. This is crucial.
-RUN npm install -g npm@10.9.0
+RUN npm install -g npm@11.4.2
 
 # Install ALL dependencies (including devDependencies) needed for build
 RUN npm ci
@@ -41,7 +41,7 @@ ENV NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Install the correct npm version globally in this stage as well
-RUN npm install -g npm@10.9.0
+RUN npm install -g npm@11.4.2
 
 # Build the application
 RUN npm run build
@@ -63,7 +63,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY package*.json ./
 
 # Install production dependencies
-RUN npm install -g npm@10.9.0
+RUN npm install -g npm@11.4.2
 RUN npm ci --only=production && npm cache clean --force
 
 # Copy built application
