@@ -196,6 +196,13 @@ export class ToolOrchestrator {
       }).join('\n\n');
 
     const prompt = `
+Today is ${new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}.
+
 You are an intelligent assistant capable of multi-step reasoning and tool orchestration. Your task is to analyze user requests and develop a strategic approach.
 
 User Request: "${userMessage}"
@@ -285,6 +292,13 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
       : '';
 
     const prompt = `
+Today is ${new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })}.
+
 You are an intelligent tool orchestrator with REAL ACCESS to live data through tools. You are NOT limited to training data.
 
 ## IMPORTANT: YOU HAVE LIVE DATA ACCESS

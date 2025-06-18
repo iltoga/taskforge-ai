@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, Clock, Download, FileText } from 'lucide-react';
+import { BarChart3, Building2, Calendar, Clock, Download, FileText, TrendingUp, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 
@@ -25,6 +25,14 @@ export function Reports() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
   const [company, setCompany] = useState<string>('');
 
+  const periodOptions = [
+    { value: 'current-week', label: 'Current Week', icon: Calendar },
+    { value: 'last-week', label: 'Last Week', icon: Calendar },
+    { value: 'last-month', label: 'Last Month', icon: Calendar },
+    { value: 'last-two-months', label: 'Last Two Months', icon: TrendingUp },
+    { value: 'last-quarter', label: 'Last Quarter', icon: BarChart3 },
+  ];
+
   const getDateRange = (period: string): { startDate: string; endDate: string; label: string } => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -34,7 +42,6 @@ export function Reports() {
 
     switch (period) {
       case 'current-week':
-        // Start of current week (Monday)
         const currentDay = today.getDay();
         const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
         startDate = new Date(today);
@@ -77,7 +84,6 @@ export function Reports() {
         break;
 
       default:
-        // Default to current week
         const defaultDay = today.getDay();
         const daysToDefaultMonday = defaultDay === 0 ? 6 : defaultDay - 1;
         startDate = new Date(today);
@@ -167,152 +173,242 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
 
   if (!session) {
     return (
-      <div className="text-center py-8">
-        <p className="text-base-content/70">Please sign in to generate reports</p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+            <Users className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+          <p className="text-base-content/60">Please sign in to access work reports</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="card bg-base-100 shadow-lg">
-        <div className="card-body">
-          <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
-            <FileText className="w-6 h-6" />
-            Work Reports
-          </h2>
+    <div className="space-y-8 max-w-6xl mx-auto">
+      {/* Header Section */}
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary to-secondary mb-4">
+          <BarChart3 className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
+          Work Reports
+        </h1>
+        <p className="text-base-content/60 max-w-md mx-auto">
+          Generate comprehensive reports for your work activities and meeting schedules
+        </p>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div className="form-control w-full">
-              <label className="label">
-                <span className="label-text">Company Name</span>
-              </label>
-              <input
-                type="text"
-                placeholder="Enter company name"
-                className="input input-bordered w-full"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-              />
+      {/* Report Generation Form */}
+      <div className="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-base-300">
+        <div className="card-body p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
-
-            <div className="form-control w-full">
-              <label className="label">
-                <span className="label-text">Select Period</span>
-              </label>
-              <select
-                className="select select-bordered"
-                value={selectedPeriod}
-                onChange={(e) => setSelectedPeriod(e.target.value)}
-              >
-                <option value="current-week">Current Week</option>
-                <option value="last-week">Last Week</option>
-                <option value="last-month">Last Month</option>
-                <option value="last-two-months">Last Two Months</option>
-                <option value="last-quarter">Last Quarter</option>
-              </select>
+            <div>
+              <h2 className="text-xl font-semibold">Generate Report</h2>
+              <p className="text-sm text-base-content/60">Configure your report parameters</p>
             </div>
           </div>
 
-          <div className="card-actions">
+          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+            {/* Company Input */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Building2 className="w-4 h-4 text-primary" />
+                Company Name
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your company name..."
+                className="input input-bordered w-full h-12 focus:input-primary transition-all duration-200"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+              <p className="text-xs text-base-content/50">This will be used to filter your daily reports</p>
+            </div>
+
+            {/* Period Selection */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Calendar className="w-4 h-4 text-primary" />
+                Report Period
+              </label>
+              <select
+                className="select select-bordered w-full h-12 focus:select-primary transition-all duration-200"
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+              >
+                {periodOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-base-content/50">Select the time period for your report</p>
+            </div>
+          </div>
+
+          {/* Generate Button */}
+          <div className="flex justify-center">
             <button
               onClick={generateReport}
-              className="btn btn-primary gap-2"
               disabled={isLoading || !company.trim()}
+              className="btn btn-primary btn-lg gap-3 px-8 disabled:opacity-50 hover:scale-105 transition-all duration-200"
             >
               {isLoading ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
-                  Generating...
+                  Generating Report...
                 </>
               ) : (
                 <>
-                  <FileText className="w-4 h-4" />
+                  <BarChart3 className="w-5 h-5" />
                   Generate Report
                 </>
               )}
             </button>
           </div>
 
+          {/* Error Display */}
+          {/* Error Display */}
           {error && (
-            <div className="alert alert-error mt-4">
+            <div className="alert alert-error mt-6 animate-in slide-in-from-top duration-300">
+              <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <span>{error}</span>
             </div>
           )}
         </div>
       </div>
 
+      {/* Report Results */}
       {report && (
-        <div className="card bg-base-100 shadow-lg">
-          <div className="card-body">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-xl font-semibold">Report for {report.period}</h3>
-                <p className="text-base-content/70 text-sm">
-                  Generated on {new Date().toLocaleDateString('en-GB')}
-                </p>
-              </div>
-              <button
-                onClick={downloadReport}
-                className="btn btn-outline btn-sm gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-figure text-primary">
-                  <Calendar className="w-8 h-8" />
+        <div className="animate-in slide-in-from-bottom duration-500">
+          {/* Report Header */}
+          <div className="card bg-gradient-to-br from-primary/5 to-secondary/5 shadow-xl border border-primary/20 mb-6">
+            <div className="card-body p-8">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-primary">Report Generated</h3>
+                    <p className="text-base-content/70">{report.period}</p>
+                    <p className="text-sm text-base-content/50">
+                      Generated on {new Date().toLocaleDateString('en-GB', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
                 </div>
-                <div className="stat-title">Total Events</div>
-                <div className="stat-value text-primary">{report.totalEvents}</div>
-              </div>
-
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-figure text-secondary">
-                  <Clock className="w-8 h-8" />
-                </div>
-                <div className="stat-title">Working Hours</div>
-                <div className="stat-value text-secondary">{report.workingHours}h</div>
-              </div>
-
-              <div className="stat bg-base-200 rounded-lg">
-                <div className="stat-figure text-accent">
-                  <FileText className="w-8 h-8" />
-                </div>
-                <div className="stat-title">Meeting Hours</div>
-                <div className="stat-value text-accent">{report.meetingHours}h</div>
+                <button
+                  onClick={downloadReport}
+                  className="btn btn-outline btn-primary gap-2 hover:scale-105 transition-all duration-200"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Report
+                </button>
               </div>
             </div>
+          </div>
 
-            <div className="mb-6">
-              <h4 className="text-lg font-semibold mb-3">Summary</h4>
-              <div className="bg-base-200 p-4 rounded-lg">
-                <p className="whitespace-pre-wrap">{report.summary}</p>
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="card bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 hover:shadow-xl transition-all duration-300">
+              <div className="card-body p-6 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                  <Calendar className="w-8 h-8 text-white" />
+                </div>
+                <h4 className="text-sm font-medium text-primary/80 mb-1">Total Events</h4>
+                <p className="text-3xl font-bold text-primary">{report.totalEvents}</p>
+                <p className="text-xs text-base-content/50 mt-1">Scheduled activities</p>
               </div>
             </div>
 
-            {report.events.length > 0 && (
-              <div>
-                <h4 className="text-lg font-semibold mb-3">Events Breakdown</h4>
+            <div className="card bg-gradient-to-br from-secondary/10 to-secondary/5 border border-secondary/20 hover:shadow-xl transition-all duration-300">
+              <div className="card-body p-6 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-secondary to-secondary/80 flex items-center justify-center">
+                  <Clock className="w-8 h-8 text-white" />
+                </div>
+                <h4 className="text-sm font-medium text-secondary/80 mb-1">Working Hours</h4>
+                <p className="text-3xl font-bold text-secondary">{report.workingHours}h</p>
+                <p className="text-xs text-base-content/50 mt-1">Total work time</p>
+              </div>
+            </div>
+
+            <div className="card bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 hover:shadow-xl transition-all duration-300">
+              <div className="card-body p-6 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-accent to-accent/80 flex items-center justify-center">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <h4 className="text-sm font-medium text-accent/80 mb-1">Meeting Hours</h4>
+                <p className="text-3xl font-bold text-accent">{report.meetingHours}h</p>
+                <p className="text-xs text-base-content/50 mt-1">Collaboration time</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Section */}
+          <div className="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-base-300 mb-6">
+            <div className="card-body p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-info/20 to-info/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-info" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-semibold">Executive Summary</h4>
+                  <p className="text-sm text-base-content/60">AI-generated insights from your work period</p>
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-base-200 to-base-300 p-6 rounded-xl border border-base-300">
+                <p className="whitespace-pre-wrap text-base leading-relaxed">{report.summary}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Events Breakdown */}
+          {report.events.length > 0 && (
+            <div className="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-base-300">
+              <div className="card-body p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-success/20 to-success/10 flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-success" />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-semibold">Events Breakdown</h4>
+                    <p className="text-sm text-base-content/60">Detailed list of all activities</p>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto">
                   <table className="table table-zebra w-full">
                     <thead>
-                      <tr>
-                        <th>Event</th>
-                        <th>Duration</th>
-                        <th>Type</th>
+                      <tr className="border-base-300">
+                        <th className="bg-base-200 text-base-content/80 font-semibold">Event</th>
+                        <th className="bg-base-200 text-base-content/80 font-semibold">Duration</th>
+                        <th className="bg-base-200 text-base-content/80 font-semibold">Type</th>
                       </tr>
                     </thead>
                     <tbody>
                       {report.events.map((event, index) => (
-                        <tr key={index}>
-                          <td>{event.title}</td>
-                          <td>{event.duration}</td>
+                        <tr key={index} className="hover:bg-base-100 transition-colors duration-200">
+                          <td className="font-medium">{event.title}</td>
                           <td>
-                            <span className="badge badge-outline">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-base-content/50" />
+                              {event.duration}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge badge-outline badge-sm hover:badge-primary transition-all duration-200">
                               {event.type}
                             </span>
                           </td>
@@ -322,8 +418,8 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
                   </table>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -66,11 +66,32 @@ export class AIService {
   private loadSystemPrompt(): string {
     try {
       const promptPath = join(process.cwd(), 'prompts', 'calendar-assistant.md');
-      return readFileSync(promptPath, 'utf-8');
+      let prompt = readFileSync(promptPath, 'utf-8');
+
+      // Add current date to the prompt
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      // Insert the current date statement at the beginning of the prompt
+      prompt = `Today is ${formattedDate}.\n\n${prompt}`;
+
+      return prompt;
     } catch (error) {
       console.error('Error loading system prompt template:', error);
       // Fallback to a basic prompt if file loading fails
-      return 'You are CalendarGPT, a digital assistant for managing Google Calendar events. Always respond with valid JSON only.';
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      return `Today is ${formattedDate}.\n\nYou are CalendarGPT, a digital assistant for managing Google Calendar events. Always respond with valid JSON only.`;
     }
   }
 
@@ -78,11 +99,32 @@ export class AIService {
   private loadAgenticPrompt(): string {
     try {
       const promptPath = join(process.cwd(), 'prompts', 'agentic-tool-mode.md');
-      return readFileSync(promptPath, 'utf-8');
+      let prompt = readFileSync(promptPath, 'utf-8');
+
+      // Add current date to the prompt
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      // Insert the current date statement at the beginning of the prompt
+      prompt = `Today is ${formattedDate}.\n\n${prompt}`;
+
+      return prompt;
     } catch (error) {
       console.error('Error loading agentic prompt template:', error);
       // Fallback to a basic prompt if file loading fails
-      return 'You are CalendarGPT, a digital assistant for managing Google Calendar events with access to tools.';
+      const today = new Date();
+      const formattedDate = today.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      return `Today is ${formattedDate}.\n\nYou are CalendarGPT, a digital assistant for managing Google Calendar events with access to tools.`;
     }
   }
 
