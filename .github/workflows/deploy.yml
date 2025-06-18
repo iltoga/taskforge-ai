@@ -83,22 +83,23 @@ jobs:
 
             # Build with cache optimization and git commit for cache busting
             echo "Building Docker image with smart caching..."
-            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-gpt
+            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-assistant
 
             echo "Stopping existing container..."
-            docker compose down calendar-gpt || true
+            docker compose down calendar-assistant || true
 
             echo "Starting new container..."
-            docker compose up -d calendar-gpt
+            docker compose down
+            docker compose up -d calendar-assistant
 
             # Verify deployment
             echo "Verifying deployment..."
             sleep 10
-            if docker compose ps calendar-gpt | grep -q "Up"; then
+            if docker compose ps calendar-assistant | grep -q "Up"; then
               echo "✅ Container is running successfully"
             else
               echo "❌ Container failed to start"
-              docker compose logs calendar-gpt
+              docker compose logs calendar-assistant
               exit 1
             fi
 
@@ -106,4 +107,4 @@ jobs:
             echo "Cleaning up Docker system..."
             docker system prune -af --volumes
 
-            echo "🚀 Deployment of calendarGPT completed successfully!"
+            echo "🚀 Deployment completed successfully!"
