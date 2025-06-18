@@ -33,6 +33,7 @@ out/
 
 # Typescript cache
 *.tsbuildinfo
+next-env.d.ts
 
 # IDE
 .vscode

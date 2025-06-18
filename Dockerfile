@@ -25,7 +25,6 @@ COPY postcss.config.mjs ./
 COPY eslint.config.mjs ./
 COPY jest.config.js ./
 COPY jest.setup.js ./
-COPY next-env.d.ts ./
 
 # Copy static assets
 COPY public ./public
