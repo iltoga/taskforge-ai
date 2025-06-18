@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Allow manual triggering
 
 jobs:
   deploy:
@@ -17,7 +18,7 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: SSH into VPS and deploy
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -25,39 +26,84 @@ jobs:
           timeout: 30m
           command_timeout: 30m
           script: |
+            set -e  # Exit on any error
+
             # Check and setup repository
             REPO_DIR="$HOME/.docker/calendar-gpt"
-            echo "Pulling latest changes."
+            echo "Starting deployment process..."
+            echo "Repository directory: $REPO_DIR"
+
+            # Navigate to repository directory
+            if [ ! -d "$REPO_DIR" ]; then
+              echo "Error: Repository directory does not exist: $REPO_DIR"
+              exit 1
+            fi
+
             cd "$REPO_DIR"
+            echo "Current directory: $(pwd)"
+
             # Ensure remote URL is correct using the custom SSH configuration
+            echo "Setting git remote URL..."
             git remote set-url origin git@github.com-deploy-calendargpt:iltoga/calendarGPT.git
+
             # Ensure we're on the main branch and clean any local changes
+            echo "Fetching latest changes..."
             git fetch --all
+
+            echo "Switching to main branch..."
             git checkout main
+
+            echo "Resetting to latest remote state..."
             git reset --hard origin/main
             git clean -fd
+
+            echo "Pulling latest changes..."
             git pull origin main
+
 
             # Set permissions
             # sudo chown -R nespola:nespola "$REPO_DIR"
 
             # Deploy with Docker
+            echo "Starting Docker deployment..."
             cd "$REPO_DIR"
             export DOCKER_BUILDKIT=1
 
             # Clear Docker build cache to ensure fresh builds
+            echo "Pruning Docker builder cache..."
             docker builder prune -f
 
             # Source environment variables if available
             if [ -f .env ]; then
+              echo "Loading environment variables from .env..."
               source .env
+            else
+              echo "Warning: .env file not found"
             fi
 
             # Build and restart services
+            echo "Building Docker image..."
             docker compose build --no-cache --pull calendar-gpt
-            docker compose down calendar-gpt
+
+            echo "Stopping existing container..."
+            docker compose down calendar-gpt || true
+
+            echo "Starting new container..."
             docker compose up -d calendar-gpt
 
+            # Verify deployment
+            echo "Verifying deployment..."
+            sleep 10
+            if docker compose ps calendar-gpt | grep -q "Up"; then
+              echo "✅ Container is running successfully"
+            else
+              echo "❌ Container failed to start"
+              docker compose logs calendar-gpt
+              exit 1
+            fi
+
             # Clean up - Comment this out initially for debugging
+            echo "Cleaning up Docker system..."
             docker system prune -af --volumes
-            echo "Deployment of calendarGPT completed successfully"
+
+            echo "🚀 Deployment of calendarGPT completed successfully!"
