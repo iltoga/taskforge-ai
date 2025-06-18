@@ -78,12 +78,12 @@ describe('CalendarService', () => {
         calendarId: 'primary',
         timeMin: undefined,
         timeMax: undefined,
-        maxResults: 2500,
+        maxResults: 250, // Updated default
         q: undefined,
         showDeleted: false,
         orderBy: 'startTime',
         singleEvents: true,
-        timeZone: 'Asia/Makassar',
+        timeZone: 'UTC', // Updated default
       });
     });
 
@@ -103,12 +103,12 @@ describe('CalendarService', () => {
         calendarId: 'primary',
         timeMin,
         timeMax,
-        maxResults: 2500,
+        maxResults: 250, // Updated default
         q: undefined,
         showDeleted: false,
         orderBy: 'startTime',
         singleEvents: true,
-        timeZone: 'Asia/Makassar',
+        timeZone: 'UTC', // Updated default
       });
     });
 

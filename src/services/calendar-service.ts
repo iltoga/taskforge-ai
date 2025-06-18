@@ -5,9 +5,71 @@ import { CalendarEvent, EventList } from '../types/calendar';
 
 export class CalendarService {
   private calendar: calendar_v3.Calendar;
+  private auth: OAuth2Client;
 
   constructor(auth: OAuth2Client) {
+    this.auth = auth;
     this.calendar = google.calendar({ version: 'v3', auth });
+  }
+
+  /**
+   * Refreshes the calendar client with fresh credentials
+   * Useful when tokens are refreshed externally
+   */
+  private refreshCalendarClient() {
+    this.calendar = google.calendar({ version: 'v3', auth: this.auth });
+  }
+
+  /**
+   * Handles API calls with automatic token refresh retry
+   */
+  private async executeWithRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      // Check if it's an authentication error
+      if (error instanceof Error &&
+          (error.message.includes('invalid authentication') ||
+           error.message.includes('OAuth 2 access token') ||
+           error.message.includes('authentication credential'))) {
+
+        serverDevLogger.log({
+          service: 'calendar',
+          method: 'ERROR_HANDLING',
+          endpoint: `${operationName}_AUTH_ERROR`,
+          error: `Authentication error in ${operationName}, attempting token refresh: ${error.message}`,
+        });
+
+        try {
+          // Try to refresh the token using the OAuth2Client
+          await this.auth.getAccessToken();
+          this.refreshCalendarClient();
+
+          serverDevLogger.log({
+            service: 'calendar',
+            method: 'ERROR_HANDLING',
+            endpoint: `${operationName}_REFRESH_SUCCESS`,
+            response: { message: `Token refresh successful, retrying ${operationName}` },
+          });
+
+          // Retry the operation with refreshed token
+          return await operation();
+        } catch (refreshError) {
+          serverDevLogger.log({
+            service: 'calendar',
+            method: 'ERROR_HANDLING',
+            endpoint: `${operationName}_REFRESH_FAILED`,
+            error: `Token refresh failed for ${operationName}: ${refreshError instanceof Error ? refreshError.message : 'Unknown refresh error'}`,
+          });
+
+          // If refresh fails, throw the original error
+          throw error;
+        }
+      }
+
+      // If it's not an auth error, just throw it
+      throw error;
+    }
   }
 
   async getEvents(
@@ -19,20 +81,22 @@ export class CalendarService {
     orderBy?: 'startTime' | 'updated',
     timeZone?: string
   ): Promise<EventList> {
-    const startTime = Date.now();
+    // Use more reasonable defaults for maxResults and timezone
     const params = {
       calendarId: 'primary',
       timeMin,
       timeMax,
-      maxResults: maxResults || 2500,
+      maxResults: maxResults || 250, // Reduced from 2500 to avoid too many old events
       q,
       showDeleted: showDeleted || false,
       orderBy: orderBy || 'startTime',
       singleEvents: true,
-      timeZone: timeZone || 'Asia/Makassar',
+      timeZone: timeZone || 'UTC', // Use UTC instead of hardcoded Asia/Makassar
     };
 
-    try {
+    return this.executeWithRetry(async () => {
+      const startTime = Date.now();
+
       // Log the request
       serverDevLogger.log({
         service: 'calendar',
@@ -59,26 +123,13 @@ export class CalendarService {
       });
 
       return response.data as EventList;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      // Log the error
-      serverDevLogger.log({
-        service: 'calendar',
-        method: 'GET',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration,
-      });
-
-      throw error;
-    }
+    }, 'getEvents');
   }
 
   async createEvent(event: CalendarEvent): Promise<CalendarEvent> {
-    const startTime = Date.now();
+    return this.executeWithRetry(async () => {
+      const startTime = Date.now();
 
-    try {
       // Log the request
       serverDevLogger.log({
         service: 'calendar',
@@ -116,24 +167,11 @@ export class CalendarService {
       });
 
       return response.data as CalendarEvent;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      // Log the error
-      serverDevLogger.log({
-        service: 'calendar',
-        method: 'POST',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
-        error: error instanceof Error ? error.message : 'Unknown error',
-        duration,
-      });
-
-      throw error;
-    }
+    }, 'createEvent');
   }
 
   async updateEvent(eventId: string, updateData: CalendarEvent): Promise<CalendarEvent> {
-    try {
+    return this.executeWithRetry(async () => {
       const response = await this.calendar.events.patch({
         calendarId: 'primary',
         eventId,
@@ -141,19 +179,15 @@ export class CalendarService {
       });
 
       return response.data as CalendarEvent;
-    } catch (error) {
-      throw error;
-    }
+    }, 'updateEvent');
   }
 
   async deleteEvent(eventId: string): Promise<void> {
-    try {
+    return this.executeWithRetry(async () => {
       await this.calendar.events.delete({
         calendarId: 'primary',
         eventId,
       });
-    } catch (error) {
-      throw error;
-    }
+    }, 'deleteEvent');
   }
 }

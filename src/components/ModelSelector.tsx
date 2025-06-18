@@ -31,6 +31,11 @@ const models: ModelInfo[] = MODEL_CONFIGS.map(config => ({
   icon: getModelIcon(config.id, config.provider)
 }));
 
+// Export function to get model info (for testing)
+export const getModelInfo = (modelId: ModelType): ModelInfo | undefined => {
+  return models.find(m => m.id === modelId);
+};
+
 interface ModelSelectorProps {
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;

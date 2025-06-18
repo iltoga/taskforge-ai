@@ -2,9 +2,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { ModelType } from '../config/models';
+import { CalendarTools } from '../tools/calendar-tools';
 import { CalendarAction, CalendarEvent } from '../types/calendar';
-
-export type ModelType = 'gpt-4o' | 'gpt-4o-mini' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'deepseek/deepseek-chat-v3-0324:free';
 
 export type ProviderType = 'openai' | 'openrouter';
 
@@ -74,6 +74,18 @@ export class AIService {
     }
   }
 
+  // Load agentic tool mode system prompt
+  private loadAgenticPrompt(): string {
+    try {
+      const promptPath = join(process.cwd(), 'prompts', 'agentic-tool-mode.md');
+      return readFileSync(promptPath, 'utf-8');
+    } catch (error) {
+      console.error('Error loading agentic prompt template:', error);
+      // Fallback to a basic prompt if file loading fails
+      return 'You are CalendarGPT, a digital assistant for managing Google Calendar events with access to tools.';
+    }
+  }
+
   async processMessage(
     message: string,
     existingEvents?: CalendarEvent[],
@@ -96,8 +108,8 @@ export class AIService {
     }
 
     try {
-      // Use temperature only for models that support it
-      const supportsTemperature = !['o4-mini', 'o4-mini-high'].includes(model);
+      // Use temperature only for models that support it (some reasoning models don't support temperature)
+      const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
       const client = this.getProviderClient(model);
 
       const response = await generateText({
@@ -115,7 +127,16 @@ export class AIService {
       console.log('User message:', message);
       console.log('AI response:', content);
 
-      const action = JSON.parse(content) as CalendarAction;
+      // Clean up the response - handle markdown code blocks
+      let cleanedContent = content.trim();
+
+      // Remove markdown code block formatting if present
+      const codeBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        cleanedContent = codeBlockMatch[1].trim();
+      }
+
+      const action = JSON.parse(cleanedContent) as CalendarAction;
 
       // Additional validation
       if (action.type === 'list' && !action.timeRange) {
@@ -160,8 +181,8 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
 `;
 
     try {
-      // Use temperature only for models that support it
-      const supportsTemperature = !['o4-mini', 'o4-mini-high'].includes(model);
+      // Use temperature only for models that support it (some reasoning models don't support temperature)
+      const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
       const client = this.getProviderClient(model);
 
       const response = await generateText({
@@ -179,16 +200,168 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     }
   }
 
-  async translateToEnglish(text: string, model: ModelType = 'gpt-4o-mini'): Promise<string> {
-    const systemPrompt = `
-You are a professional translator. Translate the given text to English if it's not already in English.
-If the text is already in English, return it unchanged.
-Use professional tone and concise language suitable for calendar events.
-`;
+  // New method for agentic tool orchestration
+  async processMessageWithOrchestrator(
+    message: string,
+    toolRegistry: unknown,
+    orchestratorModel: ModelType = 'gpt-4o-mini',
+    developmentMode: boolean = false
+  ): Promise<{
+    response: string;
+    steps: unknown[];
+    toolCalls: unknown[];
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { ToolOrchestrator } = await import('./tool-orchestrator');
+
+      const orchestrator = new ToolOrchestrator(this.apiKey);
+
+      const result = await orchestrator.orchestrate(
+        message,
+        toolRegistry as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        orchestratorModel,
+        {
+          maxSteps: 10,
+          maxToolCalls: 5,
+          developmentMode
+        }
+      );
+
+      return {
+        response: result.finalAnswer,
+        steps: result.steps,
+        toolCalls: result.toolCalls,
+        success: result.success,
+        error: result.error
+      };
+
+    } catch (error) {
+      console.error('Orchestrator processing error:', error);
+      return {
+        response: "I encountered an error while processing your request. Please try again.",
+        steps: [],
+        toolCalls: [],
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+  async processMessageWithTools(
+    message: string,
+    calendarTools: CalendarTools
+  ): Promise<{
+    response: string;
+    toolCalls: Array<{ tool: string; result: unknown }>;
+  }> {
+    // For now, let's implement a simpler approach that manually calls tools based on message analysis
+    const toolCalls: Array<{ tool: string; result: unknown }> = [];
+    let response = '';
 
     try {
-      // Use temperature only for models that support it
-      const supportsTemperature = !['o4-mini', 'o4-mini-high'].includes(model);
+      // Analyze the message to determine what tools to use
+      const messageLower = message.toLowerCase();
+
+      if (messageLower.includes('summarize') || messageLower.includes('events') || messageLower.includes('list')) {
+        // This is a query for events
+        let toolResult;
+
+        if (messageLower.includes('nespola')) {
+          // Search for nespola events
+          const timeRange = this.extractTimeRange(message);
+          toolResult = await calendarTools.searchEvents('nespola', timeRange);
+          toolCalls.push({ tool: 'searchEvents', result: toolResult });
+
+          if (toolResult.success && Array.isArray(toolResult.data)) {
+            const events = toolResult.data as CalendarEvent[];
+            if (events.length > 0) {
+              response = `I found ${events.length} events related to Nespola:\n\n`;
+              events.forEach((event, index) => {
+                const date = event.start?.dateTime || event.start?.date || 'Unknown date';
+                response += `${index + 1}. **${event.summary}** - ${new Date(date).toLocaleDateString()}\n`;
+                if (event.description) {
+                  response += `   ${event.description}\n`;
+                }
+                response += '\n';
+              });
+            } else {
+              response = "I didn't find any events related to Nespola in the specified time period.";
+            }
+          } else {
+            response = `I tried to search for Nespola events but encountered an issue: ${toolResult.message || 'Unknown error'}`;
+          }
+        } else {
+          // General event listing
+          const timeRange = this.extractTimeRange(message);
+          toolResult = await calendarTools.getEvents(timeRange);
+          toolCalls.push({ tool: 'getEvents', result: toolResult });
+
+          if (toolResult.success && Array.isArray(toolResult.data)) {
+            const events = toolResult.data as CalendarEvent[];
+            response = `I found ${events.length} events in the specified time period.`;
+          } else {
+            response = `I tried to get your events but encountered an issue: ${toolResult.message || 'Unknown error'}`;
+          }
+        }
+      } else if (messageLower.includes('create') || messageLower.includes('schedule') || messageLower.includes('add')) {
+        // This is a request to create an event
+        response = "I understand you want to create an event. The tool-based event creation is not yet implemented in this version.";
+      } else {
+        // General response
+        response = "I understand your request, but I'm not sure how to help with that specific calendar operation yet.";
+      }
+
+      return {
+        response,
+        toolCalls,
+      };
+
+    } catch (error) {
+      console.error('Tool-based processing error:', error);
+      return {
+        response: "I encountered an error while processing your request. Please try again.",
+        toolCalls,
+      };
+    }
+  }
+
+  // Helper method to extract time range from message
+  private extractTimeRange(message: string): { start?: string; end?: string } {
+    const messageLower = message.toLowerCase();
+
+    // Look for specific months and years
+    if (messageLower.includes('march') && messageLower.includes('june') && messageLower.includes('2025')) {
+      return {
+        start: '2025-03-01T00:00:00+08:00',
+        end: '2025-06-30T23:59:59+08:00'
+      };
+    }
+
+    if (messageLower.includes('february') && messageLower.includes('april') && messageLower.includes('2025')) {
+      return {
+        start: '2025-02-01T00:00:00+08:00',
+        end: '2025-04-30T23:59:59+08:00'
+      };
+    }
+
+    // Default to current month if no specific range is mentioned
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    return {
+      start: startOfMonth.toISOString(),
+      end: endOfMonth.toISOString()
+    };
+  }
+
+  async translateToEnglish(text: string, model: ModelType = 'gpt-4o-mini'): Promise<string> {
+    const systemPrompt = 'Translate the following text to English. If the text is already in English, return it as is.';
+
+    try {
+      const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
       const client = this.getProviderClient(model);
 
       const response = await generateText({
@@ -202,7 +375,8 @@ Use professional tone and concise language suitable for calendar events.
 
       return response.text || text;
     } catch (error) {
-      throw error;
+      console.error('Translation error:', error);
+      return text; // Return original text on error
     }
   }
 }

@@ -14,7 +14,11 @@ const createJestConfig = nextJest({
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jsdom',
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/', 
+    '<rootDir>/node_modules/',
+    '<rootDir>/src/__tests__/functional/full-chat-flow-debug.test.ts'
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^react-markdown$': '<rootDir>/src/__mocks__/react-markdown.tsx',

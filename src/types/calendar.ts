@@ -41,6 +41,19 @@ export interface EventList {
   timeMax?: string;
 }
 
+// Simplified event interface for AI processing - contains only essential data
+export interface SimplifiedEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startDate: string; // ISO date string
+  endDate: string; // ISO date string
+  isAllDay: boolean;
+  location?: string;
+  attendeeCount?: number;
+  status: 'confirmed' | 'tentative' | 'cancelled';
+}
+
 // Chat/AI types
 export interface ChatMessage {
   id: string;

@@ -3,10 +3,489 @@
   themes: all;
 }
 
+/* Ensure good contrast for all themes */
+:root {
+  --text-high-contrast: oklch(15% 0 0);
+  --text-medium-contrast: oklch(40% 0 0);
+  --text-low-contrast: oklch(60% 0 0);
+  --bg-subtle: oklch(98% 0 0);
+  --bg-muted: oklch(95% 0 0);
+  --border-subtle: oklch(90% 0 0);
+}
+
+[data-theme="dark"],
+[data-theme="business"],
+[data-theme="black"],
+[data-theme="night"],
+[data-theme="coffee"],
+[data-theme="dracula"],
+[data-theme="synthwave"],
+[data-theme="halloween"],
+[data-theme="forest"] {
+  --text-high-contrast: oklch(95% 0 0);
+  --text-medium-contrast: oklch(80% 0 0);
+  --text-low-contrast: oklch(65% 0 0);
+  --bg-subtle: oklch(15% 0 0);
+  --bg-muted: oklch(20% 0 0);
+  --border-subtle: oklch(30% 0 0);
+}
+
+/* Enhanced text contrast classes */
+.text-high-contrast {
+  color: var(--text-high-contrast);
+}
+
+.text-medium-contrast {
+  color: var(--text-medium-contrast);
+}
+
+.text-low-contrast {
+  color: var(--text-low-contrast);
+}
+
+.bg-subtle {
+  background-color: var(--bg-subtle);
+}
+
+.bg-muted {
+  background-color: var(--bg-muted);
+}
+
+.border-subtle {
+  border-color: var(--border-subtle);
+}
+
+/* Enhanced chat bubble styles with outlined boxes */
+.chat-bubble {
+  --tw-text-opacity: 1;
+  color: hsl(var(--bc) / var(--tw-text-opacity));
+  border: 2px solid transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.chat-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.chat-bubble-primary {
+  color: hsl(var(--pc));
+  background: linear-gradient(135deg, hsl(var(--p)) 0%, hsl(var(--p) / 0.9) 100%);
+  border-color: hsl(var(--p) / 0.3);
+}
+
+.chat-bubble-accent {
+  color: hsl(var(--ac));
+  background: linear-gradient(135deg, hsl(var(--a)) 0%, hsl(var(--a) / 0.9) 100%);
+  border-color: hsl(var(--a) / 0.3);
+}
+
+.chat-bubble-error {
+  color: hsl(var(--erc));
+  background: linear-gradient(135deg, hsl(var(--er)) 0%, hsl(var(--er) / 0.9) 100%);
+  border-color: hsl(var(--er) / 0.3);
+}
+
+/* Dark theme adjustments for chat bubbles */
+[data-theme="dark"] .chat-bubble,
+[data-theme="business"] .chat-bubble,
+[data-theme="black"] .chat-bubble,
+[data-theme="night"] .chat-bubble,
+[data-theme="coffee"] .chat-bubble,
+[data-theme="dracula"] .chat-bubble,
+[data-theme="synthwave"] .chat-bubble,
+[data-theme="halloween"] .chat-bubble,
+[data-theme="forest"] .chat-bubble {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .chat-bubble:hover,
+[data-theme="business"] .chat-bubble:hover,
+[data-theme="black"] .chat-bubble:hover,
+[data-theme="night"] .chat-bubble:hover,
+[data-theme="coffee"] .chat-bubble:hover,
+[data-theme="dracula"] .chat-bubble:hover,
+[data-theme="synthwave"] .chat-bubble:hover,
+[data-theme="halloween"] .chat-bubble:hover,
+[data-theme="forest"] .chat-bubble:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Enhanced step display with modern card design */
+.step-container {
+  background: linear-gradient(135deg, hsl(var(--b1)) 0%, hsl(var(--b2) / 0.5) 100%);
+  border: 1px solid hsl(var(--b3));
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--bc));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.step-container:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.step-badge {
+  background: linear-gradient(135deg, hsl(var(--p)) 0%, hsl(var(--p) / 0.8) 100%);
+  color: hsl(var(--pc));
+  border-radius: 9999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid hsl(var(--p) / 0.3);
+}
+
+/* Enhanced event card design */
+.event-card {
+  background: linear-gradient(135deg, hsl(var(--b1)) 0%, hsl(var(--b2) / 0.3) 100%);
+  border: 1px solid hsl(var(--b3));
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  color: hsl(var(--bc));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.event-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.event-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(135deg, hsl(var(--p)) 0%, hsl(var(--a)) 100%);
+}
+
+.event-card-description {
+  background: linear-gradient(135deg, hsl(var(--b2)) 0%, hsl(var(--b3) / 0.3) 100%);
+  color: hsl(var(--bc) / 0.9);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  border: 1px solid hsl(var(--b3) / 0.5);
+}
+
+/* Dark theme adjustments for enhanced cards */
+[data-theme="dark"] .step-container,
+[data-theme="business"] .step-container,
+[data-theme="black"] .step-container,
+[data-theme="night"] .step-container,
+[data-theme="coffee"] .step-container,
+[data-theme="dracula"] .step-container,
+[data-theme="synthwave"] .step-container,
+[data-theme="halloween"] .step-container,
+[data-theme="forest"] .step-container {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .step-container:hover,
+[data-theme="business"] .step-container:hover,
+[data-theme="black"] .step-container:hover,
+[data-theme="night"] .step-container:hover,
+[data-theme="coffee"] .step-container:hover,
+[data-theme="dracula"] .step-container:hover,
+[data-theme="synthwave"] .step-container:hover,
+[data-theme="halloween"] .step-container:hover,
+[data-theme="forest"] .step-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .event-card,
+[data-theme="business"] .event-card,
+[data-theme="black"] .event-card,
+[data-theme="night"] .event-card,
+[data-theme="coffee"] .event-card,
+[data-theme="dracula"] .event-card,
+[data-theme="synthwave"] .event-card,
+[data-theme="halloween"] .event-card,
+[data-theme="forest"] .event-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .event-card:hover,
+[data-theme="business"] .event-card:hover,
+[data-theme="black"] .event-card:hover,
+[data-theme="night"] .event-card:hover,
+[data-theme="coffee"] .event-card:hover,
+[data-theme="dracula"] .event-card:hover,
+[data-theme="synthwave"] .event-card:hover,
+[data-theme="halloween"] .event-card:hover,
+[data-theme="forest"] .event-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced prose styling for chat bubbles with modern design */
+.prose {
+  color: inherit;
+  max-width: none;
+  line-height: 1.6;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: inherit;
+  font-weight: 700;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.prose h1 {
+  font-size: 1.5em;
+  border-bottom: 2px solid currentColor;
+  border-bottom-color: rgba(156, 163, 175, 0.2);
+  padding-bottom: 0.3em;
+  margin-bottom: 0.8em;
+}
+
+.prose h2 {
+  font-size: 1.25em;
+  border-bottom: 1px solid currentColor;
+  border-bottom-color: rgba(156, 163, 175, 0.15);
+  padding-bottom: 0.2em;
+  margin-bottom: 0.6em;
+}
+
+.prose h3 {
+  font-size: 1.125em;
+  margin-bottom: 0.5em;
+}
+
+.prose h4, .prose h5, .prose h6 {
+  font-size: 1em;
+  margin-bottom: 0.4em;
+}
+
+.prose p {
+  color: inherit;
+  margin-top: 0;
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose ul, .prose ol {
+  color: inherit;
+  margin-top: 0.5em;
+  margin-bottom: 0.75em;
+  padding-left: 1.5em;
+}
+
+.prose ul {
+  list-style-type: none;
+}
+
+.prose ul li {
+  position: relative;
+  margin-top: 0.375em;
+  margin-bottom: 0.375em;
+  padding-left: 0.5em;
+}
+
+.prose ul li::before {
+  content: '•';
+  color: hsl(var(--p));
+  font-weight: bold;
+  position: absolute;
+  left: -1em;
+  top: 0;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.prose ol li {
+  margin-top: 0.375em;
+  margin-bottom: 0.375em;
+  padding-left: 0.25em;
+}
+
+.prose li {
+  line-height: 1.5;
+}
+
+.prose strong {
+  color: inherit;
+  font-weight: 700;
+  background: linear-gradient(135deg, transparent 0%, currentColor 0%, currentColor 100%, transparent 100%);
+  background-size: 100% 0.1em;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-clip: padding-box;
+  padding-bottom: 0.05em;
+}
+
+.prose em {
+  color: inherit;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.prose code {
+  color: inherit;
+  background: linear-gradient(135deg, hsl(var(--p) / 0.1) 0%, hsl(var(--a) / 0.1) 100%);
+  padding: 0.125em 0.375em;
+  border-radius: 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-size: 0.875em;
+  font-weight: 500;
+  border: 1px solid hsl(var(--p) / 0.15);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Dark theme adjustments for prose code */
+[data-theme="dark"] .prose code,
+[data-theme="business"] .prose code,
+[data-theme="black"] .prose code,
+[data-theme="night"] .prose code,
+[data-theme="coffee"] .prose code,
+[data-theme="dracula"] .prose code,
+[data-theme="synthwave"] .prose code,
+[data-theme="halloween"] .prose code,
+[data-theme="forest"] .prose code {
+  background: linear-gradient(135deg, hsl(var(--p) / 0.15) 0%, hsl(var(--a) / 0.15) 100%);
+  border-color: hsl(var(--p) / 0.25);
+}
+
+.prose pre {
+  color: inherit;
+  background: linear-gradient(135deg, hsl(var(--b2)) 0%, hsl(var(--b3) / 0.3) 100%);
+  padding: 1em;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-size: 0.875em;
+  line-height: 1.5;
+  border: 1px solid hsl(var(--b3));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .prose pre,
+[data-theme="business"] .prose pre,
+[data-theme="black"] .prose pre,
+[data-theme="night"] .prose pre,
+[data-theme="coffee"] .prose pre,
+[data-theme="dracula"] .prose pre,
+[data-theme="synthwave"] .prose pre,
+[data-theme="halloween"] .prose pre,
+[data-theme="forest"] .prose pre {
+  background: linear-gradient(135deg, hsl(var(--b3)) 0%, hsl(var(--b2) / 0.3) 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+  border: none;
+  box-shadow: none;
+}
+
+.prose blockquote {
+  color: inherit;
+  opacity: 0.9;
+  border-left: 0.25rem solid hsl(var(--p));
+  border-left-color: hsl(var(--p) / 0.4);
+  padding-left: 1.25em;
+  font-style: italic;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  background: linear-gradient(90deg, hsl(var(--p) / 0.05) 0%, transparent 100%);
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.prose a {
+  color: hsl(var(--p));
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid hsl(var(--p) / 0.3);
+  transition: all 0.2s ease;
+}
+
+.prose a:hover {
+  border-bottom-color: hsl(var(--p));
+  background: linear-gradient(135deg, hsl(var(--p) / 0.1) 0%, hsl(var(--a) / 0.1) 100%);
+  padding: 0 0.25em;
+  margin: 0 -0.25em;
+  border-radius: 0.25rem;
+}
+
+.prose table {
+  width: 100%;
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  border-collapse: collapse;
+  font-size: 0.875em;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.prose th,
+.prose td {
+  border: 1px solid hsl(var(--b3) / 0.5);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+
+.prose th {
+  background: linear-gradient(135deg, hsl(var(--b2)) 0%, hsl(var(--b3) / 0.3) 100%);
+  font-weight: 600;
+  color: hsl(var(--bc));
+}
+
+.prose tr:nth-child(even) td {
+  background: hsl(var(--b1) / 0.5);
+}
+
+[data-theme="dark"] .prose th,
+[data-theme="business"] .prose th,
+[data-theme="black"] .prose th,
+[data-theme="night"] .prose th,
+[data-theme="coffee"] .prose th,
+[data-theme="dracula"] .prose th,
+[data-theme="synthwave"] .prose th,
+[data-theme="halloween"] .prose th,
+[data-theme="forest"] .prose th {
+  background: linear-gradient(135deg, hsl(var(--b3)) 0%, hsl(var(--b2) / 0.3) 100%);
+}
+
+.prose hr {
+  border: none;
+  border-top: 2px solid hsl(var(--b3) / 0.5);
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+  border-radius: 1px;
+}
+
 /* Basic markdown styling */
 .markdown-content h1, .markdown-content h2, .markdown-content h3 {
   font-weight: bold;
   margin-bottom: 0.5em;
+  color: hsl(var(--bc));
 }
 
 .markdown-content h1 {
@@ -23,23 +502,28 @@
 
 .markdown-content p {
   margin-bottom: 0.5em;
+  color: hsl(var(--bc) / 0.9);
 }
 
 .markdown-content ul, .markdown-content ol {
   margin-left: 1em;
   margin-bottom: 0.5em;
+  color: hsl(var(--bc) / 0.9);
 }
 
 .markdown-content strong {
   font-weight: bold;
+  color: hsl(var(--bc));
 }
 
 .markdown-content em {
   font-style: italic;
+  color: hsl(var(--bc) / 0.9);
 }
 
 .markdown-content code {
   background-color: hsl(var(--b2));
+  color: hsl(var(--bc));
   padding: 0.125em 0.25em;
   border-radius: 0.25em;
   font-family: monospace;
@@ -48,6 +532,7 @@
 
 .markdown-content pre {
   background-color: hsl(var(--b2));
+  color: hsl(var(--bc));
   padding: 0.5em;
   border-radius: 0.25em;
   overflow-x: auto;
@@ -59,6 +544,7 @@
   padding-left: 1em;
   margin-left: 0;
   font-style: italic;
+  color: hsl(var(--bc) / 0.8);
 }
 
 /* Fix for drawer on mobile */
@@ -86,4 +572,133 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--bc) / 0.5);
+}
+
+/* Animation for step progression */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 15px currentColor, 0 0 25px currentColor;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.4s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.line-clamp-4 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+/* Enhanced glass morphism effects */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-effect-dark {
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* Enhanced interactive elements */
+.interactive-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.interactive-card:active {
+  transform: translateY(-1px) scale(0.99);
+  transition: all 0.1s ease;
+}
+
+/* Enhanced focus states */
+.focus-ring {
+  transition: all 0.2s ease;
+}
+
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--b1)), 0 0 0 4px hsl(var(--p));
+}
+
+/* Typography enhancements */
+.text-gradient {
+  background: linear-gradient(135deg, hsl(var(--p)) 0%, hsl(var(--a)) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }

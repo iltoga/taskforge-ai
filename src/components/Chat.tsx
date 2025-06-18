@@ -8,6 +8,7 @@ import rehypeRaw from 'rehype-raw';
 import { ModelType } from '../config/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ModelSelector } from './ModelSelector';
+import { OrchestratorModelSelector } from './OrchestratorModelSelector';
 
 interface ChatMessage {
   id: string;
@@ -15,49 +16,32 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   data?: CalendarEvent | CalendarEvent[];
+  toolCalls?: Array<{ tool: string; result: unknown }>;
+  steps?: Array<{ id: string; type: string; content: string; reasoning?: string }>;
+  approach?: 'legacy' | 'tools' | 'agentic';
 }
 
-// Utility function to detect and render formatted text (HTML/Markdown)
-function FormattedText({ content }: { content: string }) {
-  // Detect if content contains HTML tags
-  const hasHTMLTags = /<[^>]*>/g.test(content);
-
-  // Detect if content contains common Markdown patterns
-  const hasMarkdownPatterns = /[*_#`[\]]/g.test(content) || /^\s*[>\-+*]\s/m.test(content);
-
-  if (hasHTMLTags) {
-    // Render as HTML with react-markdown
-    return (
-      <div className="text-xs markdown-content">
-        <ReactMarkdown
-          rehypePlugins={[rehypeRaw]}
-        >
-          {content}
-        </ReactMarkdown>
-      </div>
-    );
-  } else if (hasMarkdownPatterns) {
-    // Render as Markdown
-    return (
-      <div className="text-xs markdown-content">
-        <ReactMarkdown>
-          {content}
-        </ReactMarkdown>
-      </div>
-    );
-  } else {
-    // Render as plain text with line breaks preserved
-    return <div className="whitespace-pre-wrap">{content}</div>;
+// Utility function to safely stringify unknown values
+function safeStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
   }
 }
 
 export function Chat() {
   const { data: session, status } = useSession();
-  const { addAPILog } = useDevelopment();
+  const { addAPILog, isDevelopmentMode } = useDevelopment();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<string>('');
+  const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
   const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4o-mini');
+  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4o-mini');
+  const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
+  const [useAgenticMode, setUseAgenticMode] = useState(true); // Default to ON for best performance
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +58,20 @@ export function Chat() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setCurrentSteps([]);
+
+    // Show progressive status updates for agentic mode
+    if (useAgenticMode && useToolsMode) {
+      setLoadingStatus('🤖 Initializing agentic orchestrator...');
+      setTimeout(() => setLoadingStatus('🔍 Analyzing your request...'), 500);
+      setTimeout(() => setLoadingStatus('🛠️ Planning tool usage...'), 1500);
+      setTimeout(() => setLoadingStatus('📊 Executing tools...'), 3000);
+      setTimeout(() => setLoadingStatus('🧠 Synthesizing response...'), 5000);
+    } else if (useToolsMode) {
+      setLoadingStatus('🔧 Processing with calendar tools...');
+    } else {
+      setLoadingStatus('💬 Processing your message...');
+    }
 
     const startTime = Date.now();
 
@@ -86,6 +84,9 @@ export function Chat() {
         payload: {
           message: userMessage.content,
           model: selectedModel,
+          useTools: useToolsMode,
+          orchestratorModel: orchestratorModel,
+          developmentMode: useAgenticMode,
         },
       });
 
@@ -96,7 +97,10 @@ export function Chat() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          model: selectedModel, // Include selected model
+          model: selectedModel,
+          useTools: useToolsMode,
+          orchestratorModel: orchestratorModel,
+          developmentMode: useAgenticMode,
         }),
       });
 
@@ -114,8 +118,30 @@ export function Chat() {
 
       // Handle different response scenarios
       let assistantContent = '';
+      let receivedSteps: Array<{ id: string; type: string; content: string; reasoning?: string }> = [];
+
       if (result.success) {
         assistantContent = result.message;
+
+        // If we have steps (agentic mode), show them progressively
+        if (result.steps && Array.isArray(result.steps)) {
+          receivedSteps = result.steps;
+
+          // Clear loading status and show steps one by one
+          setLoadingStatus('');
+
+          // Animate steps appearance
+          receivedSteps.forEach((step, index) => {
+            setTimeout(() => {
+              setCurrentSteps(prev => [...prev, step]);
+            }, index * 800); // Show each step with 800ms delay
+          });
+
+          // Clear steps after showing the final response
+          setTimeout(() => {
+            setCurrentSteps([]);
+          }, receivedSteps.length * 800 + 2000);
+        }
       } else {
         // Show detailed error message from API
         assistantContent = result.error || 'An unknown error occurred';
@@ -142,6 +168,9 @@ export function Chat() {
         content: assistantContent,
         timestamp: new Date(),
         data: result.data,
+        toolCalls: result.toolCalls,
+        steps: result.steps,
+        approach: result.approach,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -167,6 +196,8 @@ export function Chat() {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setLoadingStatus('');
+      // Don't clear currentSteps here - let them finish their animation
     }
   };
 
@@ -181,8 +212,8 @@ export function Chat() {
   if (status === 'unauthenticated') {
     return (
       <div className="text-center p-8">
-        <h2 className="text-2xl font-semibold mb-4">Please Sign In</h2>
-        <p className="text-gray-600">You need to be authenticated to use CalendarGPT.</p>
+        <h2 className="text-2xl font-semibold mb-4 text-high-contrast">Please Sign In</h2>
+        <p className="text-medium-contrast">You need to be authenticated to use CalendarGPT.</p>
       </div>
     );
   }
@@ -203,15 +234,21 @@ export function Chat() {
                 </div>
               </div>
             </div>
-            <h1 className="text-3xl font-bold mb-2">Welcome to CalendarGPT</h1>
-            <p className="text-gray-600 mb-4">
-              I&apos;m your friendly, professional assistant for calendar management.
+            <h1 className="text-3xl font-bold mb-2 text-high-contrast">Welcome to CalendarGPT</h1>
+            <p className="text-medium-contrast mb-4">
+              I&apos;m your AI assistant with full access to your Google Calendar.
             </p>
-            <div className="text-sm text-gray-500 space-y-1">
+            <div className="text-sm text-medium-contrast space-y-1 mb-4">
               <p>Try asking me to:</p>
+              <p>• &quot;Summarize all events for nespola between March and June 2025&quot;</p>
               <p>• &quot;Create a meeting tomorrow at 2 PM&quot;</p>
               <p>• &quot;Show me my events for next week&quot;</p>
               <p>• &quot;Create daily report for TechCorp: worked on API integration&quot;</p>
+            </div>
+            <div className="text-xs text-info bg-info/10 p-3 rounded-lg border border-info/20">
+              <p><strong>💡 Pro Tip:</strong> Keep &quot;Calendar Tools&quot; enabled for full functionality!</p>
+              <p>• <strong>Calendar Tools:</strong> Gives me access to read/write your calendar</p>
+              <p>• <strong>Agentic Mode:</strong> Enables multi-step reasoning for complex tasks</p>
             </div>
           </div>
         </div>
@@ -266,66 +303,177 @@ export function Chat() {
                   <span className="font-semibold">Error</span>
                 </div>
               )}
-              {message.content}
+
+              {/* Render message content */}
+              {message.type === 'user' ? (
+                // User messages as plain text
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              ) : (
+                // Assistant messages as markdown with prose styling
+                <div className="prose prose-sm max-w-none prose-invert">
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
+              )}
+
+              {/* Display orchestration steps if available (agentic mode) - only in dev mode */}
+              {isDevelopmentMode && message.steps && message.steps.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    🤖 <span>AI Reasoning Steps</span>
+                  </div>
+                  {message.steps.map((step, index) => (
+                    <div key={index} className="step-container">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`step-badge ${
+                          step.type === 'analysis' ? 'badge-info' :
+                          step.type === 'tool_call' ? 'badge-primary' :
+                          step.type === 'evaluation' ? 'badge-warning' :
+                          'badge-success'
+                        }`}>
+                          {step.type}
+                        </span>
+                        <span className="font-mono text-xs opacity-60">{step.id}</span>
+                      </div>
+                      <div className="mb-2 text-sm leading-relaxed">{step.content}</div>
+                      {step.reasoning && (
+                        <div className="text-xs opacity-70 italic bg-base-200/30 p-2 rounded-lg border-l-2 border-primary/30">
+                          💭 {step.reasoning}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Display tool calls if available (tool mode) - only in dev mode */}
+              {isDevelopmentMode && message.toolCalls && message.toolCalls.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    🔧 <span>Tool Calls</span>
+                  </div>
+                  {message.toolCalls.map((toolCall, index) => (
+                    <div key={index} className="step-container">
+                      <div className="text-sm mb-2">
+                        <span className="font-mono text-primary font-semibold bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
+                          {toolCall.tool}
+                        </span>
+                      </div>
+                      {toolCall.result !== undefined && (
+                        <div className="mockup-code text-xs rounded-lg overflow-hidden border border-base-300">
+                          <pre className="p-3"><code>{safeStringify(toolCall.result)}</code></pre>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Display approach indicator - only in dev mode */}
+              {isDevelopmentMode && message.approach && (
+                <div className="mt-2">
+                  <span className={`badge badge-xs ${
+                    message.approach === 'agentic' ? 'badge-accent' :
+                    message.approach === 'tools' ? 'badge-primary' :
+                    'badge-neutral'
+                  }`}>
+                    {message.approach === 'agentic' ? 'Agentic Mode' :
+                     message.approach === 'tools' ? 'Tool Mode' :
+                     'Legacy Mode'}
+                  </span>
+                </div>
+              )}
 
               {/* Display event data if available */}
               {message.data && Array.isArray(message.data) && message.data.length > 0 && (
-                <div className="mt-2 space-y-2">
+                <div className="mt-4 space-y-3">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    📅 <span>Calendar Events</span>
+                  </div>
                   {message.data.map((event: CalendarEvent) => (
-                    <div key={event.id} className="bg-base-100 p-3 rounded text-sm border border-base-300">
-                      <div className="font-semibold text-base mb-1">{event.summary}</div>
+                    <div key={event.id} className="event-card">
+                      <div className="font-semibold text-high-contrast mb-2 text-base">{event.summary}</div>
 
                       {/* Date and Time */}
-                      <div className="text-xs text-base-content/70 mb-2">
+                      <div className="text-sm text-medium-contrast mb-3 space-y-1">
                         {event.start?.dateTime ? (
                           <>
-                            <div>📅 {new Date(event.start.dateTime).toLocaleDateString('en-GB')}</div>
-                            <div>🕐 {new Date(event.start.dateTime).toLocaleTimeString('en-GB', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: false
-                            })}{event.end?.dateTime ? ` - ${new Date(event.end.dateTime).toLocaleTimeString('en-GB', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              hour12: false
-                            })}` : ''}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-primary">📅</span>
+                              <span>{new Date(event.start.dateTime).toLocaleDateString('en-GB', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-primary">🕐</span>
+                              <span>{new Date(event.start.dateTime).toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false
+                              })}{event.end?.dateTime ? ` - ${new Date(event.end.dateTime).toLocaleTimeString('en-GB', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false
+                              })}` : ''}</span>
+                            </div>
                           </>
                         ) : event.start?.date ? (
-                          <div>📅 All day - {new Date(event.start.date).toLocaleDateString('en-GB')}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-primary">📅</span>
+                            <span>All day - {new Date(event.start.date).toLocaleDateString('en-GB', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}</span>
+                          </div>
                         ) : null}
                       </div>
 
                       {/* Description */}
                       {event.description && (
-                        <div className="text-xs text-base-content/80 mb-2 p-2 bg-base-200 rounded">
-                          <div className="font-semibold mb-1">Description:</div>
-                          <FormattedText content={event.description} />
+                        <div className="event-card-description">
+                          <div className="font-semibold mb-2 text-sm flex items-center gap-2">
+                            <span className="text-primary">📄</span>
+                            <span>Description</span>
+                          </div>
+                          <div className="prose prose-sm max-w-none prose-invert">
+                            <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                              {event.description}
+                            </ReactMarkdown>
+                          </div>
                         </div>
                       )}
 
                       {/* Location */}
                       {event.location && (
-                        <div className="text-xs text-base-content/70 mb-1">
-                          📍 {event.location}
+                        <div className="text-sm text-medium-contrast mb-2 flex items-center gap-2">
+                          <span className="text-primary">📍</span>
+                          <span>{event.location}</span>
                         </div>
                       )}
 
                       {/* Attendees */}
                       {event.attendees && event.attendees.length > 0 && (
-                        <div className="text-xs text-base-content/70 mb-1">
-                          👥 {event.attendees.length} attendee{event.attendees.length > 1 ? 's' : ''}
+                        <div className="text-sm text-medium-contrast mb-2 flex items-center gap-2">
+                          <span className="text-primary">👥</span>
+                          <span>{event.attendees.length} attendee{event.attendees.length > 1 ? 's' : ''}</span>
                         </div>
                       )}
 
                       {/* Status */}
                       {event.status && (
-                        <div className="text-xs">
-                          <span className={`badge badge-xs ${
+                        <div className="mt-3">
+                          <span className={`badge badge-sm font-medium ${
                             event.status === 'confirmed' ? 'badge-success' :
                             event.status === 'tentative' ? 'badge-warning' :
                             'badge-neutral'
                           }`}>
-                            {event.status}
+                            {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
                           </span>
                         </div>
                       )}
@@ -345,7 +493,46 @@ export function Chat() {
               </div>
             </div>
             <div className="chat-bubble chat-bubble-accent">
-              <span className="loading loading-dots loading-sm"></span>
+              <div className="flex items-center gap-2">
+                <span className="loading loading-dots loading-sm"></span>
+                {loadingStatus && <span className="text-sm">{loadingStatus}</span>}
+              </div>
+
+              {/* Show progressive steps during processing - only in dev mode */}
+              {isDevelopmentMode && currentSteps.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    🔄 <span>Processing Steps</span>
+                  </div>
+                  {currentSteps.map((step, index) => (
+                    <div
+                      key={step.id}
+                      className="step-container animate-fade-in"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`step-badge ${
+                          step.type === 'analysis' ? 'badge-info' :
+                          step.type === 'tool_call' ? 'badge-primary' :
+                          step.type === 'evaluation' ? 'badge-warning' :
+                          'badge-success'
+                        }`}>
+                          {step.type}
+                        </span>
+                        <span className="font-mono text-xs opacity-60">{step.id}</span>
+                      </div>
+                      <div className="mb-2 line-clamp-3 text-sm leading-relaxed">
+                        {step.content.substring(0, 200)}...
+                      </div>
+                      {step.reasoning && (
+                        <div className="text-xs opacity-70 italic bg-base-200/30 p-2 rounded-lg border-l-2 border-primary/30">
+                          💭 {step.reasoning}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -353,13 +540,65 @@ export function Chat() {
 
       {/* Input Form */}
       <div className="p-4 border-t">
-        {/* Model Selector */}
-        <div className="flex justify-between items-center mb-3">
-          <span className="text-sm text-base-content/70">AI Model:</span>
-          <ModelSelector
-            selectedModel={selectedModel}
-            onModelChange={setSelectedModel}
-          />
+        {/* Model Selector and Mode Toggles */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+          {/* Chat Model */}
+          <div className="flex flex-col gap-2">
+            <span className="text-sm text-base-content/70">Chat AI Model:</span>
+            <ModelSelector
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+            />
+          </div>
+
+          {/* Orchestrator Model (shown when tools are enabled) */}
+          {useToolsMode && (
+            <div className="flex flex-col gap-2">
+              <OrchestratorModelSelector
+                selectedModel={orchestratorModel}
+                onModelChange={setOrchestratorModel}
+                disabled={!useToolsMode}
+              />
+            </div>
+          )}
+
+          {/* Mode Controls */}
+          <div className="flex flex-col gap-3">
+            {/* Tool Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-base-content/70">Calendar Tools:</span>
+              <input
+                type="checkbox"
+                className="toggle toggle-primary toggle-sm"
+                checked={useToolsMode}
+                onChange={(e) => {
+                  setUseToolsMode(e.target.checked);
+                  if (!e.target.checked) {
+                    setUseAgenticMode(false); // Disable agentic mode if tools are disabled
+                  }
+                }}
+              />
+              <span className={`text-xs ${useToolsMode ? 'text-success' : 'text-warning'}`}>
+                {useToolsMode ? 'CALENDAR ACCESS' : 'NO CALENDAR'}
+              </span>
+            </div>
+
+            {/* Agentic Mode Toggle (only shown when tools are enabled) */}
+            {useToolsMode && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-base-content/70">AI Mode:</span>
+                <input
+                  type="checkbox"
+                  className="toggle toggle-accent toggle-sm"
+                  checked={useAgenticMode}
+                  onChange={(e) => setUseAgenticMode(e.target.checked)}
+                />
+                <span className={`text-xs ${useAgenticMode ? 'text-accent' : 'text-base-content/50'}`}>
+                  {useAgenticMode ? 'AGENTIC' : 'SIMPLE'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <form onSubmit={sendMessage} className="flex gap-2">

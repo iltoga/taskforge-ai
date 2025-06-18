@@ -3,24 +3,29 @@ import { CalendarEvent } from '@/types/calendar';
 
 // Mock Vercel AI SDK
 jest.mock('@ai-sdk/openai', () => ({
-  openai: jest.fn(),
+  createOpenAI: jest.fn(),
 }));
 
 jest.mock('ai', () => ({
   generateText: jest.fn(),
+  tool: jest.fn(),
 }));
 
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 
-const mockOpenAI = jest.mocked(openai);
+const mockCreateOpenAI = jest.mocked(createOpenAI);
 const mockGenerateText = jest.mocked(generateText);
 
 describe('AIService', () => {
   let aiService: AIService;
 
   beforeEach(() => {
-    mockOpenAI.mockReturnValue({} as never);
+    // Mock the createOpenAI function to return a mock client
+    mockCreateOpenAI.mockReturnValue({
+      languageModel: jest.fn().mockReturnValue('mock-model'),
+    } as any);
+
     jest.clearAllMocks();
     aiService = new AIService('test-api-key');
   });
@@ -251,7 +256,7 @@ This week focused primarily on API development and code quality improvements. Su
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
-              content: expect.stringContaining('professional translator')
+              content: expect.stringContaining('Translate')
             })
           ])
         })

@@ -1,5 +1,6 @@
+import { ModelType } from '@/config/models';
 import { authOptions, createGoogleAuth } from '@/lib/auth';
-import { AIService, ModelType } from '@/services/ai-service';
+import { AIService } from '@/services/ai-service';
 import { CalendarService } from '@/services/calendar-service';
 import { ExtendedSession } from '@/types/auth';
 import { getServerSession } from 'next-auth';
@@ -12,6 +13,14 @@ export async function POST(request: Request) {
     if (!session?.accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Check for token refresh errors
+    if (session.error === 'RefreshAccessTokenError') {
+      return NextResponse.json(
+        { error: 'Google Calendar authentication expired. Please sign out and sign in again to refresh your permissions.' },
         { status: 401 }
       );
     }
@@ -31,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Initialize services
-    const googleAuth = createGoogleAuth(session.accessToken);
+    const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
     const aiService = new AIService(process.env.OPENAI_API_KEY!);
 
