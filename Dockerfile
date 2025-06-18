@@ -17,21 +17,9 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-
-# Copy configuration files first (less likely to change)
-COPY next.config.ts ./
-COPY tsconfig.json ./
-COPY postcss.config.mjs ./
-COPY eslint.config.mjs ./
-COPY jest.config.js ./
-COPY jest.setup.js ./
-
-# Copy static assets
+COPY . .
 COPY public ./public
 COPY prompts ./prompts
-
-# Copy source code last (most likely to change)
-COPY src ./src
 
 # Accept build arguments for Next.js public environment variables
 ARG NODE_ENV=production
