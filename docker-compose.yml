@@ -1,5 +1,5 @@
 services:
-    calendar-assistant:
+    calendar-gpt:
         build:
             context: .
             dockerfile: Dockerfile
@@ -8,8 +8,8 @@ services:
                 - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-https://calendar-assistant.revisbali.com}
                 - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://calendar-assistant.revisbali.com}
                 - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
-                - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-$(date +%s)}
-        container_name: calendar-assistant
+                - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-unknown}
+        container_name: calendar-gpt
         restart: unless-stopped
         ports:
             - '3000:3000'

@@ -77,3 +77,10 @@ logs
 # Temporary files
 tmp/
 temp/
+
+# Build artifacts
+build_timestamp.txt
+git_commit.txt
+
+# CI/CD specific files
+.github/

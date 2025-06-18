@@ -69,9 +69,9 @@ jobs:
             cd "$REPO_DIR"
             export DOCKER_BUILDKIT=1
 
-            # Clear Docker build cache to ensure fresh builds
-            echo "Pruning Docker builder cache..."
-            docker builder prune -f
+            # Get current git commit SHA
+            GIT_COMMIT_SHA=$(git rev-parse HEAD)
+            echo "Current git commit: $GIT_COMMIT_SHA"
 
             # Source environment variables if available
             if [ -f .env ]; then
@@ -81,30 +81,24 @@ jobs:
               echo "Warning: .env file not found"
             fi
 
-            # Build and restart services
-            echo "Building Docker image..."
-            docker compose build --no-cache --pull calendar-assistant
-            if [ $? -ne 0 ]; then
-              echo "❌ Docker build failed"
-              exit 1
-            fi
-            echo "Docker image built successfully"
-            # Stop and remove existing container if it exists
+            # Build with cache optimization and git commit for cache busting
+            echo "Building Docker image with smart caching..."
+            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-gpt
 
             echo "Stopping existing container..."
-            docker compose down calendar-assistant || true
+            docker compose down calendar-gpt || true
 
             echo "Starting new container..."
-            docker compose up -d calendar-assistant
+            docker compose up -d calendar-gpt
 
             # Verify deployment
             echo "Verifying deployment..."
             sleep 10
-            if docker compose ps calendar-assistant | grep -q "Up"; then
+            if docker compose ps calendar-gpt | grep -q "Up"; then
               echo "✅ Container is running successfully"
             else
               echo "❌ Container failed to start"
-              docker compose logs calendar-assistant
+              docker compose logs calendar-gpt
               exit 1
             fi
 
@@ -112,4 +106,4 @@ jobs:
             echo "Cleaning up Docker system..."
             docker system prune -af --volumes
 
-            echo "🚀 Deployment completed successfully!"
+            echo "🚀 Deployment of calendarGPT completed successfully!"

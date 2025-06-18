@@ -22,22 +22,99 @@ export function Reports() {
   const [report, setReport] = useState<WeeklyReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedWeek, setSelectedWeek] = useState<string>('');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
+  const [company, setCompany] = useState<string>('');
+
+  const getDateRange = (period: string): { startDate: string; endDate: string; label: string } => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let startDate: Date;
+    let endDate: Date;
+    let label: string;
+
+    switch (period) {
+      case 'current-week':
+        // Start of current week (Monday)
+        const currentDay = today.getDay();
+        const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - daysToMonday);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        label = 'Current Week';
+        break;
+
+      case 'last-week':
+        const lastWeekStart = new Date(today);
+        const lastWeekDay = today.getDay();
+        const daysToLastMonday = lastWeekDay === 0 ? 13 : lastWeekDay + 6;
+        lastWeekStart.setDate(today.getDate() - daysToLastMonday);
+        startDate = lastWeekStart;
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        label = 'Last Week';
+        break;
+
+      case 'last-month':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        label = 'Last Month';
+        break;
+
+      case 'last-two-months':
+        startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+        label = 'Last Two Months';
+        break;
+
+      case 'last-quarter':
+        const currentQuarter = Math.floor(today.getMonth() / 3);
+        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+        const lastQuarterYear = currentQuarter === 0 ? today.getFullYear() - 1 : today.getFullYear();
+        startDate = new Date(lastQuarterYear, lastQuarter * 3, 1);
+        endDate = new Date(lastQuarterYear, lastQuarter * 3 + 3, 0);
+        label = 'Last Quarter';
+        break;
+
+      default:
+        // Default to current week
+        const defaultDay = today.getDay();
+        const daysToDefaultMonday = defaultDay === 0 ? 6 : defaultDay - 1;
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - daysToDefaultMonday);
+        endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 6);
+        label = 'Current Week';
+    }
+
+    return {
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0],
+      label
+    };
+  };
 
   const generateReport = async () => {
-    if (!session) return;
+    if (!session || !company.trim()) {
+      setError('Please enter a company name');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
     try {
+      const { startDate, endDate } = getDateRange(selectedPeriod);
+
       const response = await fetch('/api/reports/weekly', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          weekOffset: selectedWeek ? parseInt(selectedWeek) : 0,
+          company: company.trim(),
+          startDate,
+          endDate,
         }),
       });
 
@@ -47,7 +124,7 @@ export function Reports() {
         throw new Error(data.error || 'Failed to generate report');
       }
 
-      setReport(data);
+      setReport(data.report);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate report');
     } finally {
@@ -58,7 +135,9 @@ export function Reports() {
   const downloadReport = () => {
     if (!report) return;
 
-    const reportText = `Weekly Work Report
+    const { label } = getDateRange(selectedPeriod);
+
+    const reportText = `Work Report - ${label}
 ${report.period}
 
 Summary:
@@ -79,7 +158,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `weekly-report-${report.period.replace(/ /g, '-')}.txt`;
+    a.download = `work-report-${company.toLowerCase().replace(/\s+/g, '-')}-${selectedPeriod}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -100,31 +179,46 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
         <div className="card-body">
           <h2 className="card-title text-2xl mb-4 flex items-center gap-2">
             <FileText className="w-6 h-6" />
-            Weekly Work Reports
+            Work Reports
           </h2>
 
-          <div className="form-control w-full max-w-xs mb-4">
-            <label className="label">
-              <span className="label-text">Select Week</span>
-            </label>
-            <select
-              className="select select-bordered"
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(e.target.value)}
-            >
-              <option value="0">Current Week</option>
-              <option value="-1">Last Week</option>
-              <option value="-2">2 Weeks Ago</option>
-              <option value="-3">3 Weeks Ago</option>
-              <option value="-4">4 Weeks Ago</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div className="form-control w-full">
+              <label className="label">
+                <span className="label-text">Company Name</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter company name"
+                className="input input-bordered w-full"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </div>
+
+            <div className="form-control w-full">
+              <label className="label">
+                <span className="label-text">Select Period</span>
+              </label>
+              <select
+                className="select select-bordered"
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+              >
+                <option value="current-week">Current Week</option>
+                <option value="last-week">Last Week</option>
+                <option value="last-month">Last Month</option>
+                <option value="last-two-months">Last Two Months</option>
+                <option value="last-quarter">Last Quarter</option>
+              </select>
+            </div>
           </div>
 
           <div className="card-actions">
             <button
               onClick={generateReport}
               className="btn btn-primary gap-2"
-              disabled={isLoading}
+              disabled={isLoading || !company.trim()}
             >
               {isLoading ? (
                 <>

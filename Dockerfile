@@ -4,7 +4,7 @@ FROM node:22-alpine AS base
 FROM base AS deps
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
+# Copy package files first for better caching
 COPY package.json package-lock.json* ./
 
 # Upgrade npm *BEFORE* installing dependencies. This is crucial.
@@ -17,18 +17,33 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
 
-# Accept build arguments for Next.js public environment variables (matching docker-compose.yml)
+# Copy configuration files first (less likely to change)
+COPY next.config.ts ./
+COPY tsconfig.json ./
+COPY postcss.config.mjs ./
+COPY eslint.config.mjs ./
+COPY jest.config.js ./
+COPY jest.setup.js ./
+COPY next-env.d.ts ./
+
+# Copy static assets
+COPY public ./public
+COPY prompts ./prompts
+
+# Copy source code last (most likely to change)
+COPY src ./src
+
+# Accept build arguments for Next.js public environment variables
 ARG NODE_ENV=production
 ARG NEXT_PUBLIC_BACKEND_URL
 ARG NEXT_PUBLIC_WS_URL
 ARG NEXT_PUBLIC_DEBUG=false
-# Add a build timestamp to invalidate cache on every build
-ARG BUILD_TIMESTAMP=default
+# Git commit SHA for cache busting when code actually changes
+ARG GIT_COMMIT_SHA=unknown
 
-# Create a file with the timestamp to bust cache
-RUN echo "Build timestamp: $BUILD_TIMESTAMP" > build_timestamp.txt
+# Create a file with the git commit to bust cache only when code changes
+RUN echo "Git commit: $GIT_COMMIT_SHA" > git_commit.txt
 
 # Set environment variables
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -71,6 +86,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/prompts ./prompts
 
 # Create .next directory and set permissions
 RUN chown nextjs:nodejs .next
