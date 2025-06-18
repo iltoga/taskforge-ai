@@ -60,4 +60,4 @@ jobs:
 
             # Clean up - Comment this out initially for debugging
             docker system prune -af --volumes
-            echo "Deployment completed successfully"
+            echo "Deployment of calendarGPT completed successfully"
