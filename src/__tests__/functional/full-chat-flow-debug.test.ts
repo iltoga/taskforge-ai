@@ -113,7 +113,7 @@ describe('Chat Flow - Orchestrator Triggering (Mocked Session)', () => {
       if (responseData.success) {
         fullResponse = responseData.message || '';
         toolCallsDetected = responseData.toolCalls && responseData.toolCalls.length > 0;
-        
+
         console.log('✅ Successful response received');
         console.log('� Message:', fullResponse);
         console.log('🔧 Tool calls:', responseData.toolCalls?.length || 0);

@@ -30,13 +30,13 @@ jobs:
             echo "Pulling latest changes."
             cd "$REPO_DIR"
             # Ensure remote URL is correct using the custom SSH configuration
-            GIT_SSH_COMMAND="git remote set-url origin git@github.com-deploy-calendargpt:iltoga/calendarGPT.git
+            git remote set-url origin git@github.com-deploy-calendargpt:iltoga/calendarGPT.git
             # Ensure we're on the main branch and clean any local changes
-            GIT_SSH_COMMAND=git fetch --all
-            GIT_SSH_COMMAND=git checkout main
-            GIT_SSH_COMMAND=git reset --hard origin/main
-            GIT_SSH_COMMAND=git clean -fd
-            GIT_SSH_COMMAND=pull origin main
+            git fetch --all
+            git checkout main
+            git reset --hard origin/main
+            git clean -fd
+            git pull origin main
 
             # Set permissions
             # sudo chown -R nespola:nespola "$REPO_DIR"
