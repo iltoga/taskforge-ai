@@ -176,6 +176,10 @@ During this 4-month period, there were 2 distinct Nespola-related activities:
 - **1 daily work report** documenting development activities including AI assistant improvements
 
 The activities show ongoing project development work with focus on AI-powered tools and team collaboration.`
+      })
+      // Step 5: Format validation
+      .mockResolvedValueOnce({
+        text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request with appropriate format and content structure.'
       });
 
     // Execute the agentic orchestration
@@ -261,19 +265,20 @@ The activities show ongoing project development work with focus on AI-powered to
     expect(result.finalAnswer).toContain('May 10, 2025');
 
     // Verify development mode captured all steps
-    expect(result.steps).toHaveLength(5);
+    expect(result.steps).toHaveLength(6);
     expect(result.steps[0].type).toBe('analysis');
     expect(result.steps[1].type).toBe('evaluation'); // tool decision step
     expect(result.steps[2].type).toBe('tool_call');  // actual tool execution
     expect(result.steps[3].type).toBe('evaluation'); // progress evaluation
     expect(result.steps[4].type).toBe('synthesis');
+    expect(result.steps[5].type).toBe('evaluation'); // format validation
 
     console.log('✅ Agentic mode successfully:');
     console.log('  - Used searchEvents tool with proper parameters');
     console.log('  - Returned simplified events (not verbose Google Calendar objects)');
     console.log('  - Filtered to only Nespola-related events (2 out of 3 total)');
     console.log('  - Generated comprehensive summary with essential details');
-    console.log('  - Completed full agentic workflow with analysis → planning → execution → evaluation → synthesis');
+    console.log('  - Completed full agentic workflow with analysis → planning → execution → evaluation → synthesis → format validation');
   });
 
   test('should handle date range filtering correctly', async () => {
@@ -329,7 +334,8 @@ CALL_TOOLS:
 \`\`\``
       })
       .mockResolvedValueOnce({ text: 'COMPLETE: Found 1 event in range' })
-      .mockResolvedValueOnce({ text: 'Found 1 Nespola event in March-June 2025' });
+      .mockResolvedValueOnce({ text: 'Found 1 Nespola event in March-June 2025' })
+      .mockResolvedValueOnce({ text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request.' });
 
     const result = await orchestrator.orchestrate(
       'find nespola events march to june 2025',
@@ -362,7 +368,8 @@ CALL_TOOLS:
 \`\`\``
       })
       .mockResolvedValueOnce({ text: 'COMPLETE: No events found' })
-      .mockResolvedValueOnce({ text: 'No events found matching your criteria.' });
+      .mockResolvedValueOnce({ text: 'No events found matching your criteria.' })
+      .mockResolvedValueOnce({ text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request.' });
 
     const result = await orchestrator.orchestrate(
       'find events for nonexistent',
@@ -392,7 +399,8 @@ CALL_TOOLS:
 \`\`\``
       })
       .mockResolvedValueOnce({ text: 'COMPLETE: Tool failed but can provide error info' })
-      .mockResolvedValueOnce({ text: 'Unable to access calendar due to API error.' });
+      .mockResolvedValueOnce({ text: 'Unable to access calendar due to API error.' })
+      .mockResolvedValueOnce({ text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request.' });
 
     const result = await orchestrator.orchestrate(
       'find test events',

@@ -26,7 +26,7 @@ describe('Reports Component', () => {
 
     render(<Reports />);
 
-    expect(screen.getByText('Please sign in to generate reports')).toBeInTheDocument();
+    expect(screen.getByText('Please sign in to access work reports')).toBeInTheDocument();
   });
 
   it('renders report generation form when authenticated', () => {
@@ -46,9 +46,9 @@ describe('Reports Component', () => {
 
     render(<Reports />);
 
-    expect(screen.getByText('Weekly Work Reports')).toBeInTheDocument();
-    expect(screen.getByText('Select Week')).toBeInTheDocument();
-    expect(screen.getByText('Generate Report')).toBeInTheDocument();
+    expect(screen.getByText('Work Reports')).toBeInTheDocument();
+    expect(screen.getByText('Company Name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /generate report/i })).toBeInTheDocument();
   });
 
   it('allows week selection', () => {
@@ -71,8 +71,8 @@ describe('Reports Component', () => {
     const selectElement = screen.getByDisplayValue('Current Week');
     expect(selectElement).toBeInTheDocument();
 
-    fireEvent.change(selectElement, { target: { value: '-1' } });
-    expect(selectElement).toHaveValue('-1');
+    fireEvent.change(selectElement, { target: { value: 'last-week' } });
+    expect(selectElement).toHaveValue('last-week');
   });
 
   it('generates and displays report', async () => {
@@ -105,20 +105,24 @@ describe('Reports Component', () => {
     // Mock the fetch response
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockReport,
+      json: async () => ({ report: mockReport }),
     });
 
     render(<Reports />);
 
-    const generateButton = screen.getByText('Generate Report');
+    // Set company name (required for generate button to be enabled)
+    const companyInput = screen.getByPlaceholderText('Enter your company name...');
+    fireEvent.change(companyInput, { target: { value: 'Test Company' } });
+
+    const generateButton = screen.getByRole('button', { name: /generate report/i });
     fireEvent.click(generateButton);
 
     // Check loading state
-    expect(screen.getByText('Generating...')).toBeInTheDocument();
+    expect(screen.getByText('Generating Report...')).toBeInTheDocument();
 
     // Wait for report to be displayed
     await waitFor(() => {
-      expect(screen.getByText('Report for Jan 1-7, 2024')).toBeInTheDocument();
+      expect(screen.getByText('Report Generated')).toBeInTheDocument();
       expect(screen.getByText('10')).toBeInTheDocument(); // Total Events
       expect(screen.getByText('40h')).toBeInTheDocument(); // Working Hours
       expect(screen.getByText('15h')).toBeInTheDocument(); // Meeting Hours
@@ -146,7 +150,11 @@ describe('Reports Component', () => {
 
     render(<Reports />);
 
-    const generateButton = screen.getByText('Generate Report');
+    // Set company name (required for generate button to be enabled)
+    const companyInput = screen.getByPlaceholderText('Enter your company name...');
+    fireEvent.change(companyInput, { target: { value: 'Test Company' } });
+
+    const generateButton = screen.getByRole('button', { name: /generate report/i });
     fireEvent.click(generateButton);
 
     await waitFor(() => {

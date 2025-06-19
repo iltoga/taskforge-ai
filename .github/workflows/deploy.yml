@@ -29,7 +29,7 @@ jobs:
             set -e  # Exit on any error
 
             # Check and setup repository
-            REPO_DIR="$HOME/.docker/calendar-gpt"
+            REPO_DIR="$HOME/.docker/calendar-assistant"
             echo "Starting deployment process..."
             echo "Repository directory: $REPO_DIR"
 

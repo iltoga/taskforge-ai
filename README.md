@@ -41,7 +41,7 @@ Before you begin, ensure you have:
 
 ```bash
 git clone <repository-url>
-cd calendar-gpt
+cd calendar-assistant
 npm install
 ```
 

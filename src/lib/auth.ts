@@ -1,3 +1,4 @@
+import { isEmailAllowed, loadAllowedEmails } from '@/config/email-filter';
 import { OAuth2Client } from 'google-auth-library';
 import NextAuth, { AuthOptions, Session } from 'next-auth';
 import { JWT } from 'next-auth/jwt';
@@ -67,6 +68,9 @@ async function refreshAccessToken(token: ExtendedJWT): Promise<ExtendedJWT> {
   }
 }
 
+// Load allowed emails configuration at startup
+const allowedEmails = loadAllowedEmails();
+
 export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
@@ -82,6 +86,17 @@ export const authOptions: AuthOptions = {
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      // Only apply email filtering for Google OAuth
+      if (account?.provider === 'google' && user?.email) {
+        const allowed = isEmailAllowed(user.email, allowedEmails);
+        if (!allowed) {
+          console.log(`🚫 Sign-in blocked for unauthorized email: ${user.email}`);
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, account, user }): Promise<ExtendedJWT> {
       const extendedToken = token as ExtendedJWT;
 

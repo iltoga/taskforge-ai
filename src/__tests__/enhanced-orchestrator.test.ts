@@ -119,6 +119,11 @@ I found 2 events in your calendar:
 **ID:** 2
 
 Both events are properly scheduled and ready for your reference.`
+      })
+      .mockResolvedValueOnce({
+        text: `\`\`\`
+FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
+\`\`\``
       });
 
     const result = await orchestrator.orchestrate(
@@ -207,6 +212,11 @@ I've created your new meeting and verified it's in your calendar:
 **Status:** ✅ Confirmed in calendar
 
 The event has been successfully added and is ready for you.`
+      })
+      .mockResolvedValueOnce({
+        text: `\`\`\`
+FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
+\`\`\``
       });
 
     // Add createEvent tool to registry with proper schema
@@ -290,6 +300,11 @@ I encountered an issue while trying to access your calendar:
 
 **Suggested Solution:**
 Please wait a few minutes and try your request again. Calendar API limits help ensure reliable service for all users.`
+      })
+      .mockResolvedValueOnce({
+        text: `\`\`\`
+FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
+\`\`\``
       });
 
     // Override the getEvents tool to fail
@@ -316,7 +331,7 @@ Please wait a few minutes and try your request again. Calendar API limits help e
       'Show me my events',
       registry,
       'gpt-4o-mini',
-      { developmentMode: true }
+      { developmentMode: true, maxToolCalls: 1 } // Limit to 1 tool call for this test
     );
 
     expect(result.success).toBe(true);

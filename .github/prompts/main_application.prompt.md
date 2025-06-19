@@ -53,7 +53,7 @@ Before you begin, ensure you have:
 
 ```bash
 git clone <repository-url>
-cd calendar-gpt
+cd calendar-assistant
 npm install
 ```
 
@@ -176,7 +176,7 @@ View and manage your calendar events:
 ## 5. Project Structure and Architecture
 
 ```text
-calendar-gpt/
+calendar-assistant/
 ├── .github/
 │   └── prompts/
 │       └── main_application.prompt.md  # This guide!

@@ -107,7 +107,9 @@ Found 2 Nespola-related events:
 - Development progress update
 
 Both events show active Nespola project work during Q2 2025.`
-      });
+      })
+      // Add format validation response
+      .mockResolvedValueOnce({ text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request with appropriate format and content structure.' });
 
     const registry = createToolRegistry(calendarTools);
 
@@ -192,13 +194,14 @@ Both events show active Nespola project work during Q2 2025.`
     expect(result.finalAnswer).toContain('April 15');
     expect(result.finalAnswer).toContain('May 20');
 
-    // 8. Full agentic workflow completed (5 steps)
-    expect(result.steps).toHaveLength(5);
+    // 8. Full agentic workflow completed (6 steps with format validation)
+    expect(result.steps).toHaveLength(6);
     expect(result.steps[0].type).toBe('analysis');
     expect(result.steps[1].type).toBe('evaluation'); // tool decision
     expect(result.steps[2].type).toBe('tool_call');  // tool execution
     expect(result.steps[3].type).toBe('evaluation'); // progress check
     expect(result.steps[4].type).toBe('synthesis');  // final answer
+    expect(result.steps[5].type).toBe('evaluation'); // format validation
 
     console.log('🎉 AGENTIC MODE VERIFICATION COMPLETE:');
     console.log('  ✅ Query parsing and analysis');
@@ -208,7 +211,8 @@ Both events show active Nespola project work during Q2 2025.`
     console.log('  ✅ Event filtering by keyword');
     console.log('  ✅ Date range filtering');
     console.log('  ✅ AI summary generation');
-    console.log('  ✅ Complete 5-step workflow');
+    console.log('  ✅ Format validation and iteration');
+    console.log('  ✅ Complete 6-step workflow');
     console.log('');
     console.log('🔧 TECHNICAL VERIFICATION:');
     console.log(`  ✅ Tool call: ${toolCall.tool} with correct params`);
@@ -233,7 +237,9 @@ CALL_TOOLS:
 \`\`\``
       })
       .mockResolvedValueOnce({ text: 'COMPLETE: Tool failed, can explain error' })
-      .mockResolvedValueOnce({ text: 'Unable to search calendar events due to API timeout.' });
+      .mockResolvedValueOnce({ text: 'Unable to search calendar events due to API timeout.' })
+      // Add format validation response
+      .mockResolvedValueOnce({ text: 'FORMAT_ACCEPTABLE: The response properly addresses the user\'s request with appropriate format and content structure.' });
 
     const result = await orchestrator.orchestrate(
       'find test events',

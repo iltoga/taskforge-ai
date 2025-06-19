@@ -152,10 +152,33 @@ export class ToolOrchestrator {
 
         // Check if evaluation indicates we have enough information
         needsMoreInformation = this.needsMoreInformation(evaluationStep.content);
+
+        // Special validation for calendar queries - ensure tools were actually called
+        if (!needsMoreInformation && this.isCalendarQuery(userMessage)) {
+          const hasSuccessfulCalendarTools = toolCalls.some(call =>
+            (call.tool === 'searchEvents' || call.tool === 'getEvents') && call.result.success
+          );
+
+          const hasAttemptedCalendarTools = toolCalls.some(call =>
+            call.tool === 'searchEvents' || call.tool === 'getEvents'
+          );
+
+          // Force continuation if no calendar tools were attempted at all, but only if we haven't hit limits
+          if (!hasAttemptedCalendarTools && toolCallCount < maxToolCalls && steps.length < maxSteps) {
+            needsMoreInformation = true;
+            console.log('🔄 Forcing tool retry for calendar query - no calendar tools attempted yet');
+          } else if (!hasSuccessfulCalendarTools && hasAttemptedCalendarTools) {
+            // Tools were attempted but failed - this is acceptable if handled gracefully
+            console.log('⚠️ Calendar tools attempted but failed - proceeding with error explanation');
+          } else if (!hasAttemptedCalendarTools) {
+            // We've hit limits without attempting calendar tools
+            console.log('⚠️ Calendar query completed without attempting calendar tools due to limits reached');
+          }
+        }
       }
 
-      // Final synthesis
-      const synthesisStep = await this.synthesizeFinalAnswer(
+      // Iterative synthesis with format validation
+      let synthesisStep = await this.synthesizeFinalAnswer(
         userMessage,
         currentContext,
         toolCalls,
@@ -163,6 +186,37 @@ export class ToolOrchestrator {
         currentStepId++
       );
       steps.push(synthesisStep);
+
+      // Check if synthesis matches user intent and iterate if needed
+      const maxSynthesisIterations = 3;
+      let synthesisIterations = 1;
+
+      while (synthesisIterations < maxSynthesisIterations) {
+        const formatValidation = await this.validateResponseFormat(
+          userMessage,
+          synthesisStep.content,
+          model,
+          currentStepId++
+        );
+        steps.push(formatValidation);
+
+        if (this.isFormatAcceptable(formatValidation.content)) {
+          break;
+        }
+
+        // Refine synthesis based on validation feedback
+        synthesisStep = await this.refineSynthesis(
+          userMessage,
+          currentContext,
+          toolCalls,
+          synthesisStep.content,
+          formatValidation.content,
+          model,
+          currentStepId++
+        );
+        steps.push(synthesisStep);
+        synthesisIterations++;
+      }
 
       return {
         success: true,
@@ -371,6 +425,21 @@ SUFFICIENT_INFO: Explanation of why no more tools are needed
 When users ask about future events or specific date ranges, ALWAYS use calendar tools to check for real data first.
 Do NOT assume you lack access to information without trying the tools.
 
+## IMMEDIATE ACTION REQUIRED FOR CALENDAR QUERIES
+
+**CRITICAL**: For calendar-related questions, you MUST call calendar tools immediately. Do not try to answer from general knowledge.
+
+**For queries about specific companies/projects (like "italmagneti", "nespola"):**
+1. FIRST ATTEMPT: Use searchEvents with the company name as query parameter
+2. Include the specified date range in timeRange parameter
+3. Example: For "holistic vision of project for italmagneti":
+   - Use searchEvents with query="italmagneti"
+   - Include broad timeRange like start="2024-01-01T00:00:00Z", end="2025-12-31T23:59:59Z"
+
+**For general calendar queries:**
+1. Use getEvents with appropriate time range
+2. If that doesn't work, use searchEvents with relevant keywords
+
 Provide your reasoning and decision.
 `;
 
@@ -425,28 +494,37 @@ ${toolResults}
 
 ## EVALUATION CRITERIA
 
-### 1. COMPLETENESS ASSESSMENT
-- Have we gathered sufficient information to fully answer the user's request?
-- Are there any critical gaps in the data we've collected?
+### 1. MANDATORY TOOL EXECUTION CHECK
+- For calendar-related queries, have we called calendar tools (searchEvents, getEvents)?
+- If initial tool calls failed or returned insufficient data, have we tried alternative parameters?
+- CRITICAL: If no relevant tools have been successfully executed, we MUST continue with retry attempts
+
+### 2. DATA SUFFICIENCY ASSESSMENT
+- Have we gathered sufficient REAL data from tool executions to answer the user's request?
+- Are there any critical gaps in the data we've collected from tools?
 - Do the tool results directly address what the user asked for?
 
-### 2. QUALITY EVALUATION
-- Are the results accurate and relevant?
+### 3. RETRY STRATEGY EVALUATION
+- If tools returned no/insufficient data, should we retry with:
+  - Broader search terms?
+  - Extended date ranges?
+  - Different tool combinations?
+- Have we exhausted reasonable retry options?
+
+### 4. QUALITY VALIDATION
+- Are the results from tools accurate and relevant?
 - Do any tool calls need to be retried with different parameters?
 - Are there any error conditions that need to be addressed?
 
-### 3. NEXT STEPS DETERMINATION
-- What additional information (if any) would improve the response?
-- Would calling more tools add significant value?
-- Is the current information sufficient for a comprehensive answer?
-
 ## DECISION FRAMEWORK
 
+**STRICT RULE: For calendar queries, we CANNOT complete without successful tool execution that returns relevant data**
+
 Consider these factors:
-- **User Intent**: Does our data align with what they actually wanted?
-- **Information Depth**: Is the response sufficiently detailed?
-- **Actionability**: Can the user act on the information we've gathered?
-- **Edge Cases**: Have we handled potential issues or ambiguities?
+- **Tool Execution**: Have calendar tools been called and returned useful data?
+- **User Intent**: Does our retrieved data align with what they actually wanted?
+- **Information Depth**: Is the tool-retrieved response sufficiently detailed?
+- **Retry Potential**: Could different parameters yield better results?
 
 ## RESPONSE FORMAT
 
@@ -545,27 +623,18 @@ Create a helpful, conversational response that:
 - Use *Italic* for emphasis and secondary information
 
 **Example Structure:**
-## Events Summary for Nespola (March - June 2025)
+## Events Summary for [Company/Project] ([Date Range])
 
-### Daily Report - Nespola
-**Date:** March 1 - March 2, 2025
-**Description:**
-- Front end (full day)
-- Implemented deployment scripts and Docker container's configuration
-- Added new subdomain: geniusos.nespola.io
+### [Event Title]
+**Date:** [Actual date from tool results]
+**Description:** [Actual description from calendar data]
+**Status:** [Actual status from tools]
 
-**Status:** Confirmed
+## Summary
+[Based only on retrieved data from tools]
 
-### Nespola - Bugfix Traduzioni
-**Date:** May 13 - May 14, 2025
-**Description:**
-Corrected a bug on the submission form for translations: the form was empty even after uploading the file to be translated.
-
-**Duration:** 4 hours
-**Status:** Confirmed
-
-## Next Steps
-If you need further details about these events or any additional information, feel free to ask! I'm here to help.
+## Important Note
+All information above comes from actual calendar data retrieved by tools. If no relevant events were found, this will be clearly stated.
 
 ### 3. RESPONSE STRUCTURE
 - Lead with a direct answer to the user's question
@@ -575,11 +644,18 @@ If you need further details about these events or any additional information, fe
 - Ensure all lists use proper markdown bullet points or numbering
 
 ## QUALITY STANDARDS
-- **Accuracy**: Only include information that was actually retrieved/confirmed
-- **Completeness**: Address all aspects of the user's request
+- **MANDATORY TOOL USAGE**: NEVER provide information without first attempting to retrieve it via tools
+- **RETRY REQUIREMENT**: If initial tool calls fail or return insufficient data, try alternative parameters or different tools
+- **NO FABRICATION**: Only use information that was actually retrieved from tool executions
+- **DATA VALIDATION**: If no relevant data is found, explicitly state this rather than making assumptions
+- **Accuracy**: Only include information that was actually retrieved/confirmed from tool calls
+- **Completeness**: Address all aspects of the user's request using only retrieved data
 - **Clarity**: Use clear language and avoid technical jargon
-- **Helpfulness**: Provide context and actionable information
+- **Helpfulness**: Provide context and actionable information based on real data
 - **Formatting**: Use proper markdown syntax for headings, lists, bold text, etc.
+
+## CRITICAL RULE
+If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information.
 
 Create your comprehensive, well-formatted markdown response below:
 `;
@@ -599,6 +675,201 @@ Create your comprehensive, well-formatted markdown response below:
       timestamp: Date.now(),
       content: response.text,
       reasoning: 'Comprehensive synthesis of all gathered information into a user-friendly response'
+    };
+  }
+
+  private async validateResponseFormat(
+    userMessage: string,
+    synthesizedResponse: string,
+    model: ModelType,
+    stepId: number
+  ): Promise<OrchestrationStep> {
+    const prompt = `
+## RESPONSE FORMAT VALIDATION TASK
+
+**User's Original Request:** "${userMessage}"
+
+**Generated Response:**
+${synthesizedResponse}
+
+## VALIDATION CRITERIA
+
+Analyze whether the generated response properly matches the user's intent and request format:
+
+### 1. REQUEST TYPE DETECTION
+Determine what type of response the user wanted:
+- **HOLISTIC SUMMARY**: User wants a high-level project summary, overall analysis, or synthesized overview
+  - Keywords: "summary", "overview", "how is", "status of", "overall", "in general", "tell me about"
+  - Expected format: Integrated narrative, project status, overall insights
+- **DETAILED BREAKDOWN**: User wants specific event listings, detailed schedules, or itemized information
+  - Keywords: "list", "show", "events", "schedule", "what meetings", "when is"
+  - Expected format: Individual events, specific dates/times, structured lists
+
+### 2. FORMAT MATCH ANALYSIS
+Check if the response format aligns with the detected request type:
+- Does a holistic request get a holistic response (not just event lists)?
+- Does a detailed request get proper event breakdowns?
+- Is the tone and structure appropriate for the request type?
+
+### 3. CONTENT QUALITY ASSESSMENT
+- Does the response synthesize information appropriately?
+- Is it conversational and helpful?
+- Does it provide actionable insights or just raw data?
+
+## RESPONSE FORMAT
+
+If the format matches the user's intent, respond with:
+\`\`\`
+FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
+\`\`\`
+
+If the format needs improvement, respond with:
+\`\`\`
+FORMAT_NEEDS_REFINEMENT: [Detailed explanation of what needs to be improved]
+
+REQUIRED_CHANGES:
+- [Specific change 1]
+- [Specific change 2]
+- [Specific change 3]
+
+EXPECTED_FORMAT: [Description of what the ideal response should look like]
+\`\`\`
+
+Provide your detailed analysis below:
+`;
+
+    const client = this.getProviderClient(model);
+    const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
+
+    const response = await generateText({
+      model: client.languageModel(model),
+      messages: [{ role: 'user', content: prompt }],
+      ...(supportsTemperature && { temperature: 0.1 }),
+    });
+
+    return {
+      id: `step_${stepId}`,
+      type: 'evaluation',
+      timestamp: Date.now(),
+      content: response.text,
+      reasoning: 'Validation of response format alignment with user intent'
+    };
+  }
+
+  private async refineSynthesis(
+    userMessage: string,
+    context: string,
+    toolCalls: ToolExecution[],
+    previousSynthesis: string,
+    validationFeedback: string,
+    model: ModelType,
+    stepId: number
+  ): Promise<OrchestrationStep> {
+    const toolResults = toolCalls.map(call => {
+      const summary = call.result.success ?
+        `✅ **${call.tool}** completed successfully` :
+        `❌ **${call.tool}** failed`;
+
+      const timing = ` (${call.duration}ms)`;
+      const data = call.result.data ?
+        (typeof call.result.data === 'object' ?
+          JSON.stringify(call.result.data, null, 2) :
+          call.result.data) :
+        'No data returned';
+
+      return `${summary}${timing}
+**Parameters:** ${JSON.stringify(call.parameters, null, 2)}
+**Result:** ${data}
+**Message:** ${call.result.message || 'N/A'}
+${call.result.error ? `**Error:** ${call.result.error}` : ''}`;
+    }).join('\n\n---\n\n');
+
+    const prompt = `
+## RESPONSE REFINEMENT TASK
+
+**User's Original Request:** "${userMessage}"
+
+**Previous Response:**
+${previousSynthesis}
+
+**Validation Feedback:**
+${validationFeedback}
+
+**Available Data from Tools:**
+${toolResults}
+
+## REFINEMENT INSTRUCTIONS
+
+Based on the validation feedback, create an improved response that:
+
+### 1. ADDRESSES FEEDBACK POINTS
+- Fix the specific issues identified in the validation
+- Adjust the format to match user expectations
+- Improve content structure and tone
+
+### 2. RESPONSE TYPE OPTIMIZATION
+
+**For HOLISTIC SUMMARY requests:**
+- Create an integrated narrative about the project/topic
+- Synthesize patterns and insights from the data
+- Provide project status, progress overview, and key highlights
+- Use conversational, analytical tone
+- Structure: Introduction → Key Insights → Overall Status → Recommendations/Next Steps
+
+**For DETAILED BREAKDOWN requests:**
+- List specific events with proper formatting
+- Include dates, times, descriptions, and relevant details
+- Use structured markdown with headings and bullet points
+- Organize chronologically or by category
+
+### 3. ENHANCED SYNTHESIS GUIDELINES
+
+**Holistic Summary Example Structure:**
+\`\`\`
+## Project Overview: [Project Name]
+
+Based on my review of your calendar data from [time period], here's an overview of the [project/topic]:
+
+**Key Highlights:**
+- [Major accomplishment or pattern]
+- [Important milestone or trend]
+- [Notable observation]
+
+**Current Status:**
+[Integrated analysis of recent activities and progress]
+
+**Insights:**
+[Synthesized observations about workload, focus areas, or patterns]
+
+**Looking Ahead:**
+[Recommendations or observations about upcoming work]
+\`\`\`
+
+### 4. QUALITY STANDARDS
+- **Clarity**: Use clear, conversational language
+- **Relevance**: Focus on what matters to the user
+- **Actionability**: Provide useful insights or next steps
+- **Formatting**: Use proper markdown for readability
+- **Tone**: Match the appropriate level of formality
+
+Create your refined response below:
+`;
+
+    const client = this.getProviderClient(model);
+    const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
+
+    const response = await generateText({
+      model: client.languageModel(model),
+      messages: [{ role: 'user', content: prompt }],
+      ...(supportsTemperature && { temperature: 0.3 }),
+    });
+
+    return {
+      id: `step_${stepId}`,
+      type: 'synthesis',
+      timestamp: Date.now(),
+      content: response.text,
+      reasoning: 'Refined synthesis based on format validation feedback'
     };
   }
 
@@ -672,16 +943,20 @@ Create your comprehensive, well-formatted markdown response below:
       'need more',
       'insufficient',
       'call more tools',
-      'further investigation'
+      'further investigation',
+      'retry',
+      'broader search',
+      'no relevant data',
+      'no events found',
+      'failed to find'
     ];
 
     const completeIndicators = [
-      'sufficient',
-      'enough information',
-      'complete',
-      'ready to answer',
-      'have all',
-      'no more tools needed'
+      'sufficient data retrieved',
+      'successfully retrieved',
+      'found relevant events',
+      'calendar data obtained',
+      'tools returned useful data'
     ];
 
     const hasIncompleteIndicators = continueIndicators.some(indicator =>
@@ -717,5 +992,21 @@ Original request: ${userMessage}
 Information gathered:
 ${toolResults}
 `;
+  }
+
+  private isFormatAcceptable(validationContent: string): boolean {
+    return validationContent.includes('FORMAT_ACCEPTABLE');
+  }
+
+  private isCalendarQuery(userMessage: string): boolean {
+    const calendarKeywords = [
+      'events', 'meetings', 'calendar', 'schedule', 'appointment',
+      'italmagneti', 'nespola', 'project', 'work', 'daily report',
+      'show me', 'list', 'find', 'search', 'when', 'what meetings',
+      'holistic vision', 'summary', 'overview'
+    ];
+
+    const messageLower = userMessage.toLowerCase();
+    return calendarKeywords.some(keyword => messageLower.includes(keyword));
   }
 }

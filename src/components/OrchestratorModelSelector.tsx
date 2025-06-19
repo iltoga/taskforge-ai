@@ -1,6 +1,6 @@
 'use client';
 
-import { ModelType } from '../config/models';
+import { MODEL_CONFIGS, ModelType } from '../config/models';
 
 interface OrchestratorModelSelectorProps {
   selectedModel: ModelType;
@@ -13,33 +13,18 @@ export function OrchestratorModelSelector({
   onModelChange,
   disabled = false
 }: OrchestratorModelSelectorProps) {
-  const models: { value: ModelType; label: string; description: string }[] = [
-    {
-      value: 'gpt-4o-mini',
-      label: 'GPT-4o Mini',
-      description: 'Fast and efficient for reasoning tasks'
-    },
-    {
-      value: 'gpt-4o',
-      label: 'GPT-4o',
-      description: 'More capable, better for complex reasoning'
-    },
-    {
-      value: 'o3',
-      label: 'O3',
-      description: 'Advanced reasoning model'
-    },
-    {
-      value: 'o3-mini',
-      label: 'O3 Mini',
-      description: 'Lighter reasoning model'
-    },
-    {
-      value: 'deepseek/deepseek-r1-0528:free',
-      label: 'DeepSeek R1 (Free)',
-      description: 'Alternative reasoning model via OpenRouter'
-    },
-  ];
+  // Use the same model configurations as the main ModelSelector
+  const models = MODEL_CONFIGS.map(config => ({
+    value: config.id,
+    label: config.name,
+    description: config.description,
+    provider: config.provider,
+    badge: config.badge
+  }));
+
+  // Separate models by provider for better organization
+  const openaiModels = models.filter(m => m.provider === 'openai');
+  const openrouterModels = models.filter(m => m.provider === 'openrouter');
 
   return (
     <div className="flex flex-col gap-1">
@@ -52,11 +37,27 @@ export function OrchestratorModelSelector({
         className="select select-bordered select-sm w-full max-w-xs"
         disabled={disabled}
       >
-        {models.map((model) => (
-          <option key={model.value} value={model.value}>
-            {model.label}
-          </option>
-        ))}
+        {/* OpenAI Models */}
+        <optgroup label="OpenAI Models">
+          {openaiModels.map((model) => (
+            <option key={model.value} value={model.value}>
+              {model.label}
+              {model.badge ? ` (${model.badge})` : ''}
+            </option>
+          ))}
+        </optgroup>
+
+        {/* OpenRouter Models */}
+        {openrouterModels.length > 0 && (
+          <optgroup label="OpenRouter Models">
+            {openrouterModels.map((model) => (
+              <option key={model.value} value={model.value}>
+                {model.label}
+                {model.badge ? ` (${model.badge})` : ''}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
       <div className="text-xs text-base-content/50">
         {models.find(m => m.value === selectedModel)?.description}
