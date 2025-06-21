@@ -496,6 +496,21 @@ export function Chat() {
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
+      {/* Top bar with Clear Chat button */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <div className="text-lg font-semibold text-high-contrast">AI Chat Assistant</div>
+        <button
+          type="button"
+          onClick={clearChat}
+          className="btn btn-error btn-sm btn-outline"
+          title="Clear chat history"
+          disabled={messages.length === 0}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          Clear Chat
+        </button>
+      </div>
+
       {/* Welcome Message */}
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center">
