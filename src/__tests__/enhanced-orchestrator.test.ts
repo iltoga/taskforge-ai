@@ -2,15 +2,15 @@ import { z } from 'zod';
 import { CalendarService } from '../services/calendar-service';
 import { ToolOrchestrator } from '../services/tool-orchestrator';
 import { CalendarTools } from '../tools/calendar-tools';
-import { DefaultToolRegistry } from '../tools/tool-registry';
+import { ToolRegistry, createToolRegistry } from '../tools/tool-registry';
 
 // Mock CalendarService
 const mockCalendarService = {
-  listEvents: jest.fn(),
+  getEvents: jest.fn(),
   createEvent: jest.fn(),
   updateEvent: jest.fn(),
   deleteEvent: jest.fn(),
-} as unknown as CalendarService;
+} as unknown as jest.Mocked<CalendarService>;
 
 // Mock OpenAI API
 const mockGenerateText = jest.fn();
@@ -26,7 +26,7 @@ jest.mock('@ai-sdk/openai', () => ({
 
 describe('Enhanced Tool Orchestrator', () => {
   let orchestrator: ToolOrchestrator;
-  let registry: DefaultToolRegistry;
+  let registry: ToolRegistry;
   let calendarTools: CalendarTools;
 
   beforeEach(() => {
@@ -34,31 +34,22 @@ describe('Enhanced Tool Orchestrator', () => {
 
     // Setup
     calendarTools = new CalendarTools(mockCalendarService);
-    registry = new DefaultToolRegistry();
+    registry = createToolRegistry(calendarTools);
     orchestrator = new ToolOrchestrator('test-api-key');
 
-    // Register a simple calendar tool with proper Zod schema
-    registry.registerTool(
-      {
-        name: 'getEvents',
-        description: 'Get calendar events',
-        parameters: z.object({
-          timeRange: z.object({
-            start: z.string().optional(),
-            end: z.string().optional(),
-          }).optional()
-        }),
-        category: 'calendar'
-      },
-      async () => ({
-        success: true,
-        data: [
-          { id: '1', summary: 'Test Meeting', start: { dateTime: '2024-06-15T14:00:00Z' } },
-          { id: '2', summary: 'Nespola Review', start: { dateTime: '2024-06-16T15:00:00Z' } }
-        ],
-        message: 'Retrieved 2 events'
-      })
-    );
+    // Mock calendar service to return test events
+    mockCalendarService.getEvents.mockResolvedValue({
+      items: [
+        { id: '1', summary: 'Test Meeting', start: { dateTime: '2024-06-15T14:00:00Z' } },
+        { id: '2', summary: 'Nespola Review', start: { dateTime: '2024-06-16T15:00:00Z' } }
+      ]
+    });
+
+    mockCalendarService.createEvent.mockResolvedValue({
+      id: 'new-event-123',
+      summary: 'New Meeting',
+      start: { dateTime: '2024-06-16T14:00:00Z' }
+    });
   });
 
   it('should perform comprehensive analysis with enhanced prompting', async () => {
@@ -128,6 +119,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
 
     const result = await orchestrator.orchestrate(
       'Show me my calendar events',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { developmentMode: true }
@@ -248,6 +240,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
 
     const result = await orchestrator.orchestrate(
       'Create a meeting called "New Meeting" for tomorrow at 2pm and verify it was created',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { developmentMode: true }
@@ -329,6 +322,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
 
     const result = await orchestrator.orchestrate(
       'Show me my events',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { developmentMode: true, maxToolCalls: 1 } // Limit to 1 tool call for this test
@@ -386,6 +380,7 @@ CALL_TOOLS:
 
     await orchestrator.orchestrate(
       'Test message',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { maxSteps: 1 }

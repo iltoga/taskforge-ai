@@ -116,6 +116,7 @@ Both events show active Nespola project work during Q2 2025.`
     // Execute agentic orchestration
     const result = await orchestrator.orchestrate(
       'summarize all events for nespola between march and june 2025',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { developmentMode: true }
@@ -243,6 +244,7 @@ CALL_TOOLS:
 
     const result = await orchestrator.orchestrate(
       'find test events',
+      [], // empty chat history
       registry,
       'gpt-4o-mini'
     );

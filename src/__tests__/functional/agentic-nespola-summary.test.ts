@@ -185,6 +185,7 @@ The activities show ongoing project development work with focus on AI-powered to
     // Execute the agentic orchestration
     const result = await orchestrator.orchestrate(
       'summarize all events for nespola between march and june 2025',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       {
@@ -339,6 +340,7 @@ CALL_TOOLS:
 
     const result = await orchestrator.orchestrate(
       'find nespola events march to june 2025',
+      [], // empty chat history
       registry,
       'gpt-4o-mini'
     );
@@ -373,6 +375,7 @@ CALL_TOOLS:
 
     const result = await orchestrator.orchestrate(
       'find events for nonexistent',
+      [], // empty chat history
       registry,
       'gpt-4o-mini'
     );
@@ -404,6 +407,7 @@ CALL_TOOLS:
 
     const result = await orchestrator.orchestrate(
       'find test events',
+      [], // empty chat history
       registry,
       'gpt-4o-mini'
     );

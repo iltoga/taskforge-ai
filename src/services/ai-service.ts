@@ -245,6 +245,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
   // New method for agentic tool orchestration
   async processMessageWithOrchestrator(
     message: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: unknown,
     orchestratorModel: ModelType = 'gpt-4o-mini',
     developmentMode: boolean = false
@@ -252,6 +253,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     response: string;
     steps: unknown[];
     toolCalls: unknown[];
+    progressMessages: string[];
     success: boolean;
     error?: string;
   }> {
@@ -261,8 +263,15 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
 
       const orchestrator = new ToolOrchestrator(this.apiKey);
 
+      // Capture progress messages
+      const progressMessages: string[] = [];
+      orchestrator.setProgressCallback((message: string) => {
+        progressMessages.push(message);
+      });
+
       const result = await orchestrator.orchestrate(
         message,
+        chatHistory,
         toolRegistry as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         orchestratorModel,
         {
@@ -276,6 +285,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
         response: result.finalAnswer,
         steps: result.steps,
         toolCalls: result.toolCalls,
+        progressMessages,
         success: result.success,
         error: result.error
       };
@@ -286,11 +296,85 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
         response: "I encountered an error while processing your request. Please try again.",
         steps: [],
         toolCalls: [],
+        progressMessages: ['💥 Orchestration failed with an error'],
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
+
+  // Streaming method for real-time progress updates
+  async processMessageWithOrchestratorStreaming(
+    message: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
+    toolRegistry: unknown,
+    orchestratorModel: ModelType = 'gpt-4o-mini',
+    developmentMode: boolean = false,
+    progressCallback: (data: { type: string; message?: string; [key: string]: unknown }) => void
+  ): Promise<{
+    response: string;
+    steps: unknown[];
+    toolCalls: unknown[];
+    progressMessages: string[];
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Dynamic import to avoid circular dependencies
+      const { ToolOrchestrator } = await import('./tool-orchestrator');
+
+      const orchestrator = new ToolOrchestrator(this.apiKey);
+
+      // Capture progress messages and stream them in real-time
+      const progressMessages: string[] = [];
+      orchestrator.setProgressCallback((message: string) => {
+        progressMessages.push(message);
+        // Send progress update immediately
+        progressCallback({
+          type: 'progress',
+          message: message
+        });
+      });
+
+      const result = await orchestrator.orchestrate(
+        message,
+        chatHistory,
+        toolRegistry as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+        orchestratorModel,
+        {
+          maxSteps: 10,
+          maxToolCalls: 5,
+          developmentMode
+        }
+      );
+
+      return {
+        response: result.finalAnswer,
+        steps: result.steps,
+        toolCalls: result.toolCalls,
+        progressMessages,
+        success: result.success,
+        error: result.error
+      };
+
+    } catch (error) {
+      console.error('Streaming orchestrator processing error:', error);
+      progressCallback({
+        type: 'progress',
+        message: '💥 Orchestration failed with an error'
+      });
+
+      return {
+        response: "I encountered an error while processing your request. Please try again.",
+        steps: [],
+        toolCalls: [],
+        progressMessages: ['💥 Orchestration failed with an error'],
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
   async processMessageWithTools(
     message: string,
     calendarTools: CalendarTools
@@ -400,7 +484,13 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
   }
 
   async translateToEnglish(text: string, model: ModelType = 'gpt-4o-mini'): Promise<string> {
-    const systemPrompt = 'Translate the following text to English. If the text is already in English, return it as is.';
+    // If text is already in English or looks like English, don't translate
+    const englishPattern = /^[a-zA-Z0-9\s.,!?'"()/-]+$/;
+    if (englishPattern.test(text) && text.split(' ').length > 1) {
+      return text; // Skip translation for English text
+    }
+
+    const systemPrompt = `Translate the following text to English. If the text is already in English, return it EXACTLY as provided without any modifications or comments about the language.`;
 
     try {
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);

@@ -88,6 +88,7 @@ describe('Agentic Mode Routing Fix', () => {
     // Verify that the orchestrator was called (agentic mode)
     expect(mockProcessMessageWithOrchestrator).toHaveBeenCalledWith(
       'test message', // translated message
+      [], // chat history (empty for this test)
       expect.anything(), // tool registry
       'gpt-4o-mini', // orchestrator model
       true // development mode

@@ -166,6 +166,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
     // Execute orchestration
     const result = await orchestrator.orchestrate(
       'how is the nespola project going between march and june 2025?',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       {
@@ -259,6 +260,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
 
     const result = await orchestrator.orchestrate(
       'list all nespola events',
+      [], // empty chat history
       registry,
       'gpt-4o-mini',
       { developmentMode: true }

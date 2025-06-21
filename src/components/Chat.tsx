@@ -18,6 +18,7 @@ interface ChatMessage {
   data?: CalendarEvent | CalendarEvent[];
   toolCalls?: Array<{ tool: string; result: unknown }>;
   steps?: Array<{ id: string; type: string; content: string; reasoning?: string }>;
+  progressMessages?: string[];
   approach?: 'legacy' | 'tools' | 'agentic';
 }
 
@@ -33,15 +34,159 @@ function safeStringify(value: unknown): string {
 export function Chat() {
   const { data: session, status } = useSession();
   const { addAPILog, isDevelopmentMode } = useDevelopment();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Initialize messages from sessionStorage to survive session refreshes
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = sessionStorage.getItem('chat-messages');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Convert timestamp strings back to Date objects
+          return parsed.map((msg: ChatMessage) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+        }
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // Debug: Log whenever component renders and message count
+  console.log('🔄 Chat component render - Message count:', messages.length, 'Status:', status);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
+  const [currentProgressMessages, setCurrentProgressMessages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4o-mini');
   const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4o-mini');
   const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
   const [useAgenticMode, setUseAgenticMode] = useState(true); // Default to ON for best performance
+
+  // Function to clear chat messages and sessionStorage
+  const clearChat = () => {
+    setMessages([]);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('chat-messages');
+      } catch (error) {
+        console.warn('Failed to clear messages from sessionStorage:', error);
+      }
+    }
+  };
+
+  // Function to handle final result processing (shared between streaming and regular fetch)
+  const handleFinalResult = (result: { success: boolean; message?: string; error?: string; [key: string]: unknown }, duration: number) => {
+    console.log('🎯🔥 handleFinalResult called with:', {
+      success: result.success,
+      messageLength: result.message?.length || 0,
+      hasMessage: !!result.message,
+      error: result.error,
+      actualMessage: result.message?.substring(0, 200)
+    });
+
+    // CRITICAL: Clear loading state immediately
+    setIsLoading(false);
+    setLoadingStatus('');
+
+    // Log the response
+    addAPILog({
+      service: 'ai',
+      method: 'POST',
+      endpoint: '/api/chat',
+      response: result, // Log the full response instead of truncating
+      duration,
+    });
+
+    // Handle different response scenarios
+    let assistantContent = '';
+    let receivedSteps: Array<{ id: string; type: string; content: string; reasoning?: string }> = [];
+
+    if (result.success) {
+      assistantContent = result.message || '';
+
+      // If we have steps (agentic mode), show them progressively (only in dev mode)
+      if (result.steps && Array.isArray(result.steps)) {
+        receivedSteps = result.steps;
+
+        // Animate steps appearance
+        receivedSteps.forEach((step, index) => {
+          setTimeout(() => {
+            setCurrentSteps(prev => [...prev, step]);
+          }, index * 800); // Show each step with 800ms delay
+        });
+
+        // Clear steps after showing the final response
+        setTimeout(() => {
+          setCurrentSteps([]);
+        }, receivedSteps.length * 800 + 2000);
+      }
+    } else {
+      // Show detailed error message from API
+      assistantContent = result.error || 'An unknown error occurred';
+
+      // Add helpful context and actions for specific errors
+      if (result.status === 401) {
+        if (assistantContent.includes('Google Calendar authentication')) {
+          assistantContent += '\n\n🔄 To fix this: Sign out and sign in again to refresh your Google Calendar permissions.';
+        } else {
+          assistantContent += ' (Authentication required)';
+        }
+      } else if (result.status === 403) {
+        assistantContent += '\n\n🔧 To fix this: Please ensure you granted calendar access during sign-in.';
+      } else if (result.status === 429) {
+        assistantContent += ' (Rate limit exceeded)';
+      } else if (result.status === 500) {
+        assistantContent += ' (Server error)';
+      }
+    }
+
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: assistantContent,
+      timestamp: new Date(),
+      data: result.data as CalendarEvent | CalendarEvent[] | undefined,
+      toolCalls: result.toolCalls as Array<{ tool: string; result: unknown }> | undefined,
+      steps: result.steps as Array<{ id: string; type: string; content: string; reasoning?: string }> | undefined,
+      progressMessages: result.progressMessages as string[] | undefined,
+      approach: result.approach as 'legacy' | 'tools' | 'agentic' | undefined,
+    };
+
+    console.log('💬🔥 Adding assistant message to chat:', {
+      messageId: assistantMessage.id,
+      contentLength: assistantContent.length,
+      content: assistantContent.substring(0, 200) + (assistantContent.length > 200 ? '...' : ''),
+      messagesArrayLength: messages.length
+    });
+
+    setMessages(prev => {
+      const newMessages = [...prev, assistantMessage];
+      console.log('📝 Messages updated. Total count:', newMessages.length, 'Last message:', {
+        id: assistantMessage.id,
+        type: assistantMessage.type,
+        preview: assistantMessage.content.substring(0, 50) + '...'
+      });
+
+      // Persist to sessionStorage to survive session refreshes
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('chat-messages', JSON.stringify(newMessages));
+        } catch (error) {
+          console.warn('Failed to save messages to sessionStorage:', error);
+        }
+      }
+
+      return newMessages;
+    });
+
+    // Don't clear progress messages immediately - let the streaming logic handle it
+    // or let user see them until next interaction
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,18 +200,29 @@ export function Chat() {
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => {
+      const newUserMessage = [...prev, userMessage];
+      console.log('👤 User message added. Total count:', newUserMessage.length);
+
+      // Persist to sessionStorage
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('chat-messages', JSON.stringify(newUserMessage));
+        } catch (error) {
+          console.warn('Failed to save messages to sessionStorage:', error);
+        }
+      }
+
+      return newUserMessage;
+    });
     setInput('');
     setIsLoading(true);
     setCurrentSteps([]);
+    setCurrentProgressMessages([]);
 
-    // Show progressive status updates for agentic mode
+    // Simple initial status - real progress will come from orchestrator
     if (useAgenticMode && useToolsMode) {
-      setLoadingStatus('🤖 Initializing agentic orchestrator...');
-      setTimeout(() => setLoadingStatus('🔍 Analyzing your request...'), 500);
-      setTimeout(() => setLoadingStatus('🛠️ Planning tool usage...'), 1500);
-      setTimeout(() => setLoadingStatus('📊 Executing tools...'), 3000);
-      setTimeout(() => setLoadingStatus('🧠 Synthesizing response...'), 5000);
+      setLoadingStatus('🤖 Starting agentic orchestrator...');
     } else if (useToolsMode) {
       setLoadingStatus('🔧 Processing with calendar tools...');
     } else {
@@ -90,90 +246,196 @@ export function Chat() {
         },
       });
 
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          model: selectedModel,
-          useTools: useToolsMode,
-          orchestratorModel: orchestratorModel,
-          developmentMode: useAgenticMode,
-        }),
-      });
-
-      const result = await response.json();
-      const duration = Date.now() - startTime;
-
-      // Log the response
-      addAPILog({
-        service: 'ai',
-        method: 'POST',
-        endpoint: '/api/chat',
-        response: result, // Log the full response instead of truncating
-        duration,
-      });
-
-      // Handle different response scenarios
-      let assistantContent = '';
-      let receivedSteps: Array<{ id: string; type: string; content: string; reasoning?: string }> = [];
-
-      if (result.success) {
-        assistantContent = result.message;
-
-        // If we have steps (agentic mode), show them progressively
-        if (result.steps && Array.isArray(result.steps)) {
-          receivedSteps = result.steps;
-
-          // Clear loading status and show steps one by one
-          setLoadingStatus('');
-
-          // Animate steps appearance
-          receivedSteps.forEach((step, index) => {
-            setTimeout(() => {
-              setCurrentSteps(prev => [...prev, step]);
-            }, index * 800); // Show each step with 800ms delay
+      // Use streaming for agentic mode, regular fetch for others
+      if (useAgenticMode && useToolsMode) {
+        // Real-time streaming for agentic mode
+        try {
+          const response = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: userMessage.content,
+              messages: messages, // Include full chat history
+              useTools: useToolsMode,
+              orchestratorModel: orchestratorModel,
+              developmentMode: useAgenticMode,
+            }),
           });
 
-          // Clear steps after showing the final response
-          setTimeout(() => {
-            setCurrentSteps([]);
-          }, receivedSteps.length * 800 + 2000);
-        }
-      } else {
-        // Show detailed error message from API
-        assistantContent = result.error || 'An unknown error occurred';
-
-        // Add helpful context and actions for specific errors
-        if (response.status === 401) {
-          if (assistantContent.includes('Google Calendar authentication')) {
-            assistantContent += '\n\n🔄 To fix this: Sign out and sign in again to refresh your Google Calendar permissions.';
-          } else {
-            assistantContent += ' (Authentication required)';
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
           }
-        } else if (response.status === 403) {
-          assistantContent += '\n\n🔧 To fix this: Please ensure you granted calendar access during sign-in.';
-        } else if (response.status === 429) {
-          assistantContent += ' (Rate limit exceeded)';
-        } else if (response.status === 500) {
-          assistantContent += ' (Server error)';
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+
+          if (!reader) {
+            throw new Error('No reader available');
+          }
+
+          setLoadingStatus('');
+
+          // Read the stream with proper chunk buffering for large JSON
+          let finalResultReceived = false;
+          let buffer = ''; // Buffer to accumulate incomplete chunks
+          console.log('🌊🔥 STARTING TO READ STREAM');
+
+          while (true) {
+            const { done, value } = await reader.read();
+            console.log('🌊🔥 STREAM READ:', { done, hasValue: !!value });
+
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            buffer += chunk; // Accumulate chunks in buffer
+            console.log('🌊🔥 RECEIVED CHUNK:', chunk.substring(0, 200), 'Buffer size:', buffer.length);
+
+            // Process complete lines from buffer
+            const lines = buffer.split('\n');
+
+            // Keep the last line in buffer if it doesn't end with newline (incomplete)
+            if (!buffer.endsWith('\n')) {
+              buffer = lines.pop() || '';
+            } else {
+              buffer = '';
+            }
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                console.log('🌊🔥 PROCESSING LINE:', line.substring(0, 100));
+                try {
+                  const jsonStr = line.slice(6).trim();
+                  if (!jsonStr) continue; // Skip empty data lines
+
+                  const data = JSON.parse(jsonStr);
+                  console.log('🌊🔥 PARSED DATA:', { type: data.type, hasMessage: !!data.message, messageLength: data.message?.length || 0 });
+
+                  if (data.type === 'progress') {
+                    // Add progress message in real-time
+                    setCurrentProgressMessages(prev => [...prev, data.message]);
+                  } else if (data.type === 'final') {
+                    // Handle final result
+                    const duration = Date.now() - startTime;
+                    console.log('📥🔥 FINAL RESULT RECEIVED IN STREAMING:', {
+                      success: data.success,
+                      messageLength: data.message?.length || 0,
+                      hasMessage: !!data.message,
+                      actualMessage: data.message?.substring(0, 200),
+                      hasSteps: !!data.steps,
+                      hasToolCalls: !!data.toolCalls,
+                      hasData: !!data.data
+                    });
+
+                    // Transform streaming response to match expected format
+                    const transformedResult = {
+                      success: data.success,
+                      message: data.message,
+                      steps: data.steps || [],
+                      toolCalls: data.toolCalls || [],
+                      progressMessages: data.progressMessages || [],
+                      approach: data.approach || 'agentic',
+                      error: data.error,
+                      data: data.data
+                    };
+
+                    console.log('🔄 Calling handleFinalResult with transformed result:', {
+                      success: transformedResult.success,
+                      messageLength: transformedResult.message?.length || 0,
+                      message: transformedResult.message?.substring(0, 100) + (transformedResult.message?.length > 100 ? '...' : '')
+                    });
+
+                    // Process final result immediately
+                    handleFinalResult(transformedResult, duration);
+
+                    // Clear progress messages after final result is processed
+                    setTimeout(() => {
+                      setCurrentProgressMessages([]);
+                    }, 2000);
+
+                    finalResultReceived = true;
+                    break; // Exit the inner for loop
+                  } else if (data.type === 'error') {
+                    throw new Error(data.error || 'Streaming error');
+                  }
+                } catch (parseError) {
+                  console.error('🌊💥 Failed to parse SSE data:', {
+                    line: line.substring(0, 200),
+                    parseError: parseError instanceof Error ? parseError.message : String(parseError),
+                    bufferSize: buffer.length
+                  });
+                  // Don't throw here - continue processing other lines
+                }
+              }
+            }
+
+            // Break outer loop if final result received
+            if (finalResultReceived) break;
+          }
+        } catch (streamError) {
+          console.error('Streaming failed, falling back to regular fetch:', streamError);
+
+          // Fallback to regular fetch if streaming fails
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: userMessage.content,
+              messages: messages,
+              model: selectedModel,
+              useTools: useToolsMode,
+              orchestratorModel: orchestratorModel,
+              developmentMode: useAgenticMode,
+            }),
+          });
+
+          const result = await response.json();
+          const duration = Date.now() - startTime;
+
+          // Show progress messages one by one if we received them
+          if (result.progressMessages && Array.isArray(result.progressMessages)) {
+            setLoadingStatus('');
+            result.progressMessages.forEach((progressMsg: string, index: number) => {
+              setTimeout(() => {
+                setCurrentProgressMessages(prev => [...prev, progressMsg]);
+              }, index * 200); // Show each progress message with 200ms delay
+            });
+
+            // Clear progress messages before showing final result
+            setTimeout(() => {
+              setCurrentProgressMessages([]);
+              handleFinalResult(result, duration);
+            }, result.progressMessages.length * 200 + 1000);
+          } else {
+            handleFinalResult(result, duration);
+          }
         }
+
+      } else {
+        // Regular fetch for non-agentic mode
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: userMessage.content,
+            messages: messages, // Include full chat history
+            model: selectedModel,
+            useTools: useToolsMode,
+            orchestratorModel: orchestratorModel,
+            developmentMode: useAgenticMode,
+          }),
+        });
+
+        const result = await response.json();
+        const duration = Date.now() - startTime;
+         handleFinalResult(result, duration);
       }
 
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: assistantContent,
-        timestamp: new Date(),
-        data: result.data,
-        toolCalls: result.toolCalls,
-        steps: result.steps,
-        approach: result.approach,
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       const duration = Date.now() - startTime;
 
@@ -193,11 +455,25 @@ export function Chat() {
         content: `Network error: ${error instanceof Error ? error.message : 'Unable to connect to the server. Please check your connection and try again.'}`,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => {
+        const errorMessages = [...prev, errorMessage];
+        console.log('❌ Error message added. Total count:', errorMessages.length);
+
+        // Persist to sessionStorage
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('chat-messages', JSON.stringify(errorMessages));
+          } catch (error) {
+            console.warn('Failed to save messages to sessionStorage:', error);
+          }
+        }
+
+        return errorMessages;
+      });
     } finally {
       setIsLoading(false);
       setLoadingStatus('');
-      // Don't clear currentSteps here - let them finish their animation
+      // Don't clear currentSteps or currentProgressMessages here - let them finish their animation
     }
   };
 
@@ -314,6 +590,27 @@ export function Chat() {
                   <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                     {message.content}
                   </ReactMarkdown>
+                </div>
+              )}
+
+              {/* Display progress messages if available (agentic mode) - visible to all users */}
+              {message.progressMessages && message.progressMessages.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    ⚡ <span>AI Processing Logs</span>
+                  </div>
+                  <details className="collapse collapse-arrow bg-base-200/30 border border-base-300/30">
+                    <summary className="collapse-title text-sm">
+                      Show {message.progressMessages.length} processing steps
+                    </summary>
+                    <div className="collapse-content space-y-1">
+                      {message.progressMessages.map((progressMsg, index) => (
+                        <div key={index} className="text-xs p-2 bg-base-100/50 rounded border-l-2 border-accent/30">
+                          {progressMsg}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
                 </div>
               )}
 
@@ -497,6 +794,24 @@ export function Chat() {
                 <span className="loading loading-dots loading-sm"></span>
                 {loadingStatus && <span className="text-sm">{loadingStatus}</span>}
               </div>
+
+              {/* Show real-time progress messages from orchestrator - visible to all users */}
+              {currentProgressMessages.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    ⚡ <span>AI Progress</span>
+                  </div>
+                  {currentProgressMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      className="text-sm p-2 bg-base-200/30 rounded-lg border-l-2 border-accent/30 animate-fade-in"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      {message}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Show progressive steps during processing - only in dev mode */}
               {isDevelopmentMode && currentSteps.length > 0 && (

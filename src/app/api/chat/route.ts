@@ -33,12 +33,14 @@ export async function POST(request: Request) {
 
     const {
       message,
+      messages,
       model = 'gpt-4o-mini',
       useTools = false,
       orchestratorModel = 'gpt-4o-mini',
       developmentMode = false
     } = await request.json() as {
       message: string;
+      messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
       model?: ModelType;
       useTools?: boolean;
       orchestratorModel?: ModelType;
@@ -58,7 +60,15 @@ export async function POST(request: Request) {
     const aiService = new AIService(process.env.OPENAI_API_KEY!);
 
     // Translate message to English if needed
-    const englishMessage = await aiService.translateToEnglish(message);
+    console.log('🔤 Original message:', message);
+    let englishMessage = await aiService.translateToEnglish(message);
+    console.log('🔤 Translated message:', englishMessage);
+
+    // Check if translation fucked up the message
+    if (englishMessage.includes('already in English') || englishMessage.includes('text is in English')) {
+      console.warn('⚠️ Translation failed, using original message');
+      englishMessage = message;
+    }
 
     // Choose between tool-based approaches
     if (useTools) {
@@ -79,18 +89,25 @@ export async function POST(request: Request) {
         console.log('🤖 Tool registry created, calling orchestrator...');
         const result = await aiService.processMessageWithOrchestrator(
           englishMessage,
+          messages || [], // Pass chat history
           toolRegistry,
           orchestratorModel,
           developmentMode
         );
 
-        console.log('🤖 Orchestrator result:', { success: result.success, steps: result.steps?.length, toolCalls: result.toolCalls?.length });
+        console.log('🤖 Orchestrator result:', {
+          success: result.success,
+          steps: result.steps?.length,
+          toolCalls: result.toolCalls?.length,
+          progressMessages: result.progressMessages?.length
+        });
 
         return NextResponse.json({
           success: result.success,
           message: result.response,
           steps: result.steps,
           toolCalls: result.toolCalls,
+          progressMessages: result.progressMessages,
           approach: 'agentic',
           error: result.error
         });

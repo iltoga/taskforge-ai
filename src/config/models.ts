@@ -1,4 +1,4 @@
-export type ModelType = 'gpt-4o' | 'gpt-4o-mini' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash-preview-05-20:thinking' | 'google/gemini-2.5-flash-preview-05-20' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
+export type ModelType = 'gpt-4o' | 'gpt-4o-mini' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash-preview-05-20:thinking' | 'google/gemini-2.5-flash-preview-05-20' | 'google/gemini-2.5-flash-lite-preview-06-17' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
 
 export interface ModelInfo {
   id: ModelType;
@@ -98,6 +98,15 @@ export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
     name: 'Gemini 2.5 Flash',
     description: 'State-of-the-art reasoning and coding',
     pricing: '$0.15/1M tokens',
+    contextWindow: '1M',
+    provider: 'openrouter',
+    badge: 'OpenRouter'
+  },
+  {
+    id: 'google/gemini-2.5-flash-lite-preview-06-17',
+    name: 'Gemini 2.5 Flash Lite',
+    description: 'Lightweight version of Gemini 2.5 Flash',
+    pricing: '$0.075/1M tokens',
     contextWindow: '1M',
     provider: 'openrouter',
     badge: 'OpenRouter'

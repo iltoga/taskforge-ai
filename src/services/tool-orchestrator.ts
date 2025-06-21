@@ -26,10 +26,15 @@ export interface OrchestratorConfig {
   developmentMode?: boolean;
 }
 
+export interface ProgressCallback {
+  (message: string): void;
+}
+
 export class ToolOrchestrator {
   private apiKey: string;
   private openaiClient: ReturnType<typeof createOpenAI>;
   private openrouterClient?: ReturnType<typeof createOpenAI>;
+  private progressCallback?: ProgressCallback;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -44,6 +49,20 @@ export class ToolOrchestrator {
         apiKey: openrouterApiKey,
         baseURL: 'https://openrouter.ai/api/v1',
       });
+    }
+  }
+
+  setProgressCallback(callback: ProgressCallback) {
+    this.progressCallback = callback;
+  }
+
+  private logProgress(message: string) {
+    // Always log to console for debugging, regardless of streaming
+    console.log(message);
+
+    // Also send to UI via callback if streaming
+    if (this.progressCallback) {
+      this.progressCallback(message);
     }
   }
 
@@ -63,6 +82,7 @@ export class ToolOrchestrator {
 
   async orchestrate(
     userMessage: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: ToolRegistry,
     model: ModelType = 'gpt-4o-mini',
     config: OrchestratorConfig = {}
@@ -78,9 +98,21 @@ export class ToolOrchestrator {
     let currentStepId = 1;
 
     try {
+      this.logProgress(`🎯 Starting orchestration for query: "${userMessage.substring(0, 50)}${userMessage.length > 50 ? '...' : ''}"`);
+      this.logProgress(`⚙️ Using model: ${model} | Max steps: ${maxSteps} | Max tool calls: ${maxToolCalls}`);
+
+      // Build internal conversation context that accumulates as we progress
+      const internalConversation: Array<{ role: 'user' | 'assistant'; content: string; }> = [
+        { role: 'user', content: userMessage }
+      ];
+
       // Step 1: Initial analysis
-      const analysisStep = await this.performAnalysis(userMessage, toolRegistry, model, currentStepId++);
+      this.logProgress(`🔍 Performing initial analysis...`);
+      const analysisStep = await this.performAnalysis(userMessage, chatHistory, toolRegistry, model, currentStepId++);
       steps.push(analysisStep);
+
+      // Add analysis to internal conversation
+      internalConversation.push({ role: 'assistant', content: `Analysis: ${analysisStep.content}` });
 
       let needsMoreInformation = true;
       let currentContext = userMessage;
@@ -88,27 +120,39 @@ export class ToolOrchestrator {
 
       // Iterative tool calling and evaluation
       while (needsMoreInformation && steps.length < maxSteps && toolCallCount < maxToolCalls) {
+        this.logProgress(`🤔 Iteration ${steps.length}: Deciding on tool usage (${toolCallCount}/${maxToolCalls} tools used)...`);
+
         // Step 2: Determine what tools to call
         const toolDecisionStep = await this.decideToolUsage(
           currentContext,
           toolRegistry,
           toolCalls,
+          steps,
           model,
-          currentStepId++
+          currentStepId++,
+          internalConversation // Pass internal conversation context
         );
         steps.push(toolDecisionStep);
+
+        // Add tool decision to internal conversation
+        internalConversation.push({ role: 'assistant', content: `Tool Planning: ${toolDecisionStep.content}` });
 
         // Parse tool decisions and execute tools
         const toolsToCall = this.parseToolDecisions(toolDecisionStep.content);
 
         if (toolsToCall.length === 0) {
+          this.logProgress(`✋ No more tools needed - proceeding to synthesis`);
           needsMoreInformation = false;
           break;
         }
 
+        this.logProgress(`🔧 Planning to execute ${toolsToCall.length} tools: ${toolsToCall.map(t => t.name).join(', ')}`);
+
         // Execute tools
         for (const toolCall of toolsToCall) {
           if (toolCallCount >= maxToolCalls) break;
+
+          this.logProgress(`🔧 Executing tool: ${toolCall.name} with parameters: ${JSON.stringify(toolCall.parameters)}`);
 
           const startTime = Date.now();
           const result = await toolRegistry.executeTool(toolCall.name, toolCall.parameters);
@@ -126,6 +170,42 @@ export class ToolOrchestrator {
           toolCalls.push(execution);
           toolCallCount++;
 
+          // Enhanced logging based on tool type and result
+          if (toolCall.name === 'searchEvents' || toolCall.name === 'getEvents') {
+            if (result.success) {
+              const eventCount = Array.isArray(result.data) ? result.data.length : 0;
+              this.logProgress(`📅 Calendar tool ${toolCall.name} succeeded: Found ${eventCount} events (${endTime - startTime}ms)`);
+              if (eventCount > 0 && Array.isArray(result.data)) {
+                const eventTitles = result.data.slice(0, 3).map((e: unknown) => {
+                  if (typeof e === 'object' && e !== null) {
+                    const event = e as { summary?: string; title?: string };
+                    return event.summary || event.title || 'Untitled Event';
+                  }
+                  return 'Untitled Event';
+                }).join(', ');
+                this.logProgress(`📋 Event summary: ${eventTitles}${eventCount > 3 ? '...' : ''}`);
+              }
+            } else {
+              this.logProgress(`❌ Calendar tool ${toolCall.name} failed: ${result.error || result.message || 'Unknown error'} (${endTime - startTime}ms)`);
+            }
+          } else if (toolCall.name === 'createEvent') {
+            if (result.success) {
+              const eventTitle = typeof result.data === 'object' && result.data !== null && 'summary' in result.data
+                ? (result.data as { summary: string }).summary
+                : 'New event';
+              this.logProgress(`✅ Event created successfully: ${eventTitle} (${endTime - startTime}ms)`);
+            } else {
+              this.logProgress(`❌ Event creation failed: ${result.error || result.message || 'Unknown error'} (${endTime - startTime}ms)`);
+            }
+          } else {
+            // General tool logging
+            if (result.success) {
+              this.logProgress(`✅ Tool ${toolCall.name} completed successfully (${endTime - startTime}ms)`);
+            } else {
+              this.logProgress(`❌ Tool ${toolCall.name} failed: ${result.error || result.message || 'Unknown error'} (${endTime - startTime}ms)`);
+            }
+          }
+
           // Add tool execution step
           steps.push({
             id: `step_${currentStepId++}`,
@@ -135,23 +215,36 @@ export class ToolOrchestrator {
             toolExecution: execution,
             reasoning: `Called ${toolCall.name} with parameters: ${JSON.stringify(toolCall.parameters)}`
           });
+
+          // Add tool result to internal conversation
+          const resultSummary = execution.result.success
+            ? `Tool ${toolCall.name} succeeded: ${JSON.stringify(execution.result.data)}`
+            : `Tool ${toolCall.name} failed: ${execution.result.error || 'Unknown error'}`;
+          internalConversation.push({ role: 'assistant', content: resultSummary });
         }
 
         // Step 3: Evaluate if we have enough information
+        this.logProgress(`📝 Evaluating progress and determining if more information is needed...`);
         const evaluationStep = await this.evaluateProgress(
           userMessage,
           currentContext,
           toolCalls,
+          steps,
           model,
-          currentStepId++
+          currentStepId++,
+          internalConversation // Pass internal conversation context
         );
         steps.push(evaluationStep);
+
+        // Add evaluation to internal conversation
+        internalConversation.push({ role: 'assistant', content: `Evaluation: ${evaluationStep.content}` });
 
         // Update context with tool results
         currentContext = this.buildUpdatedContext(userMessage, toolCalls);
 
         // Check if evaluation indicates we have enough information
         needsMoreInformation = this.needsMoreInformation(evaluationStep.content);
+        this.logProgress(`📊 Evaluation result: ${needsMoreInformation ? 'Need more information' : 'Sufficient information gathered'}`);
 
         // Special validation for calendar queries - ensure tools were actually called
         if (!needsMoreInformation && this.isCalendarQuery(userMessage)) {
@@ -163,27 +256,53 @@ export class ToolOrchestrator {
             call.tool === 'searchEvents' || call.tool === 'getEvents'
           );
 
+          const calendarToolCalls = toolCalls.filter(call =>
+            call.tool === 'searchEvents' || call.tool === 'getEvents'
+          );
+
           // Force continuation if no calendar tools were attempted at all, but only if we haven't hit limits
           if (!hasAttemptedCalendarTools && toolCallCount < maxToolCalls && steps.length < maxSteps) {
             needsMoreInformation = true;
-            console.log('🔄 Forcing tool retry for calendar query - no calendar tools attempted yet');
+            this.logProgress(`🔄 Forcing tool retry for calendar query - no calendar tools attempted yet (${toolCallCount}/${maxToolCalls} tool calls used)`);
           } else if (!hasSuccessfulCalendarTools && hasAttemptedCalendarTools) {
             // Tools were attempted but failed - this is acceptable if handled gracefully
-            console.log('⚠️ Calendar tools attempted but failed - proceeding with error explanation');
+            const failedAttempts = calendarToolCalls.filter(call => !call.result.success).length;
+            this.logProgress(`⚠️ Calendar tools attempted but failed - proceeding with error explanation (${failedAttempts} failed attempts)`);
+
+            // Log details of failed attempts
+            calendarToolCalls.forEach(call => {
+              if (!call.result.success) {
+                this.logProgress(`   └─ ${call.tool}: ${call.result.error || call.result.message || 'Unknown error'}`);
+              }
+            });
           } else if (!hasAttemptedCalendarTools) {
             // We've hit limits without attempting calendar tools
-            console.log('⚠️ Calendar query completed without attempting calendar tools due to limits reached');
+            this.logProgress(`⚠️ Calendar query completed without attempting calendar tools due to limits reached (${toolCallCount}/${maxToolCalls} tool calls, ${steps.length}/${maxSteps} steps)`);
+          } else {
+            // Success case - we have successful calendar tools
+            const successfulAttempts = calendarToolCalls.filter(call => call.result.success).length;
+            this.logProgress(`✅ Calendar tools executed successfully (${successfulAttempts} successful attempts)`);
           }
         }
       }
 
       // Iterative synthesis with format validation
+      this.logProgress(`🧠 Synthesizing response from ${toolCalls.length} tool executions...`);
+
+      // Log summary of tool results for synthesis
+      const successfulTools = toolCalls.filter(call => call.result.success).length;
+      const failedTools = toolCalls.filter(call => !call.result.success).length;
+      this.logProgress(`📊 Tool execution summary: ${successfulTools} successful, ${failedTools} failed`);
+
       let synthesisStep = await this.synthesizeFinalAnswer(
         userMessage,
+        chatHistory,
         currentContext,
         toolCalls,
+        steps,
         model,
-        currentStepId++
+        currentStepId++,
+        internalConversation // Pass the full internal conversation context
       );
       steps.push(synthesisStep);
 
@@ -192,6 +311,8 @@ export class ToolOrchestrator {
       let synthesisIterations = 1;
 
       while (synthesisIterations < maxSynthesisIterations) {
+        this.logProgress(`🔍 Validating response format (iteration ${synthesisIterations}/${maxSynthesisIterations})...`);
+
         const formatValidation = await this.validateResponseFormat(
           userMessage,
           synthesisStep.content,
@@ -201,14 +322,18 @@ export class ToolOrchestrator {
         steps.push(formatValidation);
 
         if (this.isFormatAcceptable(formatValidation.content)) {
+          this.logProgress(`✅ Response format validated successfully`);
           break;
         }
 
+        this.logProgress(`🔄 Refining response based on validation feedback...`);
         // Refine synthesis based on validation feedback
         synthesisStep = await this.refineSynthesis(
           userMessage,
+          chatHistory,
           currentContext,
           toolCalls,
+          steps,
           synthesisStep.content,
           formatValidation.content,
           model,
@@ -218,6 +343,13 @@ export class ToolOrchestrator {
         synthesisIterations++;
       }
 
+      if (synthesisIterations >= maxSynthesisIterations) {
+        this.logProgress(`⚠️ Response format validation reached maximum iterations (${maxSynthesisIterations})`);
+      }
+
+      const totalDuration = Date.now() - (steps[0]?.timestamp || Date.now());
+      this.logProgress(`🎉 Orchestration completed successfully in ${totalDuration}ms (${steps.length} steps, ${toolCalls.length} tool calls)`);
+
       return {
         success: true,
         finalAnswer: synthesisStep.content,
@@ -226,6 +358,7 @@ export class ToolOrchestrator {
       };
 
     } catch (error) {
+      this.logProgress(`💥 Orchestration failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return {
         success: false,
         finalAnswer: "I encountered an error while processing your request. Please try again.",
@@ -238,6 +371,7 @@ export class ToolOrchestrator {
 
   private async performAnalysis(
     userMessage: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: ToolRegistry,
     model: ModelType,
     stepId: number
@@ -257,12 +391,34 @@ Today is ${new Date().toLocaleDateString('en-US', {
       day: 'numeric'
     })}.
 
-You are an intelligent assistant capable of multi-step reasoning and tool orchestration. Your task is to analyze user requests and develop a strategic approach.
+You are a **CALENDAR ASSISTANT** with intelligent tool orchestration capabilities. Your primary purpose is to help users manage their calendar, events, and schedule-related information.
+
+**CRITICAL CONTEXT**: This is a calendar management application. Any mention of:
+- Projects (like "progetto Italmagneti", "Nespola project", "TechCorp", etc.)
+- Companies or client names
+- Work activities, meetings, or project status
+- "What can you tell me about..." relating to business/work topics
+- Summary requests about work/project topics
+- Questions about project progress, timeline, or history
+
+Should **ALWAYS** be interpreted as **CALENDAR QUERIES** that require searching calendar data, NOT as translation or general knowledge requests.
+
+**MANDATORY EXAMPLES**:
+- "what was the core reason for the project I've been working for in italmagneti in 2025" → Search for all events containing "italmagneti" in 2025
+- "tell me about the nespola project" → Search for all events containing "nespola"
+- "how is the project going?" → Search for recent project-related events
+- "project status" → Search for project meetings and updates
+
+**YOU MUST ALWAYS ATTEMPT TO USE CALENDAR TOOLS FOR PROJECT/WORK QUERIES**
+
+${this.formatChatHistory(chatHistory)}
 
 User Request: "${userMessage}"
 
 Available Tools by Category:
 ${categorizedToolsList}
+
+**IMPORTANT**: For any queries about projects, companies, work, or when users ask "what can you tell me about [project/company]", your primary approach should be to search calendar data using tools like searchEvents or getEvents to find relevant meetings, events, and schedule information.
 
 Perform a comprehensive analysis:
 
@@ -315,7 +471,7 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
       id: `step_${stepId}`,
       type: 'analysis',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Comprehensive analysis of user request and strategic tool planning'
     };
   }
@@ -324,8 +480,10 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
     context: string,
     toolRegistry: ToolRegistry,
     previousToolCalls: ToolExecution[],
+    previousSteps: OrchestrationStep[],
     model: ModelType,
-    stepId: number
+    stepId: number,
+    internalConversation?: Array<{ role: 'user' | 'assistant'; content: string; }>
   ): Promise<OrchestrationStep> {
     const availableCategories = toolRegistry.getAvailableCategories();
     const categorizedToolsList = availableCategories
@@ -345,102 +503,64 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
         }).join('\n\n')}`
       : '';
 
+    const previousStepsContext = previousSteps.length > 0
+      ? `\nPrevious processing steps:\n${previousSteps.map(step => {
+          const content = step.content.length > 300 ? step.content.substring(0, 300) + '...' : step.content;
+          return `[${step.id}] ${step.type.toUpperCase()}: ${content}`;
+        }).join('\n\n')}`
+      : '';
+
     const prompt = `
-Today is ${new Date().toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })}.
+Today is ${new Date().toISOString().split('T')[0]}.
 
-You are an intelligent tool orchestrator with REAL ACCESS to live data through tools. You are NOT limited to training data.
+You are an **intelligent CALENDAR ASSISTANT** with live access to tools.
+Your goal is to decide the *next* action that moves us closer to answering the user.
 
-## IMPORTANT: YOU HAVE LIVE DATA ACCESS
-- Calendar tools provide REAL Google Calendar data for ANY date range including future dates
-- Search tools can find CURRENT information
-- You can access events, meetings, and calendar data for 2025 and beyond
-- DO NOT assume you lack access to information - check with tools first
+---
 
-## CONTEXT
-${context}${previousCallsContext}
+## USER CONTEXT
+${context}${previousCallsContext}${previousStepsContext}
+${internalConversation && internalConversation.length > 1 ? this.formatInternalConversation(internalConversation) : ''}
 
 ## AVAILABLE TOOLS
 ${categorizedToolsList}
 
-## DECISION FRAMEWORK
+---
 
-### 1. EVALUATE CURRENT STATE
-- What information has been gathered so far?
-- What gaps remain in answering the user's request?
-- Are there any failed tool calls that need retry or alternative approaches?
+### DECISION RULES
 
-### 2. STRATEGIC TOOL SELECTION
-- Which tools would provide the most valuable information next?
-- What's the optimal sequence for maximum efficiency?
-- Are there dependencies between tools that need to be respected?
+1. **FOR PROJECT/WORK QUERIES**: **ALWAYS** search calendar first using searchEvents or getEvents
+   - Extract project/company names from the query
+   - Search calendar data before responding with "I don't know"
+   - Use broad search terms (e.g., "italmagneti", "nespola", "techcorp")
 
-### 3. PARAMETER PLANNING
-- What specific parameters should be used for each tool?
-- How can previous results inform parameter selection?
-- What filters or constraints would improve results?
+2. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
+3. **Enough info?** – Say so and explain briefly.
 
-## RESPONSE FORMAT
+**PRIORITY**: Calendar tools (searchEvents, getEvents) should be your FIRST choice for any work/project-related queries.
 
-If you need to call tools, respond with:
+### RESPONSE FORMATS
+
+If tools are required **respond exactly like**:
+
 \`\`\`json
 CALL_TOOLS:
 [
   {
-    "name": "toolName",
-    "parameters": { /* well-structured parameters */ },
-    "reasoning": "Why this tool with these parameters is needed"
+    "name": "<tool_name>",
+    "parameters": { /* parameters */ },
+    "reasoning": "<why this tool and params are right>"
   }
 ]
 \`\`\`
 
-If you have sufficient information, respond with:
+If no tools are needed **respond exactly like**:
+
 \`\`\`
-SUFFICIENT_INFO: Explanation of why no more tools are needed
+SUFFICIENT_INFO: <one‑sentence reason>
 \`\`\`
 
-## TOOL USAGE GUIDELINES
-
-- **Calendar Tools**: Use time ranges and filters strategically for ANY date range
-  - For queries about specific companies/projects (like "nespola"), use searchEvents with the company name as query
-  - Always include time ranges when specified (e.g., "march to june 2025" = timeRange: start "2025-03-01", end "2025-06-30")
-  - Use ISO date format for time ranges: "2025-03-01T00:00:00Z" to "2025-06-30T23:59:59Z"
-- **Search Operations**: Use specific queries for better results
-- **Create/Update Operations**: Ensure all required data is available
-- **Iterative Refinement**: Use previous results to refine subsequent calls
-
-## CRITICAL GUIDELINES FOR CALENDAR QUERIES
-
-**When user asks about events for a specific company/client (e.g., "nespola"):**
-1. Use searchEvents tool with the company name as query parameter
-2. Include the specified date range in timeRange parameter
-3. Example for "events for nespola between march and june 2025":
-   Use searchEvents with query="nespola" and timeRange start="2025-03-01T00:00:00Z", end="2025-06-30T23:59:59Z"
-
-## CRITICAL REMINDER
-When users ask about future events or specific date ranges, ALWAYS use calendar tools to check for real data first.
-Do NOT assume you lack access to information without trying the tools.
-
-## IMMEDIATE ACTION REQUIRED FOR CALENDAR QUERIES
-
-**CRITICAL**: For calendar-related questions, you MUST call calendar tools immediately. Do not try to answer from general knowledge.
-
-**For queries about specific companies/projects (like "italmagneti", "nespola"):**
-1. FIRST ATTEMPT: Use searchEvents with the company name as query parameter
-2. Include the specified date range in timeRange parameter
-3. Example: For "holistic vision of project for italmagneti":
-   - Use searchEvents with query="italmagneti"
-   - Include broad timeRange like start="2024-01-01T00:00:00Z", end="2025-12-31T23:59:59Z"
-
-**For general calendar queries:**
-1. Use getEvents with appropriate time range
-2. If that doesn't work, use searchEvents with relevant keywords
-
-Provide your reasoning and decision.
+*No other text or formatting.*
 `;
 
     const client = this.getProviderClient(model);
@@ -456,7 +576,7 @@ Provide your reasoning and decision.
       id: `step_${stepId}`,
       type: 'evaluation',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Strategic tool selection and parameter planning'
     };
   }
@@ -465,8 +585,10 @@ Provide your reasoning and decision.
     originalMessage: string,
     currentContext: string,
     toolCalls: ToolExecution[],
+    previousSteps: OrchestrationStep[],
     model: ModelType,
-    stepId: number
+    stepId: number,
+    internalConversation?: Array<{ role: 'user' | 'assistant'; content: string; }>
   ): Promise<OrchestrationStep> {
     const toolResults = toolCalls.map(call => {
       const duration = call.duration;
@@ -484,10 +606,22 @@ Message: ${call.result.message || 'N/A'}
 ${call.result.error ? `Error: ${call.result.error}` : ''}`;
     }).join('\n\n');
 
+    const previousStepsContext = previousSteps.length > 0
+      ? `\n**Previous Processing Steps:**\n${previousSteps.map(step => {
+          const content = step.content.length > 200 ? step.content.substring(0, 200) + '...' : step.content;
+          return `[${step.id}] ${step.type.toUpperCase()}: ${content}`;
+        }).join('\n')}`
+      : '';
+
     const prompt = `
 ## PROGRESS EVALUATION TASK
 
 **Original User Request:** "${originalMessage}"
+
+## INTERNAL PROCESS CONTEXT
+${internalConversation && internalConversation.length > 1 ? this.formatInternalConversation(internalConversation) : ''}
+
+${previousStepsContext}
 
 **Current Tool Execution Results:**
 ${toolResults}
@@ -554,17 +688,20 @@ Provide detailed reasoning for your decision.
       id: `step_${stepId}`,
       type: 'evaluation',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Comprehensive evaluation of information completeness and next steps'
     };
   }
 
   private async synthesizeFinalAnswer(
     userMessage: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     context: string,
     toolCalls: ToolExecution[],
+    previousSteps: OrchestrationStep[],
     model: ModelType,
-    stepId: number
+    stepId: number,
+    internalConversation?: Array<{ role: 'user' | 'assistant'; content: string; }>
   ): Promise<OrchestrationStep> {
     const toolResults = toolCalls.map(call => {
       const summary = call.result.success ?
@@ -585,11 +722,22 @@ Provide detailed reasoning for your decision.
 ${call.result.error ? `**Error:** ${call.result.error}` : ''}`;
     }).join('\n\n---\n\n');
 
+    const previousStepsContext = previousSteps.length > 0
+      ? `\n**Processing Steps Summary:**\n${previousSteps.map(step => {
+          const content = step.content.length > 150 ? step.content.substring(0, 150) + '...' : step.content;
+          return `[${step.id}] ${step.type.toUpperCase()}: ${content}`;
+        }).join('\n')}\n`
+      : '';
+
     const prompt = `
 ## RESPONSE SYNTHESIS TASK
 
-**User's Original Request:** "${userMessage}"
+${this.formatChatHistory(chatHistory)}
 
+${internalConversation && internalConversation.length > 1 ? this.formatInternalConversation(internalConversation) : ''}
+
+**User's Original Request:** "${userMessage}"
+${previousStepsContext}
 **Complete Tool Execution Summary:**
 ${toolResults}
 
@@ -645,6 +793,8 @@ All information above comes from actual calendar data retrieved by tools. If no 
 
 ## QUALITY STANDARDS
 - **MANDATORY TOOL USAGE**: NEVER provide information without first attempting to retrieve it via tools
+- **CALENDAR CONTEXT**: This is a calendar assistant - queries about projects, companies, work should be answered using calendar data only
+- **NO TRANSLATION RESPONSES**: Do not provide translation services - this is a calendar assistant, not a translator
 - **RETRY REQUIREMENT**: If initial tool calls fail or return insufficient data, try alternative parameters or different tools
 - **NO FABRICATION**: Only use information that was actually retrieved from tool executions
 - **DATA VALIDATION**: If no relevant data is found, explicitly state this rather than making assumptions
@@ -654,8 +804,8 @@ All information above comes from actual calendar data retrieved by tools. If no 
 - **Helpfulness**: Provide context and actionable information based on real data
 - **Formatting**: Use proper markdown syntax for headings, lists, bold text, etc.
 
-## CRITICAL RULE
-If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information.
+## CRITICAL RULE FOR CALENDAR ASSISTANT
+If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information. NEVER provide translation services - this is a calendar application.
 
 Create your comprehensive, well-formatted markdown response below:
 `;
@@ -673,7 +823,7 @@ Create your comprehensive, well-formatted markdown response below:
       id: `step_${stepId}`,
       type: 'synthesis',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Comprehensive synthesis of all gathered information into a user-friendly response'
     };
   }
@@ -751,15 +901,17 @@ Provide your detailed analysis below:
       id: `step_${stepId}`,
       type: 'evaluation',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Validation of response format alignment with user intent'
     };
   }
 
   private async refineSynthesis(
     userMessage: string,
+    chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     context: string,
     toolCalls: ToolExecution[],
+    previousSteps: OrchestrationStep[],
     previousSynthesis: string,
     validationFeedback: string,
     model: ModelType,
@@ -784,11 +936,20 @@ Provide your detailed analysis below:
 ${call.result.error ? `**Error:** ${call.result.error}` : ''}`;
     }).join('\n\n---\n\n');
 
+    const previousStepsContext = previousSteps.length > 0
+      ? `\n**Processing Steps Summary:**\n${previousSteps.map(step => {
+          const content = step.content.length > 150 ? step.content.substring(0, 150) + '...' : step.content;
+          return `[${step.id}] ${step.type.toUpperCase()}: ${content}`;
+        }).join('\n')}\n`
+      : '';
+
     const prompt = `
 ## RESPONSE REFINEMENT TASK
 
-**User's Original Request:** "${userMessage}"
+${this.formatChatHistory(chatHistory)}
 
+**User's Original Request:** "${userMessage}"
+${previousStepsContext}
 **Previous Response:**
 ${previousSynthesis}
 
@@ -868,7 +1029,7 @@ Create your refined response below:
       id: `step_${stepId}`,
       type: 'synthesis',
       timestamp: Date.now(),
-      content: response.text,
+      content: response?.text || 'No response text available',
       reasoning: 'Refined synthesis based on format validation feedback'
     };
   }
@@ -876,7 +1037,7 @@ Create your refined response below:
   private parseToolDecisions(content: string): Array<{ name: string; parameters: Record<string, unknown> }> {
     try {
       // Look for CALL_TOOLS: section with JSON
-      const callToolsMatch = content.match(/CALL_TOOLS:\s*```json\s*(\[[\s\S]*?\])\s*```/);
+      const callToolsMatch = content.match(/```json[\s\S]*?CALL_TOOLS:\s*(\[[\s\S]*?\])\s*```/);
       if (callToolsMatch) {
         const toolsJson = callToolsMatch[1];
         const tools = JSON.parse(toolsJson);
@@ -898,6 +1059,22 @@ Create your refined response below:
             name: tool.name,
             parameters: tool.parameters
           }));
+        }
+      }
+
+      // Look for EXECUTE: format with PARAMETERS:
+      const executeMatch = content.match(/EXECUTE:\s*(\w+)[\s\S]*?PARAMETERS:\s*(\{[\s\S]*?\})/);
+      if (executeMatch) {
+        const toolName = executeMatch[1];
+        const parametersJson = executeMatch[2];
+        try {
+          const parameters = JSON.parse(parametersJson);
+          return [{
+            name: toolName,
+            parameters: parameters
+          }];
+        } catch (parseError) {
+          console.error('Error parsing EXECUTE parameters:', parseError);
         }
       }
 
@@ -1008,5 +1185,32 @@ ${toolResults}
 
     const messageLower = userMessage.toLowerCase();
     return calendarKeywords.some(keyword => messageLower.includes(keyword));
+  }
+
+  private formatChatHistory(chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>): string {
+    if (!chatHistory || chatHistory.length === 0) {
+      return "This is the start of the conversation.";
+    }
+
+    const formatted = chatHistory.map(msg => {
+      const timestamp = new Date(msg.timestamp).toLocaleString();
+      const role = msg.type === 'user' ? 'User' : 'Assistant';
+      return `[${timestamp}] ${role}: ${msg.content}`;
+    }).join('\n');
+
+    return `Previous conversation history:\n${formatted}\n\nCurrent request:`;
+  }
+
+  private formatInternalConversation(internalConversation: Array<{ role: 'user' | 'assistant'; content: string; }>): string {
+    if (!internalConversation || internalConversation.length <= 1) {
+      return "";
+    }
+
+    const formatted = internalConversation.slice(1).map((msg, index) => {
+      const step = index + 1;
+      return `Step ${step}: ${msg.content}`;
+    }).join('\n');
+
+    return `\n**Internal Analysis and Processing:**\n${formatted}\n`;
   }
 }

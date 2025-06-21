@@ -33,6 +33,11 @@ describe('Chat Component', () => {
     });
 
     mockFetch.mockClear();
+
+    // Mock TextDecoder for streaming tests
+    global.TextDecoder = jest.fn().mockImplementation(() => ({
+      decode: jest.fn().mockReturnValue(''),
+    }));
   });
 
   it('should render chat interface', () => {
@@ -50,7 +55,10 @@ describe('Chat Component', () => {
       json: async () => ({
         success: true,
         message: '✅ Created event: "Test Meeting"',
-        action: 'create',
+        approach: 'legacy',
+        progressMessages: [],
+        steps: [],
+        toolCalls: []
       }),
     } as Response);
 
@@ -70,6 +78,7 @@ describe('Chat Component', () => {
         },
         body: JSON.stringify({
           message: 'Create a meeting tomorrow at 2 PM',
+          messages: [], // Now includes messages array (empty for first message)
           model: 'gpt-4o-mini',
           useTools: true, // Updated default
           orchestratorModel: 'gpt-4o-mini',
@@ -82,14 +91,20 @@ describe('Chat Component', () => {
   it('should display response message', async () => {
     const user = userEvent.setup();
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        message: '✅ Created event: "Test Meeting"',
-        action: 'create',
-      }),
-    } as Response);
+    // Mock streaming endpoint to throw error (simulating failure)
+    mockFetch
+      .mockRejectedValueOnce(new Error('Streaming not available'))
+      // Mock fallback regular endpoint
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          message: '✅ Created event: "Test Meeting"',
+          approach: 'legacy',
+          steps: [],
+          toolCalls: []
+        }),
+      } as Response);
 
     renderWithProviders(<Chat />);
 
@@ -106,13 +121,18 @@ describe('Chat Component', () => {
   it('should handle API errors gracefully', async () => {
     const user = userEvent.setup();
 
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({
-        success: false,
-        error: 'Failed to process request',
-      }),
-    } as Response);
+    // Mock streaming endpoint to throw error (simulating failure)
+    mockFetch
+      .mockRejectedValueOnce(new Error('Streaming not available'))
+      // Mock fallback regular endpoint returning error
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          success: false,
+          error: 'Failed to process request',
+        }),
+      } as Response);
 
     renderWithProviders(<Chat />);
 
