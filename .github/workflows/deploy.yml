@@ -1,4 +1,4 @@
-name: Deploy CalendarGPT to VPS
+name: Deploy Calendar Assistant to VPS
 
 on:
   push:

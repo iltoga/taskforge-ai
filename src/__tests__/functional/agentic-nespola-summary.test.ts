@@ -255,7 +255,9 @@ The activities show ongoing project development work with focus on AI-powered to
       100,                          // maxResults
       'nespola',                    // query (Google API search)
       false,                        // showDeleted
-      'startTime'                   // orderBy
+      'startTime',                  // orderBy
+      undefined,                    // timeZone
+      'primary'                     // calendarId
     );
 
     // Verify final summary includes key information

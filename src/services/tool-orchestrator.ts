@@ -1,7 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
-import fs from 'fs';
-import path from 'path';
 import { ModelType } from '../appconfig/models';
 import { ToolExecution, ToolRegistry } from '../tools/tool-registry';
 
@@ -41,7 +39,10 @@ export class ToolOrchestrator {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.loadVectorStoreConfig();
+    // Load config asynchronously in background
+    this.loadVectorStoreConfig().catch(error => {
+      console.warn('Failed to load vector store config:', error);
+    });
 
     this.openaiClient = createOpenAI({
       apiKey: apiKey,
@@ -57,8 +58,10 @@ export class ToolOrchestrator {
     }
   }
 
-  private loadVectorStoreConfig() {
+  private async loadVectorStoreConfig() {
     try {
+      const fs = await import('fs');
+      const path = await import('path');
       const configPath = path.resolve(process.cwd(), 'settings/vector-search.json');
       const configContent = fs.readFileSync(configPath, 'utf-8');
       const config = JSON.parse(configContent);
@@ -616,7 +619,9 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
               : '["vs_id1", "vs_id2"]';
             paramInfo = `{ query: "search term", vectorStoreIds?: ${vectorStoreIdsStr}, maxResults?: number }`;
           } else if (tool.name === 'searchEvents') {
-            paramInfo = '{ searchTerm: "term", startDate?: "YYYY-MM-DD", endDate?: "YYYY-MM-DD", maxResults?: number }';
+            paramInfo = '{ query: "term", timeRange?: { start: "YYYY-MM-DDTHH:MM:SSZ", end: "YYYY-MM-DDTHH:MM:SSZ" } }';
+          } else if (tool.name === 'getEvents') {
+            paramInfo = '{ timeRange?: { start: "YYYY-MM-DDTHH:MM:SSZ", end: "YYYY-MM-DDTHH:MM:SSZ" }, filters?: { maxResults: number } }';
           }
           return `  - ${tool.name}: ${tool.description}\n    Parameters: ${paramInfo}`;
         }).join('\n')}`;
@@ -657,12 +662,19 @@ ${categorizedToolsList}
 
 ### DECISION RULES
 
-1. **FOR PROJECT/WORK QUERIES**: **ALWAYS** search calendar first using searchEvents or getEvents
+1. **FOR EVENT CREATION/MODIFICATION**: **ALWAYS** use appropriate calendar tools
+   - "add", "create", "schedule", "book", "set up", "make", "plan" → Use createEvent tool
+   - "update", "change", "modify", "edit", "reschedule", "move" → Use updateEvent tool
+   - "delete", "remove", "cancel", "clear" → Use deleteEvent tool
+   - **CRITICAL**: For createEvent, always include required fields: summary, start, end times
+   - Use proper date/time formats: "2025-09-21T09:00:00" for timed events, "2025-09-21" for all-day
+
+2. **FOR PROJECT/WORK QUERIES**: **ALWAYS** search calendar first using searchEvents or getEvents
    - Extract project/company names from the query
    - Search calendar data before responding with "I don't know"
    - Use broad search terms (e.g., "italmagneti", "nespola", "techcorp")
 
-2. **FOR KNOWLEDGE/DOCUMENTATION QUERIES**: **ALWAYS** use vectorFileSearch for non-calendar information
+3. **FOR KNOWLEDGE/DOCUMENTATION QUERIES**: **ALWAYS** use vectorFileSearch for non-calendar information
    - **IMPORTANT:** For the first tool call, ALWAYS use the user's original query as the 'query' parameter for vectorFileSearch, without rephrasing or summarizing.
    - Only if the first attempt returns no results, try rephrasing or adding extra details for subsequent attempts.
    - **CRITICAL:** When calling vectorFileSearch, ALWAYS include the vectorStoreIds parameter with the actual vector store IDs shown in the tool parameters above. Do NOT omit this parameter.
@@ -670,14 +682,40 @@ ${categorizedToolsList}
    - Examples: visa requirements, company policies, travel guidelines, benefits information
    - Do NOT use web search tools - vectorFileSearch is the primary knowledge tool
 
-3. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
-4. **Enough info?** – Say so and explain briefly.
+4. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
+5. **Enough info?** – Say so and explain briefly.
 
 **PRIORITY ORDER**:
+- Event creation/modification → createEvent, updateEvent, deleteEvent
 - Calendar queries → searchEvents, getEvents
 - Knowledge queries → vectorFileSearch
 - File operations → file tools
 - Email operations → email tools
+
+**MANDATORY EXAMPLES FOR EVENT CREATION**:
+- "add event on Sep 21, 2025. title: cancel chatgpt subscription" → Use createEvent with summary="Cancel ChatGPT subscription", start/end dates for Sep 21, 2025
+- "schedule a meeting tomorrow at 2pm" → Use createEvent with appropriate date/time
+- "create appointment next week" → Use createEvent (may need to ask for specific date/time)
+- "book time for project review" → Use createEvent
+- "plan a call with the team" → Use createEvent
+
+**MANDATORY EXAMPLES FOR CALENDAR SEARCHES**:
+- "show me my events" → Use getEvents with no parameters to get recent events
+- "summarize last week calendar activities" → Use getEvents with timeRange: {start: "2025-06-16T00:00:00Z", end: "2025-06-22T23:59:59Z"}
+- "events for this month" → Use getEvents with timeRange for current month
+- "meetings in March 2025" → Use getEvents with timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-03-31T23:59:59Z"}
+- "find events with nespola" → Use searchEvents with query: "nespola"
+- "nespola activities from march to june" → Use searchEvents with query: "nespola", timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-06-30T23:59:59Z"}
+- "italmagneti project status" → Use searchEvents with query: "italmagneti"
+
+**CRITICAL DATE PARSING RULES:**
+- "last week" = June 16-22, 2025 (current date: June 23, 2025)
+- "this week" = June 16-22, 2025
+- "next week" = June 23-29, 2025
+- "this month" = June 1-30, 2025
+- "last month" = May 1-31, 2025
+- Always use UTC format: "YYYY-MM-DDTHH:MM:SSZ"
+- For date ranges, use 00:00:00Z for start and 23:59:59Z for end
 
 ### RESPONSE FORMATS
 
@@ -843,6 +881,14 @@ Provide detailed reasoning for your decision.
     stepId: number,
     internalConversation?: Array<{ role: 'user' | 'assistant'; content: string; }>
   ): Promise<OrchestrationStep> {
+    // Check if this is an action request (create, update, delete) that requires tool execution
+    const isActionRequest = /\b(add|create|schedule|book|set up|make|plan|update|change|modify|edit|reschedule|move|delete|remove|cancel|clear)\b/i.test(userMessage);
+    const hasActionTools = toolCalls.some(call => ['createEvent', 'updateEvent', 'deleteEvent'].includes(call.tool));
+
+    if (isActionRequest && !hasActionTools) {
+      this.logProgress(`⚠️ Action request detected but no action tools were called - preventing fabricated success claims`);
+    }
+
     const toolResults = toolCalls.map(call => {
       const summary = call.result.success ?
         `✅ **${call.tool}** completed successfully` :
@@ -877,6 +923,9 @@ ${this.formatChatHistory(chatHistory)}
 ${internalConversation && internalConversation.length > 1 ? this.formatInternalConversation(internalConversation) : ''}
 
 **User's Original Request:** "${userMessage}"
+**Action Request Detected:** ${isActionRequest ? 'YES' : 'NO'}
+**Action Tools Called:** ${hasActionTools ? 'YES' : 'NO'}
+**Tool Calls Made:** ${toolCalls.length}
 ${previousStepsContext}
 **Complete Tool Execution Summary:**
 ${toolResults}
@@ -945,7 +994,24 @@ All information above comes from actual calendar data retrieved by tools. If no 
 - **Formatting**: Use proper markdown syntax for headings, lists, bold text, etc.
 
 ## CRITICAL RULE FOR CALENDAR ASSISTANT
+**NEVER CLAIM ACTIONS WERE COMPLETED UNLESS TOOLS WERE ACTUALLY CALLED AND SUCCEEDED**
+
+If the user requested an action (create, update, delete events) but no tools were called:
+- NEVER say "Event has been added/updated/deleted"
+- NEVER claim success for actions that weren't performed
+- Instead explain that the action could not be completed and ask for clarification
+
 If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information. NEVER provide translation services - this is a calendar application.
+
+**Examples of FORBIDDEN responses when no tools were called:**
+- ❌ "The event has been added to your calendar"
+- ❌ "I've created the event for you"
+- ❌ "Event deleted successfully"
+
+**Examples of CORRECT responses when no tools were called:**
+- ✅ "I was unable to create the event. Could you please provide more specific details about the date and time?"
+- ✅ "I need more information to create this event. What specific time on September 21st would you like?"
+- ✅ "I couldn't process this request. Please check the event details and try again."
 
 Create your comprehensive, well-formatted markdown response below:
 `;
@@ -1175,46 +1241,62 @@ Create your refined response below:
   }
 
   private parseToolDecisions(content: string): Array<{ name: string; parameters: Record<string, unknown> }> {
+    this.logProgress(`🔍 Parsing tool decisions from content: ${content.substring(0, 500)}...`);
+
     try {
       // Look for CALL_TOOLS: section with JSON
       const callToolsMatch = content.match(/```json[\s\S]*?CALL_TOOLS:\s*(\[[\s\S]*?\])\s*```/);
       if (callToolsMatch) {
+        this.logProgress(`📋 Found CALL_TOOLS in json block: ${callToolsMatch[1]}`);
         const toolsJson = callToolsMatch[1];
         const tools = JSON.parse(toolsJson);
         if (Array.isArray(tools)) {
-          return tools.map(tool => ({
+          const parsedTools = tools.map(tool => ({
             name: tool.name,
             parameters: tool.parameters
           }));
+          this.logProgress(`✅ Successfully parsed ${parsedTools.length} tools from json block`);
+          return parsedTools;
         }
       }
 
       // Fallback: Look for CALL_TOOLS: without code blocks
       const fallbackMatch = content.match(/CALL_TOOLS:\s*(\[[\s\S]*?\])/);
       if (fallbackMatch) {
+        this.logProgress(`📋 Found CALL_TOOLS without block: ${fallbackMatch[1]}`);
         const toolsJson = fallbackMatch[1];
         const tools = JSON.parse(toolsJson);
         if (Array.isArray(tools)) {
-          return tools.map(tool => ({
+          const parsedTools = tools.map(tool => ({
             name: tool.name,
             parameters: tool.parameters
           }));
+          this.logProgress(`✅ Successfully parsed ${parsedTools.length} tools from fallback`);
+          return parsedTools;
         }
+      }
+
+      // Check for SUFFICIENT_INFO pattern
+      if (content.includes('SUFFICIENT_INFO:')) {
+        this.logProgress(`ℹ️ Found SUFFICIENT_INFO - no tools needed`);
+        return [];
       }
 
       // Look for EXECUTE: format with PARAMETERS:
       const executeMatch = content.match(/EXECUTE:\s*(\w+)[\s\S]*?PARAMETERS:\s*(\{[\s\S]*?\})/);
       if (executeMatch) {
+        this.logProgress(`📋 Found EXECUTE format: ${executeMatch[1]}`);
         const toolName = executeMatch[1];
         const parametersJson = executeMatch[2];
         try {
           const parameters = JSON.parse(parametersJson);
+          this.logProgress(`✅ Successfully parsed EXECUTE tool`);
           return [{
             name: toolName,
             parameters: parameters
           }];
         } catch (parseError) {
-          console.error('Error parsing EXECUTE parameters:', parseError);
+          this.logProgress(`❌ Error parsing EXECUTE parameters: ${parseError}`);
         }
       }
 
@@ -1224,17 +1306,21 @@ Create your refined response below:
         try {
           const tools = JSON.parse(jsonArrayMatch[1]);
           if (Array.isArray(tools) && tools.length > 0 && tools[0].name) {
-            return tools.map(tool => ({
+            const parsedTools = tools.map(tool => ({
               name: tool.name,
               parameters: tool.parameters
             }));
+            this.logProgress(`✅ Successfully parsed ${parsedTools.length} tools from JSON array fallback`);
+            return parsedTools;
           }
         } catch {
           // Ignore parsing errors for non-tool JSON
         }
       }
+
+      this.logProgress(`⚠️ No valid tool calls found in content`);
     } catch (error) {
-      console.error('Error parsing tool decisions:', error);
+      this.logProgress(`❌ Error parsing tool decisions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     return [];
@@ -1317,10 +1403,17 @@ ${toolResults}
 
   private isCalendarQuery(userMessage: string): boolean {
     const calendarKeywords = [
+      // Reading/searching calendar
       'events', 'meetings', 'calendar', 'schedule', 'appointment',
-      'italmagneti', 'nespola', 'project', 'work', 'daily report',
       'show me', 'list', 'find', 'search', 'when', 'what meetings',
-      'holistic vision', 'summary', 'overview'
+      'holistic vision', 'summary', 'overview',
+      // Creating/modifying calendar events
+      'add', 'create', 'schedule', 'book', 'set up', 'make', 'plan',
+      'update', 'change', 'modify', 'edit', 'reschedule', 'move',
+      'delete', 'remove', 'cancel', 'clear',
+      // Project/work references (calendar context)
+      'italmagneti', 'nespola', 'project', 'work', 'daily report',
+      'meeting', 'call', 'appointment', 'reminder'
     ];
 
     const messageLower = userMessage.toLowerCase();

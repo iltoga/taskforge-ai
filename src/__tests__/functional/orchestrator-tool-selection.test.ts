@@ -41,10 +41,20 @@ describe('Orchestrator Tool Selection', () => {
     registerKnowledgeTools(toolRegistry);
   });
 
+  afterAll(async () => {
+    // Give time for any pending operations to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+  });
+
   it('should select vectorFileSearch for knowledge queries instead of web search', async () => {
     const knowledgeQuery = "I am italian, what type of visa to indonesia can I get?";
 
-    const result = await orchestrator.orchestrate(
+    // Set a shorter timeout for faster feedback and add explicit timeout handling
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Test timed out after 15 seconds')), 15000);
+    });
+
+    const orchestrationPromise = orchestrator.orchestrate(
       knowledgeQuery,
       [], // empty chat history
       toolRegistry,
@@ -52,9 +62,11 @@ describe('Orchestrator Tool Selection', () => {
       { maxSteps: 3, maxToolCalls: 2, developmentMode: true }
     );
 
+    const result = await Promise.race([orchestrationPromise, timeoutPromise]) as any;
+
     console.log('Orchestration result:', {
       success: result.success,
-      toolCalls: result.toolCalls.map(call => ({
+      toolCalls: result.toolCalls.map((call: any) => ({
         tool: call.tool,
         parameters: call.parameters,
         success: call.result.success
@@ -63,7 +75,7 @@ describe('Orchestrator Tool Selection', () => {
     });
 
     // Verify that vector search was used instead of web search
-    const toolsUsed = result.toolCalls.map(call => call.tool);
+    const toolsUsed = result.toolCalls.map((call: any) => call.tool);
     expect(toolsUsed).toContain('vectorFileSearch');
     expect(toolsUsed).not.toContain('searchWeb');
 
@@ -72,10 +84,10 @@ describe('Orchestrator Tool Selection', () => {
     expect(result.toolCalls.length).toBeGreaterThan(0);
 
     // Verify that vectorFileSearch was actually called
-    const vectorSearchCall = result.toolCalls.find(call => call.tool === 'vectorFileSearch');
+    const vectorSearchCall = result.toolCalls.find((call: any) => call.tool === 'vectorFileSearch');
     expect(vectorSearchCall).toBeDefined();
     expect(vectorSearchCall?.parameters).toHaveProperty('query');
 
     console.log('✅ Test passed: vectorFileSearch was used for knowledge query');
-  }, 30000); // 30 second timeout
+  }, 20000); // 20 second timeout
 });

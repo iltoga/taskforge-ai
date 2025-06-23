@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CalendarGPT - AI Calendar Assistant",
+  title: "Calendar Assistant - AI Calendar Assistant",
   description: "Friendly, professional assistant for calendar management powered by AI",
 };
 

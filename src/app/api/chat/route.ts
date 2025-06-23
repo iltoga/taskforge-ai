@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
           success: result.success,
-          message: result.response,
+          message: `🤖 AGENTIC MODE RESPONSE: ${result.response}`,
           steps: result.steps,
           toolCalls: result.toolCalls,
           progressMessages: result.progressMessages,
@@ -124,6 +124,10 @@ export async function POST(request: Request) {
       } else {
         // EXISTING: Simple tool-based approach
         console.log('🔧 Using SIMPLE tool mode');
+        console.log('🔧 Parameters:', { useTools, developmentMode, model });
+        console.log('🔧 Message:', englishMessage);
+        console.log('🔧 Calendar ID:', calendarId);
+
         const calendarTools = new CalendarTools(calendarService, calendarId);
 
         const result = await aiService.processMessageWithTools(
@@ -131,9 +135,15 @@ export async function POST(request: Request) {
           calendarTools
         );
 
+        console.log('🔧 Simple mode result:', {
+          responseLength: result.response?.length || 0,
+          toolCallsCount: result.toolCalls?.length || 0,
+          toolCallsDetails: result.toolCalls?.map(tc => ({ tool: tc.tool, success: tc.result && typeof tc.result === 'object' && 'success' in tc.result ? tc.result.success : 'unknown' }))
+        });
+
         return NextResponse.json({
           success: true,
-          message: result.response,
+          message: `🔧 SIMPLE MODE RESPONSE: ${result.response}`,
           toolCalls: result.toolCalls,
           approach: 'tools'
         });

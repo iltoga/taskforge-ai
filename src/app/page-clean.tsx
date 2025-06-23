@@ -9,7 +9,7 @@ import { signIn, signOut, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useState } from 'react';
 
-const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'CalendarGPT';
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'Calendar Assistant';
 
 export default function Home() {
   const { data: session, status } = useSession();

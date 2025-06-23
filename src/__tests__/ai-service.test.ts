@@ -60,7 +60,7 @@ describe('AIService', () => {
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
-              content: expect.stringContaining('CalendarGPT')
+              content: expect.stringContaining('Calendar Assistant')
             }),
             expect.objectContaining({
               role: 'user',
@@ -215,7 +215,7 @@ This week focused primarily on API development and code quality improvements. Su
       mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
-      const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16');
+      const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16', 'gpt-4.1-mini-2025-04-14', 'Stefano');
 
       // Assert
       expect(result).toContain('Stefano\'s Weekly WorkLog for TechCorp');

@@ -134,7 +134,8 @@ describe('Functional Test: OpenRouter Gemini Integration', () => {
       'TechCorp',
       '2025-06-16',
       '2025-06-18',
-      'google/gemini-2.0-flash-001'
+      'google/gemini-2.0-flash-001',
+      'Stefano'
     );
 
     console.log('Gemini Weekly Report:', report);

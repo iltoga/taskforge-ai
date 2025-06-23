@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ModelType } from '../appconfig/models';
 import { CalendarTools } from '../tools/calendar-tools';
-import { CalendarAction, CalendarEvent } from '../types/calendar';
+import { CalendarAction, CalendarEvent, SimplifiedEvent } from '../types/calendar';
 
 export type ProviderType = 'openai' | 'openrouter';
 
@@ -100,7 +100,7 @@ export class AIService {
         month: 'long',
         day: 'numeric'
       });
-      return `Today is ${formattedDate}.\n\nYou are CalendarGPT, a digital assistant for managing Google Calendar events. Always respond with valid JSON only.`;
+      return `Today is ${formattedDate}.\n\nYou are Calendar Assistant, a digital assistant for managing Google Calendar events. Always respond with valid JSON only.`;
     }
   }
 
@@ -133,7 +133,7 @@ export class AIService {
         month: 'long',
         day: 'numeric'
       });
-      return `Today is ${formattedDate}.\n\nYou are CalendarGPT, a digital assistant for managing Google Calendar events with access to tools.`;
+      return `Today is ${formattedDate}.\n\nYou are Calendar Assistant, a digital assistant for managing Google Calendar events with access to tools.`;
     }
   }
 
@@ -204,32 +204,140 @@ export class AIService {
     }
   }
 
-  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini-2025-04-14'): Promise<string> {
-    const systemPrompt = `
-You are tasked with generating a detailed weekly work report for Stefano.
+  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini-2025-04-14', userName: string = 'User'): Promise<string> {
+    return this.generateReport(events, company, startDate, endDate, 'weekly', model, userName);
+  }
+
+  async generateReport(
+    events: CalendarEvent[],
+    company: string,
+    startDate: string,
+    endDate: string,
+    reportType: 'weekly' | 'monthly' | 'quarterly',
+    model: ModelType = 'gpt-4.1-mini-2025-04-14',
+    userName: string = 'User'
+  ): Promise<string> {
+    const getSystemPrompt = (type: 'weekly' | 'monthly' | 'quarterly') => {
+      const companyText = company ? ` for ${company}` : '';
+
+      switch (type) {
+        case 'weekly':
+          return `
+You are tasked with generating a detailed weekly activity report for ${userName} (just use the first name in all instances).
 Format the output as follows:
 
-Stefano's Weekly WorkLog for [Company Name] - [start date / end date]
+${userName}'s Weekly Activity Report${companyText} - [start date / end date]
 
 For each day with events, list:
 **[Day, Date]:**
 • [Activity 1]
 • [Activity 2]
 ...
+• [Activity n]
+
+If no events occurred on a day, simply state:
+**[Day, Date]: No significant activities**
 
 At the end, add:
 **Summary:**
-[Brief summary emphasizing main focus and achievements]
+[Brief summary emphasizing main focus and achievements, if the events are related to work, else summarize personal activities]
 
-Use professional, concise language and improve grammar/formatting of the original activities.
+Use professional, concise language and improve grammar/formatting of the original activities with a focus on clarity and readability.
 `;
 
-    const userPrompt = `
-Generate a weekly work report for ${company} from ${startDate} to ${endDate}.
+        case 'monthly':
+          return `
+You are tasked with generating a comprehensive monthly activity report for ${userName}.
+Format the output as follows:
+
+${userName}'s Monthly Activity Report${companyText} - [start date / end date]
+
+**Key Activities by Week:**
+Week 1 ([dates]):
+• [Major activities and achievements]
+
+Week 2 ([dates]):
+• [Major activities and achievements]
+
+Week 3 ([dates]):
+• [Major activities and achievements]
+
+Week 4 ([dates]):
+• [Major activities and achievements]
+
+**Monthly Highlights:**
+• [Key accomplishments]
+• [Important meetings/projects]
+• [Notable outcomes]
+
+**Summary:**
+[Comprehensive summary of the month's work, focusing on major achievements, project progress, and impact, if the events are related to work, else summarize personal activities in a more informal tone]
+
+- Use professional, strategic language and focus on high-level outcomes and achievements in case of work-related events and improve grammar/formatting of the original activities with a focus on clarity and readability.
+- If the events are personal, use a more informal tone summarizing personal activities.
+`;
+
+        case 'quarterly':
+          return `
+You are tasked with generating a strategic quarterly activity report for ${userName}.
+Format the output as follows:
+
+${userName}'s Quarterly Activity Report${companyText} - [start date / end date]
+
+**Month 1 Overview:**
+• [Key accomplishments and focus areas]
+
+**Month 2 Overview:**
+• [Key accomplishments and focus areas]
+
+**Month 3 Overview:**
+• [Key accomplishments and focus areas]
+
+**Quarterly Achievements:**
+• [Major project completions]
+• [Strategic initiatives]
+• [Key relationships built]
+• [Process improvements]
+
+**Impact & Outcomes:**
+• [Business impact]
+• [Team contributions]
+• [Client/stakeholder value delivered]
+
+**Summary:**
+[Executive-level summary focusing on strategic impact, growth, and long-term value creation]
+
+- Use executive-level language focusing on strategic impact, business outcomes, and long-term value creation if the events are related to work.
+- Else summarize personal activities in a more informal tone.
+`;
+
+        default:
+          return `Generate a ${type} work report for ${userName}${companyText}.`;
+      }
+    };
+
+    const getUserPrompt = (type: 'weekly' | 'monthly' | 'quarterly') => {
+      const companyText = company ? ` for ${company}` : '';
+
+      return `
+Generate a ${type} work report${companyText} from ${startDate} to ${endDate}.
 
 Events data:
-${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Activities: ${event.description}`).join('\n')}
+${events.map(event => {
+  const eventDate = event.start?.date || event.start?.dateTime;
+  const eventTitle = event.summary || 'Untitled Event';
+  const eventDescription = event.description || '';
+  const eventLocation = event.location ? ` (Location: ${event.location})` : '';
+
+  return `Date: ${eventDate}, Event: ${eventTitle}${eventLocation}, Details: ${eventDescription}`;
+}).join('\n')}
+
+Total events in period: ${events.length}
 `;
+    };
+
+    const systemPrompt = getSystemPrompt(reportType);
+    const userPrompt = getUserPrompt(reportType);
 
     try {
       // Use temperature only for models that support it (some reasoning models don't support temperature)
@@ -384,6 +492,85 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     }
   }
 
+  // Helper method to parse event creation requests
+  private async parseEventCreationRequest(message: string): Promise<CalendarEvent> {
+    // Use AI to parse the event creation request
+    const systemPrompt = `You are a calendar event parser. Extract event details from natural language and return a JSON object.
+
+Today is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
+Current timezone: Asia/Makassar (+08:00)
+
+Parse the user's request and return a JSON object with these fields:
+- summary: Event title (required)
+- start: { dateTime: "YYYY-MM-DDTHH:MM:SS+08:00" } for timed events OR { date: "YYYY-MM-DD" } for all-day events
+- end: { dateTime: "YYYY-MM-DDTHH:MM:SS+08:00" } for timed events OR { date: "YYYY-MM-DD" } for all-day events
+- location: Location if mentioned (optional)
+- description: Description if mentioned (optional)
+
+Default rules:
+- If no time specified, create as all-day event
+- If time specified but no duration, default to 1 hour
+- If "tomorrow" is mentioned, use the next day
+- If "today" is mentioned, use current date
+- Use professional, clear event titles
+
+Return ONLY the JSON object, no other text.`;
+
+    try {
+      const model = 'gpt-4.1-mini-2025-04-14';
+      const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
+      const client = this.getProviderClient(model);
+
+      const response = await generateText({
+        model: client.languageModel(model),
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
+        ...(supportsTemperature && { temperature: 0.1 }),
+      });
+
+      const content = response.text.trim();
+
+      // Clean up the response - handle markdown code blocks
+      let cleanedContent = content;
+      const codeBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        cleanedContent = codeBlockMatch[1].trim();
+      }
+
+      const eventData = JSON.parse(cleanedContent) as CalendarEvent;
+
+      // Validate required fields
+      if (!eventData.summary) {
+        throw new Error('Event title is required');
+      }
+
+      if (!eventData.start) {
+        throw new Error('Event start time is required');
+      }
+
+      if (!eventData.end) {
+        // If no end time, add 1 hour for timed events or next day for all-day events
+        if (eventData.start.dateTime) {
+          const startTime = new Date(eventData.start.dateTime);
+          startTime.setHours(startTime.getHours() + 1);
+          eventData.end = { dateTime: startTime.toISOString().replace('Z', '+08:00') };
+        } else if (eventData.start.date) {
+          const startDate = new Date(eventData.start.date);
+          startDate.setDate(startDate.getDate() + 1);
+          eventData.end = { date: startDate.toISOString().split('T')[0] };
+        }
+      }
+
+      return eventData;
+
+    } catch (error) {
+      console.error('Error parsing event creation request:', error);
+      throw new Error(`Failed to parse event details: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async processMessageWithTools(
     message: string,
     calendarTools: CalendarTools
@@ -391,6 +578,8 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     response: string;
     toolCalls: Array<{ tool: string; result: unknown }>;
   }> {
+    console.log('🔧 SIMPLE MODE: Processing message with tools:', message);
+
     // For now, let's implement a simpler approach that manually calls tools based on message analysis
     const toolCalls: Array<{ tool: string; result: unknown }> = [];
     let response = '';
@@ -398,8 +587,19 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     try {
       // Analyze the message to determine what tools to use
       const messageLower = message.toLowerCase();
+      console.log('🔧 SIMPLE MODE: Message keywords analysis:', {
+        hasSummarize: messageLower.includes('summarize'),
+        hasEvents: messageLower.includes('events'),
+        hasList: messageLower.includes('list'),
+        hasShow: messageLower.includes('show'),
+        hasPast: messageLower.includes('past'),
+        hasReport: messageLower.includes('report'),
+        hasActivities: messageLower.includes('activities'),
+        hasCalendar: messageLower.includes('calendar')
+      });
 
-      if (messageLower.includes('summarize') || messageLower.includes('events') || messageLower.includes('list')) {
+      if (messageLower.includes('summarize') || messageLower.includes('events') || messageLower.includes('list') || messageLower.includes('show') || messageLower.includes('past') || messageLower.includes('report') || messageLower.includes('activities')) {
+        console.log('🔧 SIMPLE MODE: Detected event query - proceeding with calendar tools');
         // This is a query for events
         let toolResult;
 
@@ -410,61 +610,306 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
           toolCalls.push({ tool: 'searchEvents', result: toolResult });
 
           if (toolResult.success && Array.isArray(toolResult.data)) {
-            const events = toolResult.data as CalendarEvent[];
+            const events = toolResult.data as SimplifiedEvent[];
             if (events.length > 0) {
-              response = `I found ${events.length} events related to Nespola:\n\n`;
-              events.forEach((event, index) => {
-                const date = event.start?.dateTime || event.start?.date || 'Unknown date';
-                response += `${index + 1}. **${event.summary}** - ${new Date(date).toLocaleDateString()}\n`;
-                if (event.description) {
-                  response += `   ${event.description}\n`;
-                }
-                response += '\n';
-              });
+              // Use AI to generate a proper summary of Nespola events
+              response = await this.generateEventSummary(events, message, 'Nespola-related');
             } else {
               response = "I didn't find any events related to Nespola in the specified time period.";
             }
           } else {
             response = `I tried to search for Nespola events but encountered an issue: ${toolResult.message || 'Unknown error'}`;
           }
+        } else if (messageLower.includes('search') && (messageLower.includes('keyword') || messageLower.includes('term'))) {
+          // Extract search keyword from message
+          const searchKeyword = this.extractSearchKeyword(message);
+          if (searchKeyword) {
+            const timeRange = this.extractTimeRange(message);
+            toolResult = await calendarTools.searchEvents(searchKeyword, timeRange);
+            toolCalls.push({ tool: 'searchEvents', result: toolResult });
+
+            if (toolResult.success && Array.isArray(toolResult.data)) {
+              const events = toolResult.data as SimplifiedEvent[];
+              if (events.length > 0) {
+                response = await this.generateEventSummary(events, message, `events matching "${searchKeyword}"`);
+              } else {
+                response = `I didn't find any events matching "${searchKeyword}" in the specified time period.`;
+              }
+            } else {
+              response = `I tried to search for events matching "${searchKeyword}" but encountered an issue: ${toolResult.message || 'Unknown error'}`;
+            }
+          } else {
+            response = "I couldn't identify a search keyword in your request. Please specify what you'd like me to search for.";
+          }
         } else {
-          // General event listing
+          // General event listing/summarization
+          console.log('🔧 SIMPLE MODE: Using general event listing/summarization path');
           const timeRange = this.extractTimeRange(message);
+          console.log('🔧 SIMPLE MODE: Extracted time range:', timeRange);
+
           toolResult = await calendarTools.getEvents(timeRange);
+          console.log('🔧 SIMPLE MODE: getEvents result:', {
+            success: toolResult.success,
+            dataLength: Array.isArray(toolResult.data) ? toolResult.data.length : 'not array',
+            message: toolResult.message,
+            error: toolResult.error
+          });
+
           toolCalls.push({ tool: 'getEvents', result: toolResult });
 
           if (toolResult.success && Array.isArray(toolResult.data)) {
-            const events = toolResult.data as CalendarEvent[];
-            response = `I found ${events.length} events in the specified time period.`;
+            const events = toolResult.data as SimplifiedEvent[];
+            if (events.length > 0) {
+              console.log('🔧 SIMPLE MODE: Found', events.length, 'events, generating summary');
+              console.log('🔧 SIMPLE MODE: Event data sample:', JSON.stringify(events.slice(0, 2), null, 2));
+              // Use AI to generate a proper summary based on the request
+              response = await this.generateEventSummary(events, message, 'your calendar events');
+            } else {
+              console.log('🔧 SIMPLE MODE: No events found in time period');
+              response = "I didn't find any events in the specified time period.";
+            }
           } else {
-            response = `I tried to get your events but encountered an issue: ${toolResult.message || 'Unknown error'}`;
+            console.log('🔧 SIMPLE MODE: getEvents failed:', toolResult.error || toolResult.message);
+            response = `I tried to get your events but encountered an issue: ${toolResult.message || toolResult.error || 'Unknown error'}`;
           }
         }
-      } else if (messageLower.includes('create') || messageLower.includes('schedule') || messageLower.includes('add')) {
+      } else if (messageLower.includes('create') || messageLower.includes('schedule') || messageLower.includes('add') || messageLower.includes('book') || messageLower.includes('plan')) {
         // This is a request to create an event
-        response = "I understand you want to create an event. The tool-based event creation is not yet implemented in this version.";
+        try {
+          const eventData = await this.parseEventCreationRequest(message);
+          const toolResult = await calendarTools.createEvent(eventData);
+          toolCalls.push({ tool: 'createEvent', result: toolResult });
+
+          if (toolResult.success) {
+            response = `✅ Successfully created event: "${eventData.summary}"`;
+            if (eventData.start?.dateTime) {
+              const startDate = new Date(eventData.start.dateTime);
+              response += `\n📅 Date: ${startDate.toLocaleDateString()}`;
+              response += `\n🕒 Time: ${startDate.toLocaleTimeString()}`;
+            } else if (eventData.start?.date) {
+              response += `\n📅 Date: ${new Date(eventData.start.date).toLocaleDateString()} (All day)`;
+            }
+            if (eventData.location) {
+              response += `\n📍 Location: ${eventData.location}`;
+            }
+          } else {
+            response = `❌ Failed to create event: ${toolResult.error || 'Unknown error'}`;
+          }
+        } catch (parseError) {
+          response = `❌ I couldn't understand the event details from your request. Please provide more specific information like the event title, date, and time. Error: ${parseError instanceof Error ? parseError.message : 'Unknown parsing error'}`;
+        }
       } else {
         // General response
-        response = "I understand your request, but I'm not sure how to help with that specific calendar operation yet.";
+        console.log('🔧 SIMPLE MODE: No matching keywords - returning general response');
+        response = "I understand your request, but I'm not sure how to help with that specific calendar operation yet. For calendar operations, try using words like 'summarize', 'list', 'show', 'events', or 'activities'.";
       }
 
+      console.log('🔧 SIMPLE MODE: Final response:', response.substring(0, 200));
       return {
         response,
         toolCalls,
       };
 
     } catch (error) {
-      console.error('Tool-based processing error:', error);
+      console.error('🔧 SIMPLE MODE: Tool-based processing error:', error);
       return {
-        response: "I encountered an error while processing your request. Please try again.",
+        response: "I encountered an error while processing your request. Please try again. Error details: " + (error instanceof Error ? error.message : 'Unknown error'),
         toolCalls,
       };
+    }
+  }
+
+  // Helper method to extract search keyword from message
+  private extractSearchKeyword(message: string): string | null {
+    // Look for patterns like "search for X" or "find X" or "events about X"
+    const patterns = [
+      /search\s+(?:for\s+)?["\']?([^"'\s]+)["\']?/i,
+      /find\s+(?:events?\s+)?(?:about\s+|with\s+)?["\']?([^"'\s]+)["\']?/i,
+      /events?\s+(?:about\s+|with\s+|containing\s+)?["\']?([^"'\s]+)["\']?/i,
+      /show\s+(?:me\s+)?(?:events?\s+)?(?:about\s+|with\s+)?["\']?([^"'\s]+)["\']?/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = message.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+
+    return null;
+  }
+
+  // Helper method to generate AI-powered event summaries
+  private async generateEventSummary(events: SimplifiedEvent[], originalMessage: string, contextDescription: string): Promise<string> {
+    console.log('🔧 SIMPLE MODE: generateEventSummary called with', events.length, 'events');
+    console.log('🔧 SIMPLE MODE: First event sample:', JSON.stringify(events[0], null, 2));
+
+    const systemPrompt = `You are a calendar assistant that creates helpful summaries of calendar events.
+
+Given a list of calendar events and the user's original request, create a well-formatted response that:
+1. Acknowledges what was found
+2. Provides a clear, organized summary
+3. Highlights important details like dates, times, locations
+4. Matches the tone and intent of the user's request
+
+Format your response using markdown for readability. Use bullet points, headers, or numbered lists as appropriate.
+If the user asked for a summary or report, provide an analytical overview.
+If they asked to list events, provide a clear list format.
+If they asked about past events, focus on what happened.
+
+Be helpful, concise, and professional.`;
+
+    const userPrompt = `Original user request: "${originalMessage}"
+
+Context: Found ${events.length} ${contextDescription}
+
+Calendar Events:
+${events.map((event, index) => {
+  // SimplifiedEvent has title, startDate, endDate directly
+  const title = event.title || 'Untitled Event';
+  const startDate = event.startDate;
+  const endDate = event.endDate;
+
+  console.log(`🔧 Event ${index + 1} mapping:`, {
+    title,
+    startDate,
+    endDate,
+    isAllDay: event.isAllDay
+  });
+
+  if (!startDate) {
+    console.warn(`🔧 No startDate found for event ${index + 1}:`, event);
+    return `${index + 1}. ${title} - Date unknown`;
+  }
+
+  const date = new Date(startDate);
+  const time = !event.isAllDay && startDate.includes('T') ? ` at ${date.toLocaleTimeString()}` : '';
+  const location = event.location ? ` (Location: ${event.location})` : '';
+  const description = event.description ? `\n   Description: ${event.description}` : '';
+
+  return `${index + 1}. ${title} - ${date.toLocaleDateString()}${time}${location}${description}`;
+}).join('\n')}
+
+Please create an appropriate response based on the user's request.`;
+
+    console.log('🔧 SIMPLE MODE: Generated prompt for AI:', userPrompt.substring(0, 500) + '...');
+
+    try {
+      const model = 'gpt-4.1-mini-2025-04-14';
+      const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
+      const client = this.getProviderClient(model);
+
+      const response = await generateText({
+        model: client.languageModel(model),
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        ...(supportsTemperature && { temperature: 0.3 }),
+      });
+
+      console.log('🔧 SIMPLE MODE: AI response for summary:', response.text?.substring(0, 200) + '...');
+      return response.text || `I found ${events.length} ${contextDescription}.`;
+    } catch (error) {
+      console.error('Error generating event summary:', error);
+      // Fallback to simple list format
+      let fallback = `I found ${events.length} ${contextDescription}:\n\n`;
+      events.forEach((event, index) => {
+        const title = event.title || 'Untitled Event';
+        const startDate = event.startDate || 'Unknown date';
+        fallback += `${index + 1}. **${title}** - ${new Date(startDate).toLocaleDateString()}\n`;
+        if (event.description) {
+          fallback += `   ${event.description}\n`;
+        }
+        fallback += '\n';
+      });
+      return fallback;
     }
   }
 
   // Helper method to extract time range from message
   private extractTimeRange(message: string): { start?: string; end?: string } {
     const messageLower = message.toLowerCase();
+    const now = new Date();
+
+    console.log('🔧 SIMPLE MODE: Extracting time range from message:', messageLower);
+
+    // Look for relative time expressions
+    if (messageLower.includes('past week') || messageLower.includes('last week') || messageLower.includes('previous week')) {
+      const startOfLastWeek = new Date(now);
+      startOfLastWeek.setDate(now.getDate() - now.getDay() - 7); // Start of last week (Sunday)
+      startOfLastWeek.setHours(0, 0, 0, 0);
+
+      const endOfLastWeek = new Date(startOfLastWeek);
+      endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); // End of last week (Saturday)
+      endOfLastWeek.setHours(23, 59, 59, 999);
+
+      const timeRange = {
+        start: startOfLastWeek.toISOString(),
+        end: endOfLastWeek.toISOString()
+      };
+
+      console.log('🔧 SIMPLE MODE: Detected last week range:', {
+        start: timeRange.start,
+        end: timeRange.end,
+        startFormatted: startOfLastWeek.toLocaleDateString(),
+        endFormatted: endOfLastWeek.toLocaleDateString()
+      });
+
+      return timeRange;
+    }
+
+    if (messageLower.includes('past month') || messageLower.includes('last month') || messageLower.includes('previous month')) {
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+      return {
+        start: startOfLastMonth.toISOString(),
+        end: endOfLastMonth.toISOString()
+      };
+    }
+
+    if (messageLower.includes('this week') || messageLower.includes('current week')) {
+      const startOfThisWeek = new Date(now);
+      startOfThisWeek.setDate(now.getDate() - now.getDay()); // Start of this week (Sunday)
+      startOfThisWeek.setHours(0, 0, 0, 0);
+
+      const endOfThisWeek = new Date(startOfThisWeek);
+      endOfThisWeek.setDate(startOfThisWeek.getDate() + 6); // End of this week (Saturday)
+      endOfThisWeek.setHours(23, 59, 59, 999);
+
+      return {
+        start: startOfThisWeek.toISOString(),
+        end: endOfThisWeek.toISOString()
+      };
+    }
+
+    if (messageLower.includes('today')) {
+      const startOfToday = new Date(now);
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const endOfToday = new Date(now);
+      endOfToday.setHours(23, 59, 59, 999);
+
+      return {
+        start: startOfToday.toISOString(),
+        end: endOfToday.toISOString()
+      };
+    }
+
+    if (messageLower.includes('yesterday')) {
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+
+      const endOfYesterday = new Date(yesterday);
+      endOfYesterday.setHours(23, 59, 59, 999);
+
+      return {
+        start: yesterday.toISOString(),
+        end: endOfYesterday.toISOString()
+      };
+    }
 
     // Look for specific months and years
     if (messageLower.includes('march') && messageLower.includes('june') && messageLower.includes('2025')) {
@@ -481,8 +926,26 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
       };
     }
 
+    // Look for single month references
+    const months = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+
+    for (let i = 0; i < months.length; i++) {
+      if (messageLower.includes(months[i])) {
+        const year = messageLower.includes('2025') ? 2025 : now.getFullYear();
+        const startOfMonth = new Date(year, i, 1);
+        const endOfMonth = new Date(year, i + 1, 0, 23, 59, 59);
+
+        return {
+          start: startOfMonth.toISOString(),
+          end: endOfMonth.toISOString()
+        };
+      }
+    }
+
     // Default to current month if no specific range is mentioned
-    const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 

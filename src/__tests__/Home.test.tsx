@@ -66,7 +66,7 @@ describe('Home Page', () => {
 
     renderWithProviders(<Home />);
 
-    expect(screen.getByText('CalendarGPT')).toBeInTheDocument();
+    expect(screen.getByText('Calendar Assistant')).toBeInTheDocument();
     expect(screen.getByText('Your intelligent assistant for seamless Google Calendar management.')).toBeInTheDocument();
     expect(screen.getByText('Sign in with Google')).toBeInTheDocument();
     expect(screen.getByText('Natural language event creation')).toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('Home Page', () => {
 
     renderWithProviders(<Home />);
 
-    expect(screen.getAllByText('CalendarGPT')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Calendar Assistant')[0]).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('john@example.com')).toBeInTheDocument();
     expect(screen.getByTestId('chat-component')).toBeInTheDocument();

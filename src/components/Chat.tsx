@@ -3,7 +3,7 @@
 import { useCalendar } from '@/contexts/CalendarContext';
 import { CalendarEvent } from '@/types/calendar';
 import { useSession } from 'next-auth/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { ModelType } from '../appconfig/models';
@@ -59,7 +59,7 @@ export function Chat() {
   });
 
   // Debug: Log whenever component renders and message count
-  console.log('🔄 Chat component render - Message count:', messages.length, 'Status:', status);
+  // console.log('🔄 Chat component render - Message count:', messages.length, 'Status:', status);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
@@ -68,7 +68,30 @@ export function Chat() {
   const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
   const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
   const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
-  const [useAgenticMode, setUseAgenticMode] = useState(true); // Default to ON for best performance
+
+  // Initialize agentic mode from localStorage or default to FALSE (SIMPLE mode)
+  const [useAgenticMode, setUseAgenticMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('useAgenticMode');
+        return saved ? JSON.parse(saved) : false; // Default to SIMPLE mode
+      } catch {
+        return false;
+      }
+    }
+    return false; // Default to SIMPLE mode
+  });
+
+  // Persist agentic mode setting to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('useAgenticMode', JSON.stringify(useAgenticMode));
+      } catch (error) {
+        console.warn('Failed to save agentic mode setting:', error);
+      }
+    }
+  }, [useAgenticMode]);
 
   // Function to clear chat messages and sessionStorage
   const clearChat = () => {
@@ -227,14 +250,22 @@ export function Chat() {
     if (useAgenticMode && useToolsMode) {
       setLoadingStatus('🤖 Starting agentic orchestrator...');
     } else if (useToolsMode) {
-      setLoadingStatus('🔧 Processing with calendar tools...');
+      setLoadingStatus('🔧 Processing with simple calendar tools...');
     } else {
-      setLoadingStatus('💬 Processing your message...');
+      setLoadingStatus('� Processing with legacy mode...');
     }
 
     const startTime = Date.now();
 
     try {
+      // Debug: Log the mode settings being used
+      console.log('🔧 DEBUG: Sending request with modes:', {
+        useToolsMode,
+        useAgenticMode,
+        selectedModel,
+        orchestratorModel
+      });
+
       // Log the client-side API call
       addAPILog({
         service: 'ai',
@@ -496,7 +527,7 @@ export function Chat() {
     return (
       <div className="text-center p-8">
         <h2 className="text-2xl font-semibold mb-4 text-high-contrast">Please Sign In</h2>
-        <p className="text-medium-contrast">You need to be authenticated to use CalendarGPT.</p>
+        <p className="text-medium-contrast">You need to be authenticated to use Calendar Assistant.</p>
       </div>
     );
   }
@@ -532,7 +563,7 @@ export function Chat() {
                 </div>
               </div>
             </div>
-            <h1 className="text-3xl font-bold mb-2 text-high-contrast">Welcome to CalendarGPT</h1>
+            <h1 className="text-3xl font-bold mb-2 text-high-contrast">Welcome to Calendar Assistant</h1>
             <p className="text-medium-contrast mb-4">
               I&apos;m your AI assistant with full access to your Google Calendar.
             </p>
@@ -573,7 +604,7 @@ export function Chat() {
               </div>
             </div>
             <div className="chat-header">
-              {message.type === 'user' ? 'You' : 'CalendarGPT'}
+              {message.type === 'user' ? 'You' : 'Calendar Assistant'}
               <time className="text-xs opacity-50 ml-1">
                 {message.timestamp.toLocaleTimeString('en-GB')}
               </time>

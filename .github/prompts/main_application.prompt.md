@@ -1,8 +1,8 @@
-# GitHub Copilot Guide: CalendarGPT Project
+# GitHub Copilot Guide: Calendar Assistant Project
 
-**Welcome, GitHub Copilot!** This document is your primary guide for understanding and contributing to the CalendarGPT project. Please refer to it for project structure, architectural patterns, coding conventions, testing practices, and development workflows. Your goal is to help develop and maintain this application consistently and effectively.
+**Welcome, GitHub Copilot!** This document is your primary guide for understanding and contributing to the Calendar Assistant project. Please refer to it for project structure, architectural patterns, coding conventions, testing practices, and development workflows. Your goal is to help develop and maintain this application consistently and effectively.
 
-## 1. Project Overview: CalendarGPT - AI Calendar Assistant
+## 1. Project Overview: Calendar Assistant - AI Calendar Assistant
 
 A friendly, professional AI assistant for managing Google Calendar events, built with Next.js, TypeScript, and modern web technologies.
 
@@ -99,7 +99,7 @@ Visit `http://localhost:3000` to access the application.
 
 ### Agentic Chat Interface
 
-CalendarGPT features three operation modes:
+Calendar Assistant features three operation modes:
 
 #### 1. **Legacy Mode**
 
@@ -121,7 +121,7 @@ Advanced multi-step reasoning where the AI:
 
 ### Natural Language Commands
 
-CalendarGPT understands complex natural language commands:
+Calendar Assistant understands complex natural language commands:
 
 - **Create Events**: "Schedule a meeting with John tomorrow at 2 PM"
 - **Search Events**: "Show me all Nespola events from March to June 2025"
@@ -237,7 +237,7 @@ calendar-assistant/
 
 ### 4.1. Agentic Architecture (Key for Copilot)
 
-This is the heart of CalendarGPT's intelligence. Understand it well.
+This is the heart of Calendar Assistant's intelligence. Understand it well.
 
 #### 4.1.1. ToolRegistry (`src/tools/tool-registry.ts`)
 
@@ -467,7 +467,7 @@ This section is specifically for you, GitHub Copilot, especially when operating 
 
 ### 7.1. Your Primary Objective
 
-To assist in developing CalendarGPT by generating high-quality, consistent, and well-tested code, adhering to all guidelines in this document.
+To assist in developing Calendar Assistant by generating high-quality, consistent, and well-tested code, adhering to all guidelines in this document.
 
 ### 7.2. Understanding Requests
 
@@ -579,7 +579,7 @@ If you encounter issues:
 
 ---
 
-**Copilot, by following these guidelines, you will be an invaluable asset to the CalendarGPT project. Let's build something great!**
+**Copilot, by following these guidelines, you will be an invaluable asset to the Calendar Assistant project. Let's build something great!**
 
 ## X. How to Answer User's Questions in Copilot Chat
 

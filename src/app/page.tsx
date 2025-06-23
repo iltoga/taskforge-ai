@@ -8,23 +8,23 @@ import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { useCalendar } from '@/contexts/CalendarContext';
 import { useDevelopment } from '@/contexts/DevelopmentContext';
 import {
-  BarChart3,
-  Calendar,
-  CalendarIcon,
-  CheckCircle,
-  FileText,
-  LogOut,
-  Menu,
-  MessageSquare,
-  Settings,
-  Sparkles,
-  User
+    BarChart3,
+    Calendar,
+    CalendarIcon,
+    CheckCircle,
+    FileText,
+    LogOut,
+    Menu,
+    MessageSquare,
+    Settings,
+    Sparkles,
+    User
 } from 'lucide-react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Image from 'next/image';
 import { useState } from 'react';
 
-const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'CalendarGPT';
+const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'Calendar Assistant';
 
 export default function Home() {
   const { data: session, status } = useSession();

@@ -110,7 +110,7 @@ Visit `http://localhost:3000` to access the application.
 
 ### Agentic Chat Interface
 
-CalendarGPT features three operation modes:
+Calendar Assistant features three operation modes:
 
 #### 1. **Legacy Mode**
 
@@ -132,7 +132,7 @@ Advanced multi-step reasoning where the AI:
 
 ### Natural Language Commands
 
-CalendarGPT understands complex natural language commands:
+Calendar Assistant understands complex natural language commands:
 
 - **Create Events**: "Schedule a meeting with John tomorrow at 2 PM"
 - **Search Events**: "Show me all Nespola events from March to June 2025"
@@ -246,7 +246,7 @@ src/
 
 ## Enhanced Agentic Orchestration
 
-CalendarGPT implements a sophisticated agentic AI system that goes beyond simple tool calling to provide true multi-step reasoning and intelligent workflow orchestration.
+Calendar Assistant implements a sophisticated agentic AI system that goes beyond simple tool calling to provide true multi-step reasoning and intelligent workflow orchestration.
 
 ### Orchestration Architecture
 

@@ -149,7 +149,9 @@ Both events show active Nespola project work during Q2 2025.`
       100,
       'nespola',
       false,
-      'startTime'
+      'startTime',
+      undefined,  // timeZone
+      'primary'   // calendarId
     );
 
     // 5. Returned data is simplified (not verbose Google Calendar objects)

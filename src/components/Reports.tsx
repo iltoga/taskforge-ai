@@ -7,8 +7,9 @@ import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { ModelSelector } from './ModelSelector';
 
-interface WeeklyReport {
+interface Report {
   period: string;
+  reportType?: 'weekly' | 'monthly' | 'quarterly';
   totalEvents: number;
   workingHours: number;
   meetingHours: number;
@@ -20,6 +21,8 @@ interface WeeklyReport {
     duration: string;
     startDate?: string | null;
     endDate?: string | null;
+    startTimeZone?: string | null;
+    endTimeZone?: string | null;
     type: string;
     status?: string | null;
     attendees?: number;
@@ -30,7 +33,7 @@ interface WeeklyReport {
 export function Reports() {
   const { data: session } = useSession();
   const { selectedCalendarId, isInitialized } = useCalendar();
-  const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
@@ -140,8 +143,8 @@ export function Reports() {
     }
 
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      startDate: `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`,
+      endDate: `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`,
       label
     };
   };
@@ -158,13 +161,26 @@ export function Reports() {
     try {
       const { startDate, endDate } = getDateRange(selectedPeriod);
 
+      // Determine report type based on selected period
+      const getReportType = (period: string): 'weekly' | 'monthly' | 'quarterly' => {
+        if (period.includes('week')) {
+          return 'weekly';
+        } else if (period.includes('quarter')) {
+          return 'quarterly';
+        } else {
+          return 'monthly'; // months and two-months periods
+        }
+      };
+
+      const reportType = getReportType(selectedPeriod);
+
       // Debug: Log the calculated date range
-      console.log(`🗓️ Generating report for period: ${selectedPeriod}`);
+      console.log(`🗓️ Generating ${reportType} report for period: ${selectedPeriod}`);
       console.log(`📅 Date range: ${startDate} to ${endDate}`);
       console.log(`🏢 Company: ${company.trim()}`);
       console.log(`📅 Calendar: ${selectedCalendarId}`);
 
-      const response = await fetch('/api/reports/weekly', {
+      const response = await fetch('/api/reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,6 +192,7 @@ export function Reports() {
           endDate,
           calendarId: selectedCalendarId,
           model: selectedModel,
+          reportType,
         }),
       });
 
@@ -197,8 +214,11 @@ export function Reports() {
     if (!report) return;
 
     const { label } = getDateRange(selectedPeriod);
+    const reportTypeLabel = report.reportType ?
+      report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1) :
+      'Work';
 
-    const reportText = `Work Report - ${label}
+    const reportText = `${reportTypeLabel} Report - ${label}
 ${report.period}
 
 Summary:
@@ -219,7 +239,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `work-report-${company && company.trim() ? company.toLowerCase().replace(/\s+/g, '-') : 'all'}-${selectedPeriod}.txt`;
+    a.download = `${report.reportType || 'work'}-report-${company && company.trim() ? company.toLowerCase().replace(/\s+/g, '-') : 'all'}-${selectedPeriod}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -553,20 +573,33 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
                                           weekday: 'long',
                                           year: 'numeric',
                                           month: 'long',
-                                          day: 'numeric'
+                                          day: 'numeric',
+                                          ...(event.startTimeZone && { timeZone: event.startTimeZone })
                                         })}
                                       </p>
                                       {!event.isAllDay && (
-                                        <p className="text-base-content">
-                                          🕐 {new Date(event.startDate).toLocaleTimeString('en-GB', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}
-                                          {event.endDate && ` - ${new Date(event.endDate).toLocaleTimeString('en-GB', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })}`}
-                                        </p>
+                                        <div className="space-y-1">
+                                          <p className="text-base-content">
+                                            🕐 {new Date(event.startDate).toLocaleTimeString('en-GB', {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                              ...(event.startTimeZone && { timeZone: event.startTimeZone })
+                                            })}
+                                            {event.endDate && ` - ${new Date(event.endDate).toLocaleTimeString('en-GB', {
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                              ...(event.endTimeZone && { timeZone: event.endTimeZone })
+                                            })}`}
+                                          </p>
+                                          {event.startTimeZone && (
+                                            <p className="text-xs text-base-content/60 flex items-center gap-1">
+                                              🌍 Timezone: {event.startTimeZone}
+                                              {event.endTimeZone && event.endTimeZone !== event.startTimeZone && (
+                                                <span> → {event.endTimeZone}</span>
+                                              )}
+                                            </p>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
                                   </div>
@@ -643,6 +676,20 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
                                           <span className="font-medium">24-hour</span>
                                         </div>
                                       )}
+                                      {event.startTimeZone && (
+                                        <div className="flex justify-between">
+                                          <span className="text-base-content/70">Timezone</span>
+                                          <span className="font-medium text-xs">{event.startTimeZone}</span>
+                                        </div>
+                                      )}
+                                      {event.startDate && event.endDate && (
+                                        <div className="flex justify-between">
+                                          <span className="text-base-content/70">Duration Calc</span>
+                                          <span className="font-medium text-xs">
+                                            {Math.round((new Date(event.endDate).getTime() - new Date(event.startDate).getTime()) / (1000 * 60))} min
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -674,6 +721,11 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
                             {event.status && (
                               <div className="badge badge-ghost badge-sm">
                                 ✅ {event.status}
+                              </div>
+                            )}
+                            {event.startTimeZone && !event.isAllDay && (
+                              <div className="badge badge-ghost badge-sm">
+                                🌍 {event.startTimeZone}
                               </div>
                             )}
                           </div>
