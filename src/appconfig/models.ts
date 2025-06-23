@@ -1,4 +1,4 @@
-export type ModelType = 'gpt-4o' | 'gpt-4o-mini' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash-preview-05-20:thinking' | 'google/gemini-2.5-flash-preview-05-20' | 'google/gemini-2.5-flash-lite-preview-06-17' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
+export type ModelType = 'gpt-4o' | 'gpt-4.1-mini-2025-04-14' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash-preview-05-20:thinking' | 'google/gemini-2.5-flash-preview-05-20' | 'google/gemini-2.5-flash-lite-preview-06-17' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
 
 export interface ModelInfo {
   id: ModelType;
@@ -14,8 +14,8 @@ export interface ModelInfo {
 // Model configuration that can be used on both client and server
 export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
   {
-    id: 'gpt-4o-mini',
-    name: 'GPT-4o Mini',
+    id: 'gpt-4.1-mini-2025-04-14',
+    name: 'GPT-4.1 Mini (2025-04-14)',
     description: 'Fast & cost-effective for most tasks',
     pricing: '$0.15/1M tokens',
     contextWindow: '128K',

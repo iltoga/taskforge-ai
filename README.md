@@ -113,13 +113,17 @@ Visit `http://localhost:3000` to access the application.
 CalendarGPT features three operation modes:
 
 #### 1. **Legacy Mode**
+
 Traditional JSON-based calendar operations for backward compatibility.
 
 #### 2. **Tools Mode**
+
 Simple tool-based responses with single tool calls.
 
 #### 3. **Agentic Mode** (NEW!)
+
 Advanced multi-step reasoning where the AI:
+
 - Analyzes your request and plans which tools to use
 - Executes tools iteratively based on intermediate results
 - Evaluates when sufficient information is gathered
@@ -145,6 +149,7 @@ CalendarGPT understands complex natural language commands:
 ### Development Mode
 
 Enable development mode to see:
+
 - Step-by-step AI reasoning process
 - Tool call parameters and responses
 - Execution timing and performance metrics
@@ -221,7 +226,7 @@ src/
 │   ├── ModelSelector.tsx # Chat AI model selection
 │   ├── OrchestratorModelSelector.tsx # Orchestrator AI model selection
 │   └── Providers.tsx     # Context providers
-├── config/                # Configuration files
+├── appconfig/                # Configuration files
 │   └── models.ts         # AI model configurations and types
 ├── lib/                   # Utility libraries
 │   └── auth.ts           # NextAuth configuration
@@ -246,6 +251,7 @@ CalendarGPT implements a sophisticated agentic AI system that goes beyond simple
 ### Orchestration Architecture
 
 #### ToolOrchestrator Engine
+
 The `ToolOrchestrator` class provides advanced AI reasoning capabilities:
 
 - **Multi-Step Analysis**: Comprehensive request decomposition and strategic planning
@@ -286,12 +292,14 @@ The orchestrator uses structured prompting for each phase:
 ### Tool Categories & Extensibility
 
 #### Currently Implemented
+
 - **Calendar Tools**: Event management, searching, creation, updates, deletion
 - **Email Tools**: Sending, searching, replying (mock implementations)
 - **File Tools**: File operations, directory management (mock implementations)
 - **Web Tools**: Web searching, content fetching (mock implementations)
 
 #### Extensibility Pattern
+
 Adding new tool categories follows a consistent pattern:
 
 ```typescript
@@ -325,7 +333,7 @@ Enable comprehensive debugging and transparency:
 const result = await orchestrator.orchestrate(
   userMessage,
   registry,
-  'gpt-4o-mini',
+  'gpt-4.1-mini-2025-04-14',
   { developmentMode: true }
 );
 
@@ -357,6 +365,7 @@ For a request like "Find all Nespola meetings next week and create a summary":
 ### Testing Coverage
 
 Comprehensive test suite covers:
+
 - Enhanced prompting system validation
 - Multi-step reasoning scenarios
 - Tool failure recovery mechanisms
@@ -410,7 +419,7 @@ The application can be deployed on any platform that supports Next.js:
 
 2. **OpenAI API Errors**
    - Check your API key is valid and has sufficient credits
-   - Ensure you're using the correct model (gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
+   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini-2025-04-14, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
 
 3. **Authentication Issues**
    - Verify NEXTAUTH_SECRET is set

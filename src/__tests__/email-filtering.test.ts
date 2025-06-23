@@ -8,8 +8,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { isEmailAllowed, loadAllowedEmails } from '../config/email-filter';
-import { EmailFilterManager } from '../config/email-filter-manager';
+import { isEmailAllowed, loadAllowedEmails } from '../appconfig/email-filter';
+import { EmailFilterManager } from '../appconfig/email-filter-manager';
 
 // Mock file system for testing
 jest.mock('fs');

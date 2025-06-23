@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { ModelType } from '../config/models';
+import { ModelType } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ModelSelector } from './ModelSelector';
 import { OrchestratorModelSelector } from './OrchestratorModelSelector';
@@ -62,8 +62,8 @@ export function Chat() {
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
   const [currentProgressMessages, setCurrentProgressMessages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4o-mini');
-  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4o-mini');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
+  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
   const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
   const [useAgenticMode, setUseAgenticMode] = useState(true); // Default to ON for best performance
 

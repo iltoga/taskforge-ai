@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 
 # email filter configuration (contains sensitive email addresses)
-config/allowed-emails.json
+settings/allowed-emails.json

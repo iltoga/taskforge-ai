@@ -152,7 +152,7 @@ describe('Chat API - Nespola Filtering Test', () => {
       method: 'POST',
       body: JSON.stringify({
         message: 'list all events relative to nespola from march to june 2025',
-        model: 'gpt-4o-mini'
+        model: 'gpt-4.1-mini-2025-04-14'
       }),
     });
 
@@ -164,7 +164,7 @@ describe('Chat API - Nespola Filtering Test', () => {
     expect(mockAIProcessMessage).toHaveBeenCalledWith(
       'list all events relative to nespola from march to june 2025',
       mockCalendarEvents.items,
-      'gpt-4o-mini'
+      'gpt-4.1-mini-2025-04-14'
     );
 
     // Verify calendar service was called with correct date range (no search query since we do client-side filtering)
@@ -252,7 +252,7 @@ describe('Chat API - Nespola Filtering Test', () => {
       method: 'POST',
       body: JSON.stringify({
         message: 'list events for nespola',
-        model: 'gpt-4o-mini'
+        model: 'gpt-4.1-mini-2025-04-14'
       }),
     });
 

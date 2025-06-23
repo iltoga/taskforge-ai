@@ -40,7 +40,7 @@ describe('Calendar Filtering Integration Test', () => {
 
     try {
       // Test AI processing
-      const action = await aiService.processMessage(testPrompt, [], 'gpt-4o-mini');
+      const action = await aiService.processMessage(testPrompt, [], 'gpt-4.1-mini-2025-04-14');
 
       // Verify the AI correctly interpreted the request
       expect(action.type).toBe('list');

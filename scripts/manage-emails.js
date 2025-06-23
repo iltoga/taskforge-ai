@@ -10,7 +10,7 @@
  */
 
 import { createInterface } from 'readline';
-import { EmailFilterManager } from '../src/config/email-filter-manager.js';
+import { EmailFilterManager } from '../src/appconfig/email-filter-manager.js';
 
 const manager = new EmailFilterManager();
 

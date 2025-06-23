@@ -79,9 +79,9 @@ describe('Chat Component', () => {
         body: JSON.stringify({
           message: 'Create a meeting tomorrow at 2 PM',
           messages: [], // Now includes messages array (empty for first message)
-          model: 'gpt-4o-mini',
+          model: 'gpt-4.1-mini-2025-04-14',
           useTools: true, // Updated default
-          orchestratorModel: 'gpt-4o-mini',
+          orchestratorModel: 'gpt-4.1-mini-2025-04-14',
           developmentMode: true, // Updated default
         }),
       });

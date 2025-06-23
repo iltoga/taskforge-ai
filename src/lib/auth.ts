@@ -1,4 +1,4 @@
-import { isEmailAllowed, loadAllowedEmails } from '@/config/email-filter';
+import { isEmailAllowed, loadAllowedEmails } from '@/appconfig/email-filter';
 import { OAuth2Client } from 'google-auth-library';
 import NextAuth, { AuthOptions, Session } from 'next-auth';
 import { JWT } from 'next-auth/jwt';

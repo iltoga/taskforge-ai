@@ -30,7 +30,7 @@ describe('Nespola Event Filtering - Core Logic Test', () => {
     const testPrompt = 'list all events relative to nespola from march to june 2025';
 
     try {
-      const action = await aiService.processMessage(testPrompt, [], 'gpt-4o-mini');
+      const action = await aiService.processMessage(testPrompt, [], 'gpt-4.1-mini-2025-04-14');
 
       console.log('🤖 AI Response:', JSON.stringify(action, null, 2));
 

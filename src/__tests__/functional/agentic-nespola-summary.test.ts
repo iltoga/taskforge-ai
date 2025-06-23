@@ -187,7 +187,7 @@ The activities show ongoing project development work with focus on AI-powered to
       'summarize all events for nespola between march and june 2025',
       [], // empty chat history
       registry,
-      'gpt-4o-mini',
+      'gpt-4.1-mini-2025-04-14',
       {
         developmentMode: true,
         maxSteps: 10
@@ -342,7 +342,7 @@ CALL_TOOLS:
       'find nespola events march to june 2025',
       [], // empty chat history
       registry,
-      'gpt-4o-mini'
+      'gpt-4.1-mini-2025-04-14'
     );
 
     expect(result.success).toBe(true);
@@ -377,7 +377,7 @@ CALL_TOOLS:
       'find events for nonexistent',
       [], // empty chat history
       registry,
-      'gpt-4o-mini'
+      'gpt-4.1-mini-2025-04-14'
     );
 
     expect(result.success).toBe(true);
@@ -409,7 +409,7 @@ CALL_TOOLS:
       'find test events',
       [], // empty chat history
       registry,
-      'gpt-4o-mini'
+      'gpt-4.1-mini-2025-04-14'
     );
 
     expect(result.success).toBe(true);

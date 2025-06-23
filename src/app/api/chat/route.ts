@@ -1,4 +1,4 @@
-import { ModelType } from '@/config/models';
+import { ModelType } from '@/appconfig/models';
 import { authOptions, createGoogleAuth } from '@/lib/auth';
 import { AIService } from '@/services/ai-service';
 import { CalendarService } from '@/services/calendar-service';
@@ -6,7 +6,8 @@ import { CalendarTools } from '@/tools/calendar-tools';
 import { EmailTools } from '@/tools/email-tools';
 import { FileTools } from '@/tools/file-tools';
 import { createToolRegistry } from '@/tools/tool-registry';
-import { WebTools } from '@/tools/web-tools';
+// import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
+import { registerKnowledgeTools } from '@/tools/knowledge-tools';
 import { ExtendedSession } from '@/types/auth';
 import { CalendarEvent } from '@/types/calendar';
 import { getServerSession } from 'next-auth';
@@ -34,9 +35,9 @@ export async function POST(request: Request) {
     const {
       message,
       messages,
-      model = 'gpt-4o-mini',
+      model = 'gpt-4.1-mini-2025-04-14',
       useTools = false,
-      orchestratorModel = 'gpt-4o-mini',
+      orchestratorModel = 'gpt-4.1-mini-2025-04-14',
       developmentMode = false
     } = await request.json() as {
       message: string;
@@ -82,9 +83,13 @@ export async function POST(request: Request) {
         const calendarTools = new CalendarTools(calendarService);
         const emailTools = new EmailTools();
         const fileTools = new FileTools();
-        const webTools = new WebTools();
+        // Disabled web tools to force use of vector search for knowledge queries
+        // const webTools = new WebTools();
+        // const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, webTools);
+        const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools);
 
-        const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, webTools);
+        // Register knowledge tools (including vector search) for non-calendar queries
+        registerKnowledgeTools(toolRegistry);
 
         console.log('🤖 Tool registry created, calling orchestrator...');
         const result = await aiService.processMessageWithOrchestrator(

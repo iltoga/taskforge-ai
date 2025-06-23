@@ -81,11 +81,28 @@ export class CalendarService {
     orderBy?: 'startTime' | 'updated',
     timeZone?: string
   ): Promise<EventList> {
+    // Convert date strings to RFC3339 format if they're in YYYY-MM-DD format
+    const formatDateForCalendarAPI = (dateStr?: string): string | undefined => {
+      if (!dateStr) return undefined;
+
+      // If it's already in ISO format, return as is
+      if (dateStr.includes('T') || dateStr.includes('Z')) {
+        return dateStr;
+      }
+
+      // If it's in YYYY-MM-DD format, convert to RFC3339
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return `${dateStr}T00:00:00Z`;
+      }
+
+      return dateStr;
+    };
+
     // Use more reasonable defaults for maxResults and timezone
     const params = {
       calendarId: 'primary',
-      timeMin,
-      timeMax,
+      timeMin: formatDateForCalendarAPI(timeMin),
+      timeMax: formatDateForCalendarAPI(timeMax),
       maxResults: maxResults || 250, // Reduced from 2500 to avoid too many old events
       q,
       showDeleted: showDeleted || false,

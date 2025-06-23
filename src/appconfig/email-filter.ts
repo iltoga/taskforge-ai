@@ -11,7 +11,7 @@ export interface AllowedEmailsConfig {
  */
 export function loadAllowedEmails(): string[] {
   try {
-    const configPath = path.join(process.cwd(), 'config', 'allowed-emails.json');
+    const configPath = path.join(process.cwd(), 'settings', 'allowed-emails.json');
 
     // Check if config file exists
     if (!fs.existsSync(configPath)) {

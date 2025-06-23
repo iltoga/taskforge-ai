@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { ModelType } from '../config/models';
+import { ModelType } from '../appconfig/models';
 import { CalendarTools } from '../tools/calendar-tools';
 import { CalendarAction, CalendarEvent } from '../types/calendar';
 
@@ -12,6 +12,15 @@ export interface AIProviderConfig {
   provider: ProviderType;
   apiKey: string;
   baseURL?: string;
+}
+
+export interface ExtractedEvent {
+  title: string;
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  location: string | null;
+  description: string | null;
 }
 
 export class AIService {
@@ -131,7 +140,7 @@ export class AIService {
   async processMessage(
     message: string,
     existingEvents?: CalendarEvent[],
-    model: ModelType = 'gpt-4o-mini'
+    model: ModelType = 'gpt-4.1-mini-2025-04-14'
   ): Promise<CalendarAction> {
     const systemPrompt = this.loadSystemPrompt();
 
@@ -195,7 +204,7 @@ export class AIService {
     }
   }
 
-  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4o-mini'): Promise<string> {
+  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini-2025-04-14'): Promise<string> {
     const systemPrompt = `
 You are tasked with generating a detailed weekly work report for Stefano.
 Format the output as follows:
@@ -247,7 +256,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     message: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = 'gpt-4o-mini',
+    orchestratorModel: ModelType = 'gpt-4.1-mini-2025-04-14',
     developmentMode: boolean = false
   ): Promise<{
     response: string;
@@ -308,7 +317,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     message: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = 'gpt-4o-mini',
+    orchestratorModel: ModelType = 'gpt-4.1-mini-2025-04-14',
     developmentMode: boolean = false,
     progressCallback: (data: { type: string; message?: string; [key: string]: unknown }) => void
   ): Promise<{
@@ -483,7 +492,7 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     };
   }
 
-  async translateToEnglish(text: string, model: ModelType = 'gpt-4o-mini'): Promise<string> {
+  async translateToEnglish(text: string, model: ModelType = 'gpt-4.1-mini-2025-04-14'): Promise<string> {
     // If text is already in English or looks like English, don't translate
     const englishPattern = /^[a-zA-Z0-9\s.,!?'"()/-]+$/;
     if (englishPattern.test(text) && text.split(' ').length > 1) {
@@ -509,6 +518,58 @@ ${events.map(event => `Date: ${event.start?.date || event.start?.dateTime}, Acti
     } catch (error) {
       console.error('Translation error:', error);
       return text; // Return original text on error
+    }
+  }
+
+  async analyzeImageForEvents(imageBase64: string, prompt: string): Promise<ExtractedEvent[]> {
+    try {
+      // Remove data URL prefix if present
+      const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+
+      const response = await generateText({
+        model: this.openaiClient.languageModel('gpt-4.1-mini-2025-04-14'),
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'image',
+                image: `data:image/jpeg;base64,${base64Data}`
+              }
+            ]
+          }
+        ],
+        temperature: 0.3,
+      });
+
+      // Parse the JSON response
+      const responseText = response.text.trim();
+
+      // Try to extract JSON from the response
+      let jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        // If no array found, try to find any JSON object and wrap it
+        jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonMatch[0] = `[${jsonMatch[0]}]`;
+        }
+      }
+
+      if (!jsonMatch) {
+        console.error('No JSON found in response:', responseText);
+        return [];
+      }
+
+      const eventsData = JSON.parse(jsonMatch[0]);
+      return Array.isArray(eventsData) ? eventsData : [eventsData];
+
+    } catch (error) {
+      console.error('Vision analysis error:', error);
+      throw new Error(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

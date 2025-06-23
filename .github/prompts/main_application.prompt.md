@@ -23,12 +23,14 @@ To provide an intelligent, intuitive, and extensible calendar management solutio
 - 🎨 **Modern UI**: Beautiful interface built with DaisyUI and Tailwind CSS.
 - 🔐 **Secure Authentication**: Google OAuth2 integration with NextAuth.js.
 - ✅ **Test Coverage**: Comprehensive test suite using Jest and Testing Library.
+- 📚 **Knowledge Base Search**: Factual-only search of internal documents and policies using the vectorFileSearch tool, with a strict fallback when no results are found.
 
 ## 2. Technology Stack
 
 - **Framework**: Next.js 15+ with TypeScript
 - **AI Architecture**: Agentic tool orchestration with multi-step reasoning (`ToolOrchestrator`, `ToolRegistry`)
 - **Tool System**: Extensible `ToolRegistry` and `ToolOrchestrator` for scalable AI workflows (see `src/tools/` and `src/services/tool-orchestrator.ts`)
+- **Vector Search Tool**: OpenAI v1/responses API integration for factual search over internal knowledge stores (`src/tools/vector-search-tool.ts`, `settings/vector-search.json`)
 - **Authentication**: NextAuth.js with Google OAuth2 (`src/lib/auth.ts`)
 - **UI**: DaisyUI 5, Tailwind CSS 4, Lucide React icons
 - **APIs**: Google Calendar API, OpenAI API (supporting GPT-4o, GPT-4o Mini, and other models via OpenRouter)
@@ -181,29 +183,44 @@ calendar-assistant/
 │   └── prompts/
 │       └── main_application.prompt.md  # This guide!
 ├── public/                             # Static assets
+├── settings/                           # Configuration files (e.g., allowed emails, vector search)
 ├── src/
+│   ├── __mocks__/                      # Mock implementations for testing
 │   ├── __tests__/                      # Jest tests (unit, integration, component)
 │   │   ├── functional/                 # Functional tests
 │   │   └── integration/                # Integration tests
 │   ├── app/                            # Next.js App Router
-│   │   ├── (pages)/                    # Page routes (e.g., page.tsx for home)
 │   │   ├── api/                        # API routes (backend logic)
 │   │   │   ├── auth/                   # NextAuth.js authentication
 │   │   │   ├── chat/                   # Main chat API endpoint (agentic orchestration)
-│   │   │   └── reports/                # Reports generation API
+│   │   │   │   ├── route.ts            # Chat API route
+│   │   │   │   └── stream/             # Streaming chat API
+│   │   │   │       └── route.ts        # Streaming chat route
+│   │   │   ├── dev/                    # Development-related API endpoints
+│   │   │   ├── reports/                # Reports generation API
+│   │   │   └── test/                   # Test-related API endpoints
 │   │   ├── layout.tsx                  # Root layout
 │   │   ├── globals.css                 # Global styles
-│   │   └── favicon.ico
+│   │   ├── page-clean.tsx              # Clean page layout
+│   │   └── page.tsx                    # Home page
 │   ├── components/                     # React UI components (client & server)
+│   ├── appconfig/                      # Application configuration and core logic
+│   │   ├── email-filter-manager.ts     # Utility to manage allowed emails configuration
+│   │   ├── models.ts                   # Model type definitions and configuration for supported AI models
+│   ├── contexts/                       # React Contexts for state management
 │   ├── lib/                            # Core libraries, utilities (e.g., auth.ts)
 │   ├── services/                       # Backend service logic
 │   │   ├── ai-service.ts               # AI model interaction
 │   │   ├── calendar-service.ts         # Google Calendar interaction
 │   │   └── tool-orchestrator.ts        # Core agentic reasoning engine
 │   ├── tools/                          # Extensible tool system
-│   │   ├── tool-registry.ts            # Tool registration and management
-│   │   ├── tool-definitions.ts         # Zod schemas for tool parameters
 │   │   ├── calendar-tools.ts           # Calendar-specific tools
+│   │   ├── email-tools.ts              # Email-specific tools
+│   │   ├── file-tools.ts               # File-specific tools
+│   │   ├── knowledge-tools.ts          # Knowledge-specific tools
+│   │   ├── tool-definitions.ts         # Zod schemas for tool parameters
+│   │   ├── tool-registry.ts            # Tool registration and management
+│   │   ├── vector-search-tool.ts       # Vector search tool for knowledge base
 │   │   └── web-tools.ts                # Web-related tools (e.g., fetching)
 │   └── types/                          # TypeScript type definitions
 ├── eslint.config.mjs                   # ESLint configuration
@@ -211,7 +228,11 @@ calendar-assistant/
 ├── next.config.ts                      # Next.js configuration
 ├── package.json                        # Project dependencies and scripts
 ├── tsconfig.json                       # TypeScript configuration
-└── README.md                           # General project README
+├── tsconfig.test.json                  # TypeScript configuration for tests
+├── tsconfig.tsbuildinfo                # TypeScript build info
+├── Dockerfile                          # Docker configuration
+├── docker-compose.yml                  # Docker Compose configuration
+├── README.md                           # General project README
 ```
 
 ### 4.1. Agentic Architecture (Key for Copilot)
@@ -540,7 +561,7 @@ To assist in developing CalendarGPT by generating high-quality, consistent, and 
 2. **OpenAI API Errors**
 
    - Check your API key is valid and has sufficient credits
-   - Ensure you're using the correct model (gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
+   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini-2025-04-14, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
 
 3. **Authentication Issues**
    - Verify NEXTAUTH_SECRET is set
@@ -559,3 +580,15 @@ If you encounter issues:
 ---
 
 **Copilot, by following these guidelines, you will be an invaluable asset to the CalendarGPT project. Let's build something great!**
+
+## X. How to Answer User's Questions in Copilot Chat
+
+When interacting with users in GitHub Copilot Chat, follow these optimized LLM guidelines:
+
+1. **Confirm Understanding & Summarize**: Always begin by restating the user's request in your own words and ask for confirmation.
+2. **Present an Implementation Plan**: Once the user approves, provide a detailed plan outlining what you will develop and how you will integrate it.
+3. **Leverage Existing Features**: Prioritize reusing and extending current components, tools, and services instead of duplicating functionality.
+4. **Maintain Backward Compatibility**: When coding, ensure existing features remain intact and your changes work seamlessly with the current application.
+5. **Iterate Code with Validation**: After completing implementation, check the VS Code Problems panel for any new errors or warnings before finalizing.
+
+_Feel free to adapt language for clarity and brevity, but keep instructions explicit for the LLM._

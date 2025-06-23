@@ -1,6 +1,8 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
-import { ModelType } from '../config/models';
+import fs from 'fs';
+import path from 'path';
+import { ModelType } from '../appconfig/models';
 import { ToolExecution, ToolRegistry } from '../tools/tool-registry';
 
 export interface OrchestrationStep {
@@ -35,9 +37,12 @@ export class ToolOrchestrator {
   private openaiClient: ReturnType<typeof createOpenAI>;
   private openrouterClient?: ReturnType<typeof createOpenAI>;
   private progressCallback?: ProgressCallback;
+  private vectorStoreIds: string[] = [];
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    this.loadVectorStoreConfig();
+
     this.openaiClient = createOpenAI({
       apiKey: apiKey,
     });
@@ -49,6 +54,18 @@ export class ToolOrchestrator {
         apiKey: openrouterApiKey,
         baseURL: 'https://openrouter.ai/api/v1',
       });
+    }
+  }
+
+  private loadVectorStoreConfig() {
+    try {
+      const configPath = path.resolve(process.cwd(), 'settings/vector-search.json');
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(configContent);
+      this.vectorStoreIds = config.vectorStoreIds || [];
+    } catch (error) {
+      console.warn('Could not load vector store config:', error);
+      this.vectorStoreIds = [];
     }
   }
 
@@ -84,7 +101,7 @@ export class ToolOrchestrator {
     userMessage: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: ToolRegistry,
-    model: ModelType = 'gpt-4o-mini',
+    model: ModelType = 'gpt-4.1-mini-2025-04-14',
     config: OrchestratorConfig = {}
   ): Promise<OrchestrationResult> {
     const {
@@ -152,10 +169,52 @@ export class ToolOrchestrator {
         for (const toolCall of toolsToCall) {
           if (toolCallCount >= maxToolCalls) break;
 
+          // Enforce original query for first vectorFileSearch call
+          if (
+            toolCall.name === 'vectorFileSearch' &&
+            toolCallCount === 0 && // first tool call
+            toolCall.parameters &&
+            typeof toolCall.parameters.query === 'string' &&
+            toolCall.parameters.query !== userMessage
+          ) {
+            toolCall.parameters.query = userMessage;
+          }
+
+          // Auto-inject vectorStoreIds for vectorFileSearch if not provided
+          if (toolCall.name === 'vectorFileSearch' && toolCall.parameters && !toolCall.parameters.vectorStoreIds) {
+            try {
+              const fs = await import('fs');
+              const path = await import('path');
+              const configPath = path.resolve(process.cwd(), 'settings/vector-search.json');
+              const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+              toolCall.parameters.vectorStoreIds = config.vectorStoreIds;
+            } catch (error) {
+              this.logProgress(`⚠️ Could not load vectorStoreIds from config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+
           this.logProgress(`🔧 Executing tool: ${toolCall.name} with parameters: ${JSON.stringify(toolCall.parameters)}`);
 
           const startTime = Date.now();
           const result = await toolRegistry.executeTool(toolCall.name, toolCall.parameters);
+
+
+          // Enhanced logging for all tools
+          this.logProgress(`🛠️ Tool "${toolCall.name}" parameters: ${JSON.stringify(toolCall.parameters, null, 2)}`);
+          this.logProgress(`📥 Tool "${toolCall.name}" result: ${JSON.stringify(result, null, 2)}`);
+
+          // Enhanced consolidated logging for vectorFileSearch
+          if (toolCall.name === 'vectorFileSearch') {
+            const vectorStoreIds = toolCall.parameters && toolCall.parameters.vectorStoreIds ? JSON.stringify(toolCall.parameters.vectorStoreIds) : 'N/A';
+            const returnedData = result && result.data ? JSON.stringify(result.data, null, 2) : 'No data returned';
+            this.logProgress(
+              `� [vectorFileSearch] Tool executed.\n` +
+              `   - Queried vectorStoreIds: ${vectorStoreIds}\n` +
+              `   - Parameters: ${JSON.stringify(toolCall.parameters, null, 2)}\n` +
+              `   - Returned data: ${returnedData}`
+            );
+          }
+
           const endTime = Date.now();
 
           const execution: ToolExecution = {
@@ -380,7 +439,16 @@ export class ToolOrchestrator {
     const categorizedToolsList = availableCategories
       .map(category => {
         const tools = toolRegistry.getToolsByCategory(category);
-        return `**${category.toUpperCase()}**:\n${tools.map(tool => `  - ${tool.name}: ${tool.description}`).join('\n')}`;
+        return `**${category.toUpperCase()}**:\n${tools.map(tool => {
+          // Provide parameter information based on tool name
+          let paramInfo = 'See tool schema';
+          if (tool.name === 'vectorFileSearch') {
+            paramInfo = 'query (required), maxResults (optional)';
+          } else if (tool.name === 'searchEvents') {
+            paramInfo = 'searchTerm (required), startDate, endDate, maxResults';
+          }
+          return `  - ${tool.name}: ${tool.description} (Parameters: ${paramInfo})`;
+        }).join('\n')}`;
       }).join('\n\n');
 
     const prompt = `
@@ -391,36 +459,86 @@ Today is ${new Date().toLocaleDateString('en-US', {
       day: 'numeric'
     })}.
 
-You are a **CALENDAR ASSISTANT** with intelligent tool orchestration capabilities. Your primary purpose is to help users manage their calendar, events, and schedule-related information.
-
-**CRITICAL CONTEXT**: This is a calendar management application. Any mention of:
-- Projects (like "progetto Italmagneti", "Nespola project", "TechCorp", etc.)
-- Companies or client names
-- Work activities, meetings, or project status
-- "What can you tell me about..." relating to business/work topics
-- Summary requests about work/project topics
-- Questions about project progress, timeline, or history
-
-Should **ALWAYS** be interpreted as **CALENDAR QUERIES** that require searching calendar data, NOT as translation or general knowledge requests.
-
-**MANDATORY EXAMPLES**:
-- "what was the core reason for the project I've been working for in italmagneti in 2025" → Search for all events containing "italmagneti" in 2025
-- "tell me about the nespola project" → Search for all events containing "nespola"
-- "how is the project going?" → Search for recent project-related events
-- "project status" → Search for project meetings and updates
-
-**YOU MUST ALWAYS ATTEMPT TO USE CALENDAR TOOLS FOR PROJECT/WORK QUERIES**
-
+You are a **CALENDAR ASSISTANT** with intelligent tool orchestration capabilities. Your primary purpose is to help users manage their calendar, events, and schedule-related information, with the help of various tools (e.g., searchEvents for calendar integration and vectorFileSearch for knowledge base queries).
+Your goal is to analyze the user's request and determine the best next steps to answer their query based on available tools and context below.
+---START OF CONTEXT---
 ${this.formatChatHistory(chatHistory)}
+---END OF CONTEXT---
 
 User Request: "${userMessage}"
 
 Available Tools by Category:
 ${categorizedToolsList}
 
-**IMPORTANT**: For any queries about projects, companies, work, or when users ask "what can you tell me about [project/company]", your primary approach should be to search calendar data using tools like searchEvents or getEvents to find relevant meetings, events, and schedule information.
+**ALWAYS REMEMBER**:
+- ONLY answer using the tools provided in the tool registry and the context provided. NEVER attempt to answer questions using internal knowledge or guesswork. If you cannot find an answer using the tools, clearly state that no information was found.
+- Use calendar tools for calendar-related queries, such as searching for events, creating events, or managing schedules.
+- Use vectorFileSearch for knowledge base queries, such as searching for documentation, policies, or general knowledge.
+- Do not use web search tools for knowledge queries; always prefer vectorFileSearch.
+- If the user's question is too generic or vague, ask for more details before using any tools.
 
-Perform a comprehensive analysis:
+**CRITICAL CONTEXT**: This is a calendar management application.
+Any mention of:
+- Projects (like "progetto Italmagneti", "Nespola project", "TechCorp", etc.)
+- Companies or client names
+- Work activities, meetings, or project status
+- Deadlines for visa or projects or time-sensitive information
+- Documents expiring or needing updates
+- "What can you tell me about..." relating to business/work topics
+- Summary requests about work/project topics
+- Questions about project progress, timeline, or history
+
+Should **ALWAYS** be interpreted as **CALENDAR QUERIES** that require searching calendar data, NOT as translation or general knowledge requests.
+
+Any questions that:
+- cannot be answered from calendar data (e.g., asks for documentation, policies, procedures, general knowledge, visa information, travel requirements, or other uploaded information)
+- requires domain-specific knowledge (e.g., company policies, visa requirements, travel guidelines, document requirements, deadlines and other general knowledge)
+- asks for documentation, policies, procedures, or general knowledge
+- asks for information about benefits, travel requirements, or visa types
+
+MUST be answered using the vectorFileSearch tool to search the knowledge base, NOT calendar tools.
+
+
+**MANDATORY EXAMPLES FOR CALENDAR QUERIES**:
+- "what was the core reason for the project I've been working for in microsoft in 2025" → Use calendar tools to Search for all events containing "microsoft" in 2025
+- "tell me about the microsoft project" → Use calendar tools to search for all events containing "microsoft"
+- "how is the project going?" → Use calendar tools to search for recent project-related events, limited to the last 20 records/events
+- "project status" → Use calendar tools to search for project meetings and updates
+- "project status for last quarter" → Use calendar tools to search for project meetings and updates in the last quarter
+
+
+**MANDATORY EXAMPLES FOR NON-CALENDAR KNOWLEDGE QUERIES**:
+- "What is the company policy on remote work?" → Use vectorFileSearch
+- "Show me the documentation about visa requirements" → Use vectorFileSearch
+- "What are the travel guidelines?" → Use vectorFileSearch
+- "I need information about benefits" → Use vectorFileSearch
+- "I am italian, what type of visa to indonesia can I get?" → Use vectorFileSearch
+- "What documents do I need for travel?" → Use vectorFileSearch
+- "I need to know the visa requirements for a business trip to Bali" → Use vectorFileSearch
+- "My passport expires next month, can I still apply for a visa? What should I do?" → Use vectorFileSearch
+
+**CRITICAL RULES FOR KNOWLEDGE QUERIES**:
+1. ALWAYS use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions
+2. Do NOT use web search tools for knowledge queries
+3. Do NOT attempt to answer knowledge questions from internal AI knowledge or guess
+4. ONLY return what is found in the vector store via vectorFileSearch
+5. If vectorFileSearch returns no results, clearly state that no information was found in the knowledge base
+
+**IMPORTANT**:
+- You must always prioritize calendar tools for project/work queries, and use vectorFileSearch for knowledge/documentation queries. though the two tools can be combined, in the correct sequence, to produce the best results and answer the user's question or perform the requested action/s.
+- If the user's question is too generic or vague, you should first answer by asking for more information about what you need to know, or what you need to do, before using any tools.
+
+
+**EXAMPLE OF COMBINED TOOL USAGE**:
+- User asks something like "Set an appointment for next week do discuss about my visa requirements for my trip to Bali" -> The sequence of actions would be:
+  1. Ask for more details about the reason for the visit (e.g., "What is the purpose of your trip to Bali? Is it for business or tourism?") and appointment timing (e.g., " and What day and time next week works for you?")
+  2. Use vectorSearch to find information about visa requirements (eg. passport validity, processing times and required documents to apply) for user's specific purpose, nationality and situation (note: you can rephrase user's question and to maximize search effectiveness)
+  3. Then use calendar tools to find any free slot of 30 minutes next week or when the user is available.
+  4. If there are more than one free slot, ask the user to choose one of them.
+  5. Create the event in the calendar with the information found in the vector search (a summary of it) and the original user's request.
+
+
+Now perform a comprehensive analysis:
 
 ## 1. REQUEST DECOMPOSITION
 Break down the user's request into:
@@ -431,13 +549,13 @@ Break down the user's request into:
 ## 2. TOOL STRATEGY
 For each objective, identify:
 - Which tool categories are most relevant
-- Specific tools that might be needed
-- Optimal sequence of tool calls
-- Dependencies between tools
+- Specific tools that might be needed (e.g., searchEvents, vectorFileSearch, or none)
+- Optimal sequence of tool calls (e.g., if a calendar search is needed before a file search, or vice versa)
+- Dependencies between tools (e.g., if one tool's output is required as input for another)
 
 ## 3. INFORMATION REQUIREMENTS
 Determine what information you need to gather:
-- Direct answers to user questions
+- Direct answers to user questions (when no tools are needed anymore and sufficient information is available)
 - Context needed for subsequent actions
 - Validation data for proposed changes
 
@@ -489,9 +607,19 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
     const categorizedToolsList = availableCategories
       .map(category => {
         const tools = toolRegistry.getToolsByCategory(category);
-        return `**${category.toUpperCase()}**:\n${tools.map(tool =>
-          `  - ${tool.name}: ${tool.description}\n    Parameters: [Structured object with validation]`
-        ).join('\n')}`;
+        return `**${category.toUpperCase()}**:\n${tools.map(tool => {
+          // Provide parameter information based on tool name
+          let paramInfo = 'See tool schema';
+          if (tool.name === 'vectorFileSearch') {
+            const vectorStoreIdsStr = this.vectorStoreIds.length > 0
+              ? JSON.stringify(this.vectorStoreIds)
+              : '["vs_id1", "vs_id2"]';
+            paramInfo = `{ query: "search term", vectorStoreIds?: ${vectorStoreIdsStr}, maxResults?: number }`;
+          } else if (tool.name === 'searchEvents') {
+            paramInfo = '{ searchTerm: "term", startDate?: "YYYY-MM-DD", endDate?: "YYYY-MM-DD", maxResults?: number }';
+          }
+          return `  - ${tool.name}: ${tool.description}\n    Parameters: ${paramInfo}`;
+        }).join('\n')}`;
       }).join('\n\n');
 
     const previousCallsContext = previousToolCalls.length > 0
@@ -534,10 +662,22 @@ ${categorizedToolsList}
    - Search calendar data before responding with "I don't know"
    - Use broad search terms (e.g., "italmagneti", "nespola", "techcorp")
 
-2. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
-3. **Enough info?** – Say so and explain briefly.
+2. **FOR KNOWLEDGE/DOCUMENTATION QUERIES**: **ALWAYS** use vectorFileSearch for non-calendar information
+   - **IMPORTANT:** For the first tool call, ALWAYS use the user's original query as the 'query' parameter for vectorFileSearch, without rephrasing or summarizing.
+   - Only if the first attempt returns no results, try rephrasing or adding extra details for subsequent attempts.
+   - **CRITICAL:** When calling vectorFileSearch, ALWAYS include the vectorStoreIds parameter with the actual vector store IDs shown in the tool parameters above. Do NOT omit this parameter.
+   - Use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions
+   - Examples: visa requirements, company policies, travel guidelines, benefits information
+   - Do NOT use web search tools - vectorFileSearch is the primary knowledge tool
 
-**PRIORITY**: Calendar tools (searchEvents, getEvents) should be your FIRST choice for any work/project-related queries.
+3. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
+4. **Enough info?** – Say so and explain briefly.
+
+**PRIORITY ORDER**:
+- Calendar queries → searchEvents, getEvents
+- Knowledge queries → vectorFileSearch
+- File operations → file tools
+- Email operations → email tools
 
 ### RESPONSE FORMATS
 

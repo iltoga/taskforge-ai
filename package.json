@@ -36,6 +36,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
+    "react-webcam": "^7.2.0",
     "rehype-raw": "^7.0.0",
     "tailwindcss": "^4.1.10",
     "whatwg-fetch": "^3.6.20",

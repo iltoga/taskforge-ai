@@ -23,7 +23,7 @@ export function Reports() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
-  const [company, setCompany] = useState<string>('');
+  const [company, setCompany] = useState<string>('nespola');
 
   const periodOptions = [
     { value: 'current-week', label: 'Current Week', icon: Calendar },
@@ -75,11 +75,38 @@ export function Reports() {
         break;
 
       case 'last-quarter':
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        const lastQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
-        const lastQuarterYear = currentQuarter === 0 ? today.getFullYear() - 1 : today.getFullYear();
-        startDate = new Date(lastQuarterYear, lastQuarter * 3, 1);
-        endDate = new Date(lastQuarterYear, lastQuarter * 3 + 3, 0);
+        // Current date: June 22, 2025 (Q2)
+        // Last quarter would be Q1 2025 (Jan-Mar)
+        const currentMonth = today.getMonth(); // 0-11 (June = 5)
+        const currentYear = today.getFullYear();
+
+        // Determine current quarter (0=Q1, 1=Q2, 2=Q3, 3=Q4)
+        const currentQ = Math.floor(currentMonth / 3);
+
+        // Calculate last quarter
+        let lastQ: number;
+        let lastQYear: number;
+
+        if (currentQ === 0) {
+          // If current is Q1, last quarter is Q4 of previous year
+          lastQ = 3;
+          lastQYear = currentYear - 1;
+        } else {
+          // Otherwise, it's the previous quarter of same year
+          lastQ = currentQ - 1;
+          lastQYear = currentYear;
+        }
+
+        // Calculate start and end dates
+        const qStartMonth = lastQ * 3;
+        const qEndMonth = qStartMonth + 2;
+
+        startDate = new Date(lastQYear, qStartMonth, 1);
+        endDate = new Date(lastQYear, qEndMonth + 1, 0); // Last day of quarter
+
+        console.log(`🗓️ Last quarter calculation: Q${lastQ + 1} ${lastQYear} (months ${qStartMonth}-${qEndMonth})`);
+        console.log(`📅 Start: ${startDate.toISOString()}, End: ${endDate.toISOString()}`);
+
         label = 'Last Quarter';
         break;
 
@@ -112,11 +139,17 @@ export function Reports() {
     try {
       const { startDate, endDate } = getDateRange(selectedPeriod);
 
+      // Debug: Log the calculated date range
+      console.log(`🗓️ Generating report for period: ${selectedPeriod}`);
+      console.log(`📅 Date range: ${startDate} to ${endDate}`);
+      console.log(`🏢 Company: ${company.trim()}`);
+
       const response = await fetch('/api/reports/weekly', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           company: company.trim(),
           startDate,
@@ -375,7 +408,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
           </div>
 
           {/* Events Breakdown */}
-          {report.events.length > 0 && (
+          {report.events && report.events.length > 0 && (
             <div className="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-base-300">
               <div className="card-body p-8">
                 <div className="flex items-center gap-3 mb-6">

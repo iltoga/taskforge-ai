@@ -53,7 +53,7 @@ async function debugOrchestratorWithItalmagneti() {
     const chatHistory = [];
 
     console.log(`📝 User Query: "${userMessage}"`);
-    console.log(`🤖 Model: gpt-4o-mini`);
+    console.log(`🤖 Model: gpt-4.1-mini-2025-04-14`);
     console.log(`⚙️ Development Mode: true\n`);
 
     const startTime = Date.now();
@@ -62,7 +62,7 @@ async function debugOrchestratorWithItalmagneti() {
       userMessage,
       chatHistory,
       toolRegistry,
-      'gpt-4o-mini',
+      'gpt-4.1-mini-2025-04-14',
       {
         maxSteps: 10,
         maxToolCalls: 5,

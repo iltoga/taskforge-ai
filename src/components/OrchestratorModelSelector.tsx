@@ -1,6 +1,6 @@
 'use client';
 
-import { MODEL_CONFIGS, ModelType } from '../config/models';
+import { MODEL_CONFIGS, ModelType } from '../appconfig/models';
 
 interface OrchestratorModelSelectorProps {
   selectedModel: ModelType;

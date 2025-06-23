@@ -193,7 +193,7 @@ const orchestrator = new ToolOrchestrator(apiKey);
 const result = await orchestrator.orchestrate(
   "Research TypeScript best practices, save findings to a file, and email summary to team",
   toolRegistry,
-  'gpt-4o-mini',
+  'gpt-4.1-mini-2025-04-14',
   { developmentMode: true }
 );
 

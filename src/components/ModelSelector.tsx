@@ -2,7 +2,7 @@
 
 import { Bot, Brain, ChevronDown, Cpu, Globe, Sparkles, Zap } from 'lucide-react';
 import { useState } from 'react';
-import { MODEL_CONFIGS, ModelType } from '../config/models';
+import { MODEL_CONFIGS, ModelType } from '../appconfig/models';
 
 interface ModelInfo {
   id: ModelType;

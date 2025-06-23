@@ -1,4 +1,4 @@
-import { ModelType } from '@/config/models';
+import { ModelType } from '@/appconfig/models';
 import { authOptions, createGoogleAuth } from '@/lib/auth';
 import { AIService } from '@/services/ai-service';
 import { CalendarService } from '@/services/calendar-service';
@@ -7,10 +7,14 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
+  console.log('🚀 Weekly report API called');
+
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
+    console.log('🔐 Session check:', session ? 'Session exists' : 'No session');
 
     if (!session?.accessToken) {
+      console.error('❌ No access token in session');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -25,7 +29,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { company, startDate, endDate, model = 'gpt-4o-mini' } = await request.json() as {
+
+    const { company, startDate, endDate, model = 'gpt-4.1-mini-2025-04-14' } = await request.json() as {
       company: string;
       startDate: string;
       endDate: string;
@@ -47,33 +52,78 @@ export async function POST(request: Request) {
     // Get work report events for the specified date range
     const events = await calendarService.getEvents(startDate, endDate);
 
-    // Filter for daily report events for the specified company
-    const dailyReports = events.items.filter(event =>
-      event.summary?.toLowerCase().includes('daily report') &&
-      event.summary?.toLowerCase().includes(company.toLowerCase())
-    );
+    // Debug: Log event count and first few summaries
+    console.log(`📅 Found ${events.items.length} events between ${startDate} and ${endDate}`);
+    if (events.items.length > 0) {
+      console.log('Sample event summaries:', events.items.slice(0, 3).map(e => e.summary));
+    }
 
+    // Filter for daily report events for the specified company
+    const dailyReports = events.items.filter(event => {
+      const summary = event.summary?.toLowerCase() || '';
+      return summary.includes('daily report') && summary.includes(company.toLowerCase());
+    });
+
+    // Improved error handling with detailed messages
     if (dailyReports.length === 0) {
+      const errorDetails = {
+        company,
+        startDate,
+        endDate,
+        totalEvents: events.items.length,
+        sampleSummaries: events.items.slice(0, 3).map(e => e.summary)
+      };
+
+      console.error('❌ No daily reports found:', errorDetails);
       return NextResponse.json(
-        { error: 'No daily reports found for the specified company and date range' },
+        {
+          success: false,
+          error: 'No daily reports found for the specified company and date range',
+          details: errorDetails
+        },
         { status: 404 }
       );
     }
 
-    // Generate weekly report using AI
-    const weeklyReport = await aiService.generateWeeklyReport(
-      dailyReports,
-      company,
-      startDate,
-      endDate,
-      model
-    );
+    // Try generating the report
+    try {
+      const weeklyReport = await aiService.generateWeeklyReport(
+        dailyReports,
+        company,
+        startDate,
+        endDate,
+        model
+      );
 
-    return NextResponse.json({
-      success: true,
-      report: weeklyReport,
-      dailyReportsCount: dailyReports.length,
-    });
+      return NextResponse.json({
+        success: true,
+        report: {
+          period: `${startDate} to ${endDate}`,
+          totalEvents: dailyReports.length,
+          workingHours: 0, // This could be calculated if needed
+          meetingHours: 0, // This could be calculated if needed
+          summary: weeklyReport,
+          events: dailyReports.map(event => ({
+            title: event.summary || 'Untitled Event',
+            duration: event.start?.dateTime && event.end?.dateTime
+              ? `${new Date(event.start.dateTime).toLocaleTimeString()} - ${new Date(event.end.dateTime).toLocaleTimeString()}`
+              : 'All day',
+            type: 'daily-report'
+          }))
+        },
+        dailyReportsCount: dailyReports.length,
+      });
+    } catch (genError) {
+      console.error('❌ Report generation failed:', genError);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Report generation failed',
+          details: genError instanceof Error ? genError.message : String(genError)
+        },
+        { status: 500 }
+      );
+    }
 
   } catch (error) {
     console.error('Weekly report API error:', error);
