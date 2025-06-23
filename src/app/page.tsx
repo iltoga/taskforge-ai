@@ -6,16 +6,16 @@ import { Reports } from '@/components/Reports';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { useDevelopment } from '@/contexts/DevelopmentContext';
 import {
-    BarChart3,
-    Calendar,
-    CalendarIcon,
-    CheckCircle,
-    FileText,
-    LogOut,
-    Menu,
-    MessageSquare,
-    Sparkles,
-    User
+  BarChart3,
+  Calendar,
+  CalendarIcon,
+  CheckCircle,
+  FileText,
+  LogOut,
+  Menu,
+  MessageSquare,
+  Sparkles,
+  User
 } from 'lucide-react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import Image from 'next/image';
@@ -239,8 +239,11 @@ export default function Home() {
         </main>
       </div>      {/* Sidebar */}
       <div className="drawer-side">
-        <label htmlFor="drawer-toggle" aria-label="close sidebar" className="drawer-overlay"></label>
-        <aside className="h-full w-64 bg-base-200">
+        <label htmlFor="drawer-toggle" aria-label="close sidebar" className="drawer-overlay lg:hidden"></label>
+        <aside
+          className="h-full w-64 bg-base-200 lg:fixed lg:top-0 lg:left-0 lg:h-screen lg:flex lg:flex-col"
+          style={{ boxShadow: '2px 0 8px 0 rgba(0,0,0,0.03)' }}
+        >
           <div className="p-3">
             <div className="flex items-center gap-3 mb-6 lg:hidden">
               <CalendarIcon className="w-8 h-8 text-primary" />
@@ -252,6 +255,7 @@ export default function Home() {
                 <a
                   className={`gap-3 ${activeTab === 'chat' ? 'active' : ''}`}
                   onClick={() => setActiveTab('chat')}
+                  tabIndex={0}
                 >
                   <MessageSquare className="w-5 h-5" />
                   AI Chat
@@ -261,6 +265,7 @@ export default function Home() {
                 <a
                   className={`gap-3 ${activeTab === 'events' ? 'active' : ''}`}
                   onClick={() => setActiveTab('events')}
+                  tabIndex={0}
                 >
                   <Calendar className="w-5 h-5" />
                   Events
@@ -270,6 +275,7 @@ export default function Home() {
                 <a
                   className={`gap-3 ${activeTab === 'reports' ? 'active' : ''}`}
                   onClick={() => setActiveTab('reports')}
+                  tabIndex={0}
                 >
                   <BarChart3 className="w-5 h-5" />
                   Reports

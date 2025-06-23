@@ -1,3 +1,17 @@
+/* Sidebar should not scroll with content in desktop mode */
+.drawer-side aside.lg\:fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  .drawer-content {
+    margin-left: 16rem; /* width of sidebar */
+  }
+}
 @import "tailwindcss";
 @plugin "daisyui" {
   themes: all;
@@ -548,13 +562,7 @@
 }
 
 /* Fix for drawer on mobile */
-.drawer-side {
-  z-index: 40;
-}
-
-.drawer-overlay {
-  z-index: 39;
-}
+/* Removed custom z-index to let daisyUI handle stacking context */
 
 /* Custom scrollbar for better theme integration */
 ::-webkit-scrollbar {
