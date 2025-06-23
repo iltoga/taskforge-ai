@@ -73,9 +73,11 @@ function filterEventsByDateRange(events: SimplifiedEvent[], startDate?: string, 
 
 export class CalendarTools {
   private calendarService: CalendarService;
+  private calendarId: string;
 
-  constructor(calendarService: CalendarService) {
+  constructor(calendarService: CalendarService, calendarId: string = 'primary') {
     this.calendarService = calendarService;
+    this.calendarId = calendarId;
   }
 
   /**
@@ -91,7 +93,9 @@ export class CalendarTools {
         filters?.maxResults || 100, // Use reasonable default
         filters?.query,
         filters?.showDeleted || false,
-        filters?.orderBy || 'startTime'
+        filters?.orderBy || 'startTime',
+        undefined, // timezone
+        this.calendarId
       );
 
       // Transform verbose Google Calendar events into simplified format
@@ -119,7 +123,7 @@ export class CalendarTools {
    */
   async createEvent(eventData: CalendarEvent): Promise<CalendarToolResult> {
     try {
-      const createdEvent = await this.calendarService.createEvent(eventData);
+      const createdEvent = await this.calendarService.createEvent(eventData, this.calendarId);
 
       return {
         success: true,
@@ -140,7 +144,7 @@ export class CalendarTools {
    */
   async updateEvent(eventId: string, changes: Partial<CalendarEvent>): Promise<CalendarToolResult> {
     try {
-      const updatedEvent = await this.calendarService.updateEvent(eventId, changes as CalendarEvent);
+      const updatedEvent = await this.calendarService.updateEvent(eventId, changes as CalendarEvent, this.calendarId);
 
       return {
         success: true,
@@ -161,7 +165,7 @@ export class CalendarTools {
    */
   async deleteEvent(eventId: string): Promise<CalendarToolResult> {
     try {
-      await this.calendarService.deleteEvent(eventId);
+      await this.calendarService.deleteEvent(eventId, this.calendarId);
 
       return {
         success: true,
@@ -189,7 +193,9 @@ export class CalendarTools {
         100, // Use reasonable limit for search
         query,
         false,
-        'startTime'
+        'startTime',
+        undefined, // timezone
+        this.calendarId
       );
 
       // Transform verbose Google Calendar events into simplified format

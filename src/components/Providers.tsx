@@ -2,6 +2,7 @@
 
 import { SessionProvider } from 'next-auth/react';
 import { ReactNode } from 'react';
+import { CalendarProvider } from '../contexts/CalendarContext';
 import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 import { DebugPanel } from './DebugPanel';
 
@@ -13,8 +14,10 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <DevelopmentProvider>
-        {children}
-        <DebugPanel />
+        <CalendarProvider>
+          {children}
+          <DebugPanel />
+        </CalendarProvider>
       </DevelopmentProvider>
     </SessionProvider>
   );

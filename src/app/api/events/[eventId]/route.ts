@@ -34,6 +34,12 @@ export async function DELETE(
       );
     }
 
+    // Get calendarId from query parameters
+    const { searchParams } = new URL(request.url);
+    const calendarId = searchParams.get('calendarId') || 'primary';
+
+    console.log(`📅 Using calendar: ${calendarId}`);
+
     // Initialize calendar service
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
@@ -41,7 +47,7 @@ export async function DELETE(
     console.log(`🗑️ Deleting event: ${eventId}`);
 
     // Delete the event
-    await calendarService.deleteEvent(eventId);
+    await calendarService.deleteEvent(eventId, calendarId);
 
     console.log(`✅ Event deleted successfully: ${eventId}`);
 
@@ -94,6 +100,10 @@ export async function PATCH(
       );
     }
 
+    // Extract calendarId from updates, default to 'primary'
+    const calendarId = updates.calendarId || 'primary';
+    console.log(`📅 Using calendar: ${calendarId}`);
+
     // Initialize calendar service
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
@@ -101,7 +111,7 @@ export async function PATCH(
     console.log(`✏️ Updating event: ${eventId}`, updates);
 
     // Update the event
-    const updatedEvent = await calendarService.updateEvent(eventId, updates);
+    const updatedEvent = await calendarService.updateEvent(eventId, updates, calendarId);
 
     console.log(`✅ Event updated successfully: ${eventId}`);
 

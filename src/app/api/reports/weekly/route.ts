@@ -30,19 +30,22 @@ export async function POST(request: Request) {
     }
 
 
-    const { company, startDate, endDate, model = 'gpt-4.1-mini-2025-04-14' } = await request.json() as {
-      company: string;
+    const { company, startDate, endDate, calendarId = 'primary', model = 'gpt-4.1-mini-2025-04-14' } = await request.json() as {
+      company?: string;
       startDate: string;
       endDate: string;
+      calendarId?: string;
       model?: ModelType;
     };
 
-    if (!company || !startDate || !endDate) {
+    if (!startDate || !endDate) {
       return NextResponse.json(
-        { error: 'Company, start date, and end date are required' },
+        { error: 'Start date and end date are required' },
         { status: 400 }
       );
     }
+
+    console.log(`📅 Using calendar: ${calendarId}`);
 
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
     const aiService = new AIService(process.env.OPENAI_API_KEY!);
 
     // Get work report events for the specified date range
-    const events = await calendarService.getEvents(startDate, endDate);
+    const events = await calendarService.getEvents(startDate, endDate, 250, undefined, false, 'startTime', undefined, calendarId);
 
     // Debug: Log event count and first few summaries
     console.log(`📅 Found ${events.items.length} events between ${startDate} and ${endDate}`);
@@ -58,14 +61,19 @@ export async function POST(request: Request) {
       console.log('Sample event summaries:', events.items.slice(0, 3).map(e => e.summary));
     }
 
-    // Filter for daily report events for the specified company
-    const dailyReports = events.items.filter(event => {
+    // Filter events based on company if provided, otherwise include all events
+    const filteredEvents = events.items.filter(event => {
       const summary = event.summary?.toLowerCase() || '';
-      return summary.includes('daily report') && summary.includes(company.toLowerCase());
+      if (company && company.trim()) {
+        // If company is provided, look for events containing the company name
+        return summary.includes(company.toLowerCase());
+      }
+      // If no company filter, include all events
+      return true;
     });
 
     // Improved error handling with detailed messages
-    if (dailyReports.length === 0) {
+    if (filteredEvents.length === 0) {
       const errorDetails = {
         company,
         startDate,
@@ -74,11 +82,13 @@ export async function POST(request: Request) {
         sampleSummaries: events.items.slice(0, 3).map(e => e.summary)
       };
 
-      console.error('❌ No daily reports found:', errorDetails);
+      console.error('❌ No events found:', errorDetails);
       return NextResponse.json(
         {
           success: false,
-          error: 'No daily reports found for the specified company and date range',
+          error: company && company.trim()
+            ? 'No events found for the specified company and date range'
+            : 'No events found for the specified date range',
           details: errorDetails
         },
         { status: 404 }
@@ -87,9 +97,10 @@ export async function POST(request: Request) {
 
     // Try generating the report
     try {
+
       const weeklyReport = await aiService.generateWeeklyReport(
-        dailyReports,
-        company,
+        filteredEvents,
+        company ?? '',
         startDate,
         endDate,
         model
@@ -99,19 +110,26 @@ export async function POST(request: Request) {
         success: true,
         report: {
           period: `${startDate} to ${endDate}`,
-          totalEvents: dailyReports.length,
+          totalEvents: filteredEvents.length,
           workingHours: 0, // This could be calculated if needed
           meetingHours: 0, // This could be calculated if needed
           summary: weeklyReport,
-          events: dailyReports.map(event => ({
+          events: filteredEvents.map(event => ({
             title: event.summary || 'Untitled Event',
+            description: event.description || null,
+            location: event.location || null,
             duration: event.start?.dateTime && event.end?.dateTime
               ? `${new Date(event.start.dateTime).toLocaleTimeString()} - ${new Date(event.end.dateTime).toLocaleTimeString()}`
               : 'All day',
-            type: 'daily-report'
+            startDate: event.start?.dateTime || event.start?.date || null,
+            endDate: event.end?.dateTime || event.end?.date || null,
+            type: 'calendar-event',
+            status: event.status || null,
+            attendees: event.attendees?.length || 0,
+            isAllDay: !event.start?.dateTime
           }))
         },
-        dailyReportsCount: dailyReports.length,
+        eventsCount: filteredEvents.length,
       });
     } catch (genError) {
       console.error('❌ Report generation failed:', genError);

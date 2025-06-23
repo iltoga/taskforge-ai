@@ -79,7 +79,8 @@ export class CalendarService {
     q?: string,
     showDeleted?: boolean,
     orderBy?: 'startTime' | 'updated',
-    timeZone?: string
+    timeZone?: string,
+    calendarId?: string
   ): Promise<EventList> {
     // Convert date strings to RFC3339 format if they're in YYYY-MM-DD format
     const formatDateForCalendarAPI = (dateStr?: string): string | undefined => {
@@ -100,7 +101,7 @@ export class CalendarService {
 
     // Use more reasonable defaults for maxResults and timezone
     const params = {
-      calendarId: 'primary',
+      calendarId: calendarId || 'primary',
       timeMin: formatDateForCalendarAPI(timeMin),
       timeMax: formatDateForCalendarAPI(timeMax),
       maxResults: maxResults || 250, // Reduced from 2500 to avoid too many old events
@@ -118,7 +119,7 @@ export class CalendarService {
       serverDevLogger.log({
         service: 'calendar',
         method: 'GET',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${params.calendarId}/events`,
         payload: params,
       });
 
@@ -129,7 +130,7 @@ export class CalendarService {
       serverDevLogger.log({
         service: 'calendar',
         method: 'GET',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${params.calendarId}/events`,
         response: {
           eventsCount: response.data.items?.length || 0,
           nextPageToken: response.data.nextPageToken,
@@ -143,7 +144,7 @@ export class CalendarService {
     }, 'getEvents');
   }
 
-  async createEvent(event: CalendarEvent): Promise<CalendarEvent> {
+  async createEvent(event: CalendarEvent, calendarId?: string): Promise<CalendarEvent> {
     return this.executeWithRetry(async () => {
       const startTime = Date.now();
 
@@ -151,7 +152,7 @@ export class CalendarService {
       serverDevLogger.log({
         service: 'calendar',
         method: 'POST',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${calendarId || 'primary'}/events`,
         payload: {
           summary: event.summary,
           description: event.description,
@@ -163,7 +164,7 @@ export class CalendarService {
       });
 
       const response = await this.calendar.events.insert({
-        calendarId: 'primary',
+        calendarId: calendarId || 'primary',
         requestBody: event,
       });
 
@@ -173,7 +174,7 @@ export class CalendarService {
       serverDevLogger.log({
         service: 'calendar',
         method: 'POST',
-        endpoint: 'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${calendarId || 'primary'}/events`,
         response: {
           eventId: response.data.id,
           summary: response.data.summary,
@@ -187,10 +188,10 @@ export class CalendarService {
     }, 'createEvent');
   }
 
-  async updateEvent(eventId: string, updateData: CalendarEvent): Promise<CalendarEvent> {
+  async updateEvent(eventId: string, updateData: CalendarEvent, calendarId?: string): Promise<CalendarEvent> {
     return this.executeWithRetry(async () => {
       const response = await this.calendar.events.patch({
-        calendarId: 'primary',
+        calendarId: calendarId || 'primary',
         eventId,
         requestBody: updateData,
       });
@@ -199,12 +200,53 @@ export class CalendarService {
     }, 'updateEvent');
   }
 
-  async deleteEvent(eventId: string): Promise<void> {
+  async deleteEvent(eventId: string, calendarId?: string): Promise<void> {
     return this.executeWithRetry(async () => {
       await this.calendar.events.delete({
-        calendarId: 'primary',
+        calendarId: calendarId || 'primary',
         eventId,
       });
     }, 'deleteEvent');
+  }
+
+  async getCalendarList(): Promise<calendar_v3.Schema$CalendarListEntry[]> {
+    return this.executeWithRetry(async () => {
+      const startTime = Date.now();
+
+      // Log the request
+      serverDevLogger.log({
+        service: 'calendar',
+        method: 'GET',
+        endpoint: 'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+        payload: {},
+      });
+
+      const response = await this.calendar.calendarList.list({
+        minAccessRole: 'reader',
+        showDeleted: false,
+        showHidden: false,
+      });
+
+      const duration = Date.now() - startTime;
+
+      // Log the successful response
+      serverDevLogger.log({
+        service: 'calendar',
+        method: 'GET',
+        endpoint: 'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+        response: {
+          calendarsCount: response.data.items?.length || 0,
+          calendars: response.data.items?.map(cal => ({
+            id: cal.id,
+            summary: cal.summary,
+            primary: cal.primary,
+            accessRole: cal.accessRole,
+          })),
+        },
+        duration,
+      });
+
+      return response.data.items || [];
+    }, 'getCalendarList');
   }
 }

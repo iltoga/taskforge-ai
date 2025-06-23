@@ -32,6 +32,10 @@ export async function POST(request: Request) {
       );
     }
 
+    // Extract calendarId from eventData, default to 'primary'
+    const calendarId = eventData.calendarId || 'primary';
+    console.log(`📅 Using calendar: ${calendarId}`);
+
     // Initialize calendar service
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
@@ -39,7 +43,7 @@ export async function POST(request: Request) {
     console.log(`📅 Creating new event:`, eventData);
 
     // Create the event
-    const newEvent = await calendarService.createEvent(eventData);
+    const newEvent = await calendarService.createEvent(eventData, calendarId);
 
     console.log(`✅ Event created successfully:`, newEvent.id);
 

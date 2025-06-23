@@ -38,7 +38,8 @@ export async function POST(request: Request) {
       model = 'gpt-4.1-mini-2025-04-14',
       useTools = false,
       orchestratorModel = 'gpt-4.1-mini-2025-04-14',
-      developmentMode = false
+      developmentMode = false,
+      calendarId = 'primary'
     } = await request.json() as {
       message: string;
       messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       useTools?: boolean;
       orchestratorModel?: ModelType;
       developmentMode?: boolean;
+      calendarId?: string;
     };
 
     if (!message || typeof message !== 'string') {
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    console.log(`📅 Using calendar: ${calendarId}`);
 
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
         console.log('🤖 Parameters:', { useTools, developmentMode, orchestratorModel });
         console.log('🤖 Message:', englishMessage);
 
-        const calendarTools = new CalendarTools(calendarService);
+        const calendarTools = new CalendarTools(calendarService, calendarId);
         const emailTools = new EmailTools();
         const fileTools = new FileTools();
         // Disabled web tools to force use of vector search for knowledge queries
@@ -120,7 +124,7 @@ export async function POST(request: Request) {
       } else {
         // EXISTING: Simple tool-based approach
         console.log('🔧 Using SIMPLE tool mode');
-        const calendarTools = new CalendarTools(calendarService);
+        const calendarTools = new CalendarTools(calendarService, calendarId);
 
         const result = await aiService.processMessageWithTools(
           englishMessage,

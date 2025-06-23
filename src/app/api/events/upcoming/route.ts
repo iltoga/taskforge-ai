@@ -4,7 +4,7 @@ import { ExtendedSession } from '@/types/auth';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
 
@@ -22,6 +22,12 @@ export async function GET() {
         { status: 401 }
       );
     }
+
+    // Get calendarId from query parameters
+    const { searchParams } = new URL(request.url);
+    const calendarId = searchParams.get('calendarId') || 'primary';
+
+    console.log(`📅 Using calendar: ${calendarId}`);
 
     // Initialize calendar service
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
@@ -41,7 +47,8 @@ export async function GET() {
       undefined, // No search query
       false, // showDeleted
       'startTime', // orderBy
-      undefined // Use default timezone
+      undefined, // Use default timezone
+      calendarId // Use selected calendar
     );
 
     console.log(`📅 Found ${events.items.length} upcoming events`);

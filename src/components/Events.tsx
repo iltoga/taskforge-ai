@@ -1,5 +1,6 @@
 'use client';
 
+import { useCalendar } from '@/contexts/CalendarContext';
 import { CalendarEvent } from '@/types/calendar';
 import { Calendar, Camera, Clock, Edit, MapPin, Plus, Trash2, Upload, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -10,6 +11,7 @@ import { useDevelopment } from '../contexts/DevelopmentContext';
 export function Events() {
   const { data: session } = useSession();
   const { addAPILog } = useDevelopment();
+  const { selectedCalendarId, isInitialized } = useCalendar();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function Events() {
   });
 
   const fetchEvents = useCallback(async () => {
-    if (!session) return;
+    if (!session || !isInitialized) return;
 
     setIsLoading(true);
     setError(null);
@@ -52,10 +54,13 @@ export function Events() {
         service: 'calendar',
         method: 'GET',
         endpoint: '/api/events/upcoming',
-        payload: {},
+        payload: { calendarId: selectedCalendarId },
       });
 
-      const response = await fetch('/api/events/upcoming', {
+      const url = new URL('/api/events/upcoming', window.location.origin);
+      url.searchParams.append('calendarId', selectedCalendarId);
+
+      const response = await fetch(url.toString(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +114,7 @@ export function Events() {
     } finally {
       setIsLoading(false);
     }
-  }, [session, addAPILog]);
+  }, [session, addAPILog, isInitialized, selectedCalendarId]);
 
   useEffect(() => {
     fetchEvents();
@@ -162,7 +167,7 @@ export function Events() {
   };
 
   const deleteEvent = async (eventId: string, eventSummary: string) => {
-    if (!session || !eventId) return;
+    if (!session || !eventId || !isInitialized) return;
 
     const confirmed = confirm(`Are you sure you want to delete "${eventSummary}"?`);
     if (!confirmed) return;
@@ -177,10 +182,13 @@ export function Events() {
         service: 'calendar',
         method: 'DELETE',
         endpoint: `/api/events/${eventId}`,
-        payload: { eventId },
+        payload: { eventId, calendarId: selectedCalendarId },
       });
 
-      const response = await fetch(`/api/events/${eventId}`, {
+      const url = new URL(`/api/events/${eventId}`, window.location.origin);
+      url.searchParams.append('calendarId', selectedCalendarId);
+
+      const response = await fetch(url.toString(), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -264,7 +272,7 @@ export function Events() {
   };
 
   const saveEventChanges = async () => {
-    if (!editingEvent || !session) return;
+    if (!editingEvent || !session || !isInitialized) return;
 
     setIsSaving(true);
 
@@ -282,7 +290,8 @@ export function Events() {
         },
         end: {
           dateTime: new Date(editForm.endDateTime).toISOString(),
-        }
+        },
+        calendarId: selectedCalendarId
       };
 
       const method = isNewEvent ? 'POST' : 'PATCH';
@@ -376,7 +385,7 @@ export function Events() {
   };
 
   const processImageForEvents = useCallback(async (file: File) => {
-    if (!session) return;
+    if (!session || !isInitialized) return;
 
     setIsProcessingImage(true);
 
@@ -396,7 +405,7 @@ export function Events() {
         service: 'ai',
         method: 'POST',
         endpoint: '/api/events/from-image',
-        payload: { fileName: file.name, fileSize: file.size },
+        payload: { fileName: file.name, fileSize: file.size, calendarId: selectedCalendarId },
       });
 
       const response = await fetch('/api/events/from-image', {
@@ -407,7 +416,8 @@ export function Events() {
         credentials: 'include',
         body: JSON.stringify({
           image: base64,
-          fileName: file.name
+          fileName: file.name,
+          calendarId: selectedCalendarId
         }),
       });
 
@@ -473,7 +483,7 @@ export function Events() {
     } finally {
       setIsProcessingImage(false);
     }
-  }, [session, addAPILog, events, fetchEvents]);
+  }, [session, addAPILog, events, fetchEvents, isInitialized, selectedCalendarId]);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

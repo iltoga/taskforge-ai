@@ -35,13 +35,15 @@ export async function POST(request: Request) {
       messages,
       useTools = false,
       orchestratorModel = 'gpt-4.1-mini-2025-04-14',
-      developmentMode = false
+      developmentMode = false,
+      calendarId = 'primary'
     } = await request.json() as {
       message: string;
       messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
       useTools?: boolean;
       orchestratorModel?: ModelType;
       developmentMode?: boolean;
+      calendarId?: string;
     };
 
     if (!message || typeof message !== 'string') {
@@ -50,6 +52,8 @@ export async function POST(request: Request) {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`📅 Using calendar: ${calendarId}`);
 
     // Only stream for agentic mode
     if (!useTools || !developmentMode) {
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
           try {
             console.log('🌊 Starting streaming orchestration for:', englishMessage);
 
-            const calendarTools = new CalendarTools(calendarService);
+            const calendarTools = new CalendarTools(calendarService, calendarId);
             const emailTools = new EmailTools();
             const fileTools = new FileTools();
             // Disabled web tools to force use of vector search for knowledge queries

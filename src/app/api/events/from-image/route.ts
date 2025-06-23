@@ -24,9 +24,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { image, fileName } = await request.json() as {
+    const { image, fileName, calendarId = 'primary' } = await request.json() as {
       image: string;
       fileName: string;
+      calendarId?: string;
     };
 
     if (!image) {
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     }
 
     console.log(`🖼️ Processing image for calendar events: ${fileName}`);
+    console.log(`📅 Using calendar: ${calendarId}`);
 
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
@@ -129,7 +131,7 @@ Example output:
             : { date: eventData.date }
         };
 
-        const createdEvent = await calendarService.createEvent(calendarEvent);
+        const createdEvent = await calendarService.createEvent(calendarEvent, calendarId);
         createdEvents.push(createdEvent);
         console.log(`✅ Created event: ${eventData.title}`);
       } catch (err) {

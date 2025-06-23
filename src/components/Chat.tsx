@@ -1,5 +1,6 @@
 'use client';
 
+import { useCalendar } from '@/contexts/CalendarContext';
 import { CalendarEvent } from '@/types/calendar';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
@@ -34,6 +35,8 @@ function safeStringify(value: unknown): string {
 export function Chat() {
   const { data: session, status } = useSession();
   const { addAPILog, isDevelopmentMode } = useDevelopment();
+  const { selectedCalendarId, isInitialized } = useCalendar();
+
 
   // Initialize messages from sessionStorage to survive session refreshes
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -191,7 +194,7 @@ export function Chat() {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !isInitialized) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -243,6 +246,7 @@ export function Chat() {
           useTools: useToolsMode,
           orchestratorModel: orchestratorModel,
           developmentMode: useAgenticMode,
+          calendarId: selectedCalendarId,
         },
       });
 
@@ -261,6 +265,7 @@ export function Chat() {
               useTools: useToolsMode,
               orchestratorModel: orchestratorModel,
               developmentMode: useAgenticMode,
+              calendarId: selectedCalendarId,
             }),
           });
 
@@ -389,6 +394,7 @@ export function Chat() {
               useTools: useToolsMode,
               orchestratorModel: orchestratorModel,
               developmentMode: useAgenticMode,
+              calendarId: selectedCalendarId,
             }),
           });
 
@@ -428,6 +434,7 @@ export function Chat() {
             useTools: useToolsMode,
             orchestratorModel: orchestratorModel,
             developmentMode: useAgenticMode,
+            calendarId: selectedCalendarId,
           }),
         });
 
@@ -498,7 +505,7 @@ export function Chat() {
     <div className="flex flex-col h-full max-w-4xl mx-auto">
       {/* Top bar with Clear Chat button */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="text-lg font-semibold text-high-contrast">AI Chat Assistant</div>
+        <div className="text-lg font-semibold text-high-contrast"></div>
         <button
           type="button"
           onClick={clearChat}
@@ -887,7 +894,6 @@ export function Chat() {
               <OrchestratorModelSelector
                 selectedModel={orchestratorModel}
                 onModelChange={setOrchestratorModel}
-                disabled={!useToolsMode}
               />
             </div>
           )}

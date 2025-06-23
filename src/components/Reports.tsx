@@ -1,8 +1,11 @@
 'use client';
 
+import { ModelType } from '@/appconfig/models';
+import { useCalendar } from '@/contexts/CalendarContext';
 import { BarChart3, Building2, Calendar, Clock, Download, FileText, TrendingUp, Users } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useState } from 'react';
+import { ModelSelector } from './ModelSelector';
 
 interface WeeklyReport {
   period: string;
@@ -12,22 +15,32 @@ interface WeeklyReport {
   summary: string;
   events: Array<{
     title: string;
+    description?: string | null;
+    location?: string | null;
     duration: string;
+    startDate?: string | null;
+    endDate?: string | null;
     type: string;
+    status?: string | null;
+    attendees?: number;
+    isAllDay?: boolean;
   }>;
 }
 
 export function Reports() {
   const { data: session } = useSession();
+  const { selectedCalendarId, isInitialized } = useCalendar();
   const [report, setReport] = useState<WeeklyReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
-  const [company, setCompany] = useState<string>('nespola');
+  const [company, setCompany] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
 
   const periodOptions = [
     { value: 'current-week', label: 'Current Week', icon: Calendar },
     { value: 'last-week', label: 'Last Week', icon: Calendar },
+    { value: 'current-month', label: 'Current Month', icon: Calendar },
     { value: 'last-month', label: 'Last Month', icon: Calendar },
     { value: 'last-two-months', label: 'Last Two Months', icon: TrendingUp },
     { value: 'last-quarter', label: 'Last Quarter', icon: BarChart3 },
@@ -66,6 +79,12 @@ export function Reports() {
         startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         endDate = new Date(today.getFullYear(), today.getMonth(), 0);
         label = 'Last Month';
+        break;
+
+      case 'current-month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        label = 'Current Month';
         break;
 
       case 'last-two-months':
@@ -128,8 +147,8 @@ export function Reports() {
   };
 
   const generateReport = async () => {
-    if (!session || !company.trim()) {
-      setError('Please enter a company name');
+    if (!session || !isInitialized) {
+      setError('Please sign in and ensure the calendar is initialized');
       return;
     }
 
@@ -143,6 +162,7 @@ export function Reports() {
       console.log(`🗓️ Generating report for period: ${selectedPeriod}`);
       console.log(`📅 Date range: ${startDate} to ${endDate}`);
       console.log(`🏢 Company: ${company.trim()}`);
+      console.log(`📅 Calendar: ${selectedCalendarId}`);
 
       const response = await fetch('/api/reports/weekly', {
         method: 'POST',
@@ -151,9 +171,11 @@ export function Reports() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          company: company.trim(),
+          company: company.trim() || undefined,
           startDate,
           endDate,
+          calendarId: selectedCalendarId,
+          model: selectedModel,
         }),
       });
 
@@ -197,7 +219,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `work-report-${company.toLowerCase().replace(/\s+/g, '-')}-${selectedPeriod}.txt`;
+    a.download = `work-report-${company && company.trim() ? company.toLowerCase().replace(/\s+/g, '-') : 'all'}-${selectedPeriod}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -212,7 +234,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
             <Users className="w-8 h-8 text-primary" />
           </div>
           <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
-          <p className="text-base-content/60">Please sign in to access work reports</p>
+          <p className="text-base-content/60">Please sign in to access calendar reports</p>
         </div>
       </div>
     );
@@ -226,7 +248,7 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
           <BarChart3 className="w-8 h-8 text-white" />
         </div>
         <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
-          Work Reports
+          Calendar Reports
         </h1>
         <p className="text-base-content/60 max-w-md mx-auto">
           Generate comprehensive reports for your work activities and meeting schedules
@@ -246,16 +268,16 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <div className="grid lg:grid-cols-3 gap-6 mb-8">
             {/* Company Input */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Building2 className="w-4 h-4 text-primary" />
-                Company Name
+                Fiter by Words
               </label>
               <input
                 type="text"
-                placeholder="Enter your company name..."
+                placeholder="Enter your query to filter..."
                 className="input input-bordered w-full h-12 focus:input-primary transition-all duration-200"
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
@@ -282,13 +304,28 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
               </select>
               <p className="text-xs text-base-content/50">Select the time period for your report</p>
             </div>
+
+            {/* AI Model Selection */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                AI Model
+              </label>
+              <div className="h-12 flex items-center">
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                />
+              </div>
+              <p className="text-xs text-base-content/50">Choose the AI model for report generation</p>
+            </div>
           </div>
 
           {/* Generate Button */}
           <div className="flex justify-center">
             <button
               onClick={generateReport}
-              disabled={isLoading || !company.trim()}
+              disabled={isLoading}
               className="btn btn-primary btn-lg gap-3 px-8 disabled:opacity-50 hover:scale-105 transition-all duration-200"
             >
               {isLoading ? (
@@ -421,34 +458,229 @@ Generated on: ${new Date().toLocaleDateString('en-GB')}
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="table table-zebra w-full">
-                    <thead>
-                      <tr className="border-base-300">
-                        <th className="bg-base-200 text-base-content/80 font-semibold">Event</th>
-                        <th className="bg-base-200 text-base-content/80 font-semibold">Duration</th>
-                        <th className="bg-base-200 text-base-content/80 font-semibold">Type</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {report.events.map((event, index) => (
-                        <tr key={index} className="hover:bg-base-100 transition-colors duration-200">
-                          <td className="font-medium">{event.title}</td>
-                          <td>
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-base-content/50" />
-                              {event.duration}
+                <div className="space-y-3">
+                  {report.events.map((event, index) => (
+                    <div key={index} className="collapse collapse-arrow bg-gradient-to-r from-base-100 to-base-200 border border-base-300 hover:border-primary/30 transition-all duration-200">
+                      <input type="checkbox" className="peer" />
+                      <div className="collapse-title text-lg font-medium flex items-center justify-between pr-8">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-3 h-3 rounded-full bg-primary"></div>
+                          <span className="text-base-content font-semibold truncate">{event.title}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-base-content/60">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{event.duration}</span>
+                          </div>
+                          <span className="badge badge-outline badge-sm">
+                            {event.type}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="collapse-content">
+                        <div className="pt-4 space-y-4">
+                          {/* Event Details Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Basic Info */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                                  <Calendar className="w-4 h-4 text-primary" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-sm text-base-content/80">Event Title</h4>
+                                  <p className="text-base-content font-semibold">{event.title}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                                  <Clock className="w-4 h-4 text-secondary" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-sm text-base-content/80">Duration</h4>
+                                  <p className="text-base-content font-semibold">{event.duration}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                                  <FileText className="w-4 h-4 text-accent" />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-sm text-base-content/80">Event Type</h4>
+                                  <span className="badge badge-accent badge-sm">{event.type}</span>
+                                </div>
+                              </div>
+
+                              {/* Event Description */}
+                              {event.description && (
+                                <div className="flex items-start gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center">
+                                    <FileText className="w-4 h-4 text-info" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-sm text-base-content/80">Description</h4>
+                                    <p className="text-base-content text-sm leading-relaxed mt-1">{event.description}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Event Location */}
+                              {event.location && (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                                    <span className="text-success">📍</span>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-medium text-sm text-base-content/80">Location</h4>
+                                    <p className="text-base-content font-semibold">{event.location}</p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Date & Time Details */}
+                              {event.startDate && (
+                                <div className="flex items-start gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+                                    <Calendar className="w-4 h-4 text-warning" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-sm text-base-content/80">Date & Time</h4>
+                                    <div className="text-sm space-y-1">
+                                      <p className="text-base-content">
+                                        📅 {new Date(event.startDate).toLocaleDateString('en-GB', {
+                                          weekday: 'long',
+                                          year: 'numeric',
+                                          month: 'long',
+                                          day: 'numeric'
+                                        })}
+                                      </p>
+                                      {!event.isAllDay && (
+                                        <p className="text-base-content">
+                                          🕐 {new Date(event.startDate).toLocaleTimeString('en-GB', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}
+                                          {event.endDate && ` - ${new Date(event.endDate).toLocaleTimeString('en-GB', {
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                          })}`}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </td>
-                          <td>
-                            <span className="badge badge-outline badge-sm hover:badge-primary transition-all duration-200">
-                              {event.type}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                            {/* Additional Details */}
+                            <div className="space-y-3">
+                              <div className="card bg-gradient-to-br from-info/5 to-info/10 border border-info/20">
+                                <div className="card-body p-4">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2 text-info mb-2">
+                                    <BarChart3 className="w-4 h-4" />
+                                    Event Statistics
+                                  </h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-base-content/70">Event #</span>
+                                      <span className="font-medium">{index + 1} of {report.events.length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-base-content/70">Position</span>
+                                      <span className="font-medium">{((index / report.events.length) * 100).toFixed(0)}% through period</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-base-content/70">Type Classification</span>
+                                      <span className="font-medium capitalize">{event.type.replace('-', ' ')}</span>
+                                    </div>
+                                    {event.status && (
+                                      <div className="flex justify-between">
+                                        <span className="text-base-content/70">Status</span>
+                                        <span className="font-medium capitalize">{event.status}</span>
+                                      </div>
+                                    )}
+                                    {event.attendees !== undefined && (
+                                      <div className="flex justify-between">
+                                        <span className="text-base-content/70">Attendees</span>
+                                        <span className="font-medium">{event.attendees} people</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between">
+                                      <span className="text-base-content/70">Event Format</span>
+                                      <span className="font-medium">{event.isAllDay ? 'All Day' : 'Timed'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Time Analysis */}
+                              {event.duration !== 'All day' && (
+                                <div className="card bg-gradient-to-br from-warning/5 to-warning/10 border border-warning/20">
+                                  <div className="card-body p-4">
+                                    <h4 className="font-semibold text-sm flex items-center gap-2 text-warning mb-2">
+                                      <Clock className="w-4 h-4" />
+                                      Time Analysis
+                                    </h4>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between">
+                                        <span className="text-base-content/70">Format</span>
+                                        <span className="font-medium">Timed Event</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                        <span className="text-base-content/70">Duration</span>
+                                        <span className="font-medium">{event.duration}</span>
+                                      </div>
+                                      {event.duration.includes('AM') || event.duration.includes('PM') ? (
+                                        <div className="flex justify-between">
+                                          <span className="text-base-content/70">Time Format</span>
+                                          <span className="font-medium">12-hour</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex justify-between">
+                                          <span className="text-base-content/70">Time Format</span>
+                                          <span className="font-medium">24-hour</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Event Actions */}
+                          <div className="flex flex-wrap gap-2 pt-2 border-t border-base-300">
+                            <div className="badge badge-ghost badge-sm">
+                              📊 Event #{index + 1}
+                            </div>
+                            <div className="badge badge-ghost badge-sm">
+                              🕐 {event.duration}
+                            </div>
+                            <div className="badge badge-ghost badge-sm">
+                              📋 {event.type}
+                            </div>
+                            {event.location && (
+                              <div className="badge badge-ghost badge-sm">
+                                📍 {event.location}
+                              </div>
+                            )}
+                            {event.attendees && event.attendees > 0 && (
+                              <div className="badge badge-ghost badge-sm">
+                                👥 {event.attendees} attendees
+                              </div>
+                            )}
+                            {event.status && (
+                              <div className="badge badge-ghost badge-sm">
+                                ✅ {event.status}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

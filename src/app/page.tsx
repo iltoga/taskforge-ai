@@ -3,7 +3,9 @@
 import { Chat } from '@/components/Chat';
 import { Events } from '@/components/Events';
 import { Reports } from '@/components/Reports';
+import { SettingsPage } from '@/components/SettingsPage';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { useCalendar } from '@/contexts/CalendarContext';
 import { useDevelopment } from '@/contexts/DevelopmentContext';
 import {
   BarChart3,
@@ -14,6 +16,7 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  Settings,
   Sparkles,
   User
 } from 'lucide-react';
@@ -25,10 +28,11 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || 'CalendarGPT';
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState<'chat' | 'events' | 'reports'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'events' | 'reports' | 'settings'>('chat');
   const { isDevelopmentMode, isDebugPanelCollapsed, toggleDevelopmentMode } = useDevelopment();
+  const { selectedCalendarId, availableCalendars, isInitialized } = useCalendar();
 
-  if (status === 'loading') {
+  if (status === 'loading' || (session && !isInitialized)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-base-200">
         <div className="loading loading-spinner loading-lg text-primary" role="status"></div>
@@ -159,6 +163,12 @@ export default function Home() {
                 <li><a className="text-sm opacity-70">{session.user?.email}</a></li>
                 <li><hr className="my-1" /></li>
                 <li>
+                  <a onClick={() => setActiveTab('settings')}>
+                    <Settings className="w-4 h-4" />
+                    Settings
+                  </a>
+                </li>
+                <li>
                   <a onClick={() => signOut()}>
                     <LogOut className="w-4 h-4" />
                     Sign out
@@ -174,29 +184,20 @@ export default function Home() {
             <div className="hero bg-gradient-to-r from-primary/10 to-secondary/10 rounded-box">
               <div className="hero-content text-center py-6">
                 <div className="max-w-md">
-                  <h1 className="text-2xl font-bold mb-3">Welcome back!</h1>
-                  <p className="text-base-content/70 mb-4 text-sm">
-                    Ready to manage your calendar with AI assistance?
-                  </p>
+                  {/* Calendar Selection Info */}
+                  {availableCalendars.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-center gap-2 text-sm text-base-content/80">
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>Using calendar:</span>
+                        <span className="font-medium text-primary">
+                          {availableCalendars.find(cal => cal.id === selectedCalendarId)?.summary || 'Primary Calendar'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="stats stats-horizontal shadow bg-base-100 rounded-box">
-                    <div className="stat py-3">
-                      <div className="stat-figure text-primary">
-                        <Calendar className="w-5 h-5" />
-                      </div>
-                      <div className="stat-title text-xs">Today</div>
-                      <div className="stat-value text-primary text-xl">0</div>
-                      <div className="stat-desc text-xs">events</div>
-                    </div>
-                    <div className="stat py-3">
-                      <div className="stat-figure text-secondary">
-                        <MessageSquare className="w-5 h-5" />
-                      </div>
-                      <div className="stat-title text-xs">AI Chats</div>
-                      <div className="stat-value text-secondary text-xl">0</div>
-                      <div className="stat-desc text-xs">interactions</div>
-                    </div>
-                  </div>
+
                 </div>
               </div>
             </div>
@@ -232,6 +233,16 @@ export default function Home() {
                     <h2 className="card-title text-lg">Analytics & Reports</h2>
                   </div>
                   <Reports />
+                </>
+              )}
+
+              {activeTab === 'settings' && (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Settings className="w-4 h-4 text-primary" />
+                    <h2 className="card-title text-lg">Settings</h2>
+                  </div>
+                  <SettingsPage />
                 </>
               )}
             </div>
@@ -279,6 +290,16 @@ export default function Home() {
                 >
                   <BarChart3 className="w-5 h-5" />
                   Reports
+                </a>
+              </li>
+              <li>
+                <a
+                  className={`gap-3 ${activeTab === 'settings' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('settings')}
+                  tabIndex={0}
+                >
+                  <Settings className="w-5 h-5" />
+                  Settings
                 </a>
               </li>
             </ul>
