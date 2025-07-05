@@ -15,10 +15,13 @@ out/
 .git
 .gitignore
 
+
 # Docker
 Dockerfile*
 docker-compose*
 .dockerignore
+
+# DO NOT ignore prisma directory or schema.prisma!
 
 # IDE
 .vscode

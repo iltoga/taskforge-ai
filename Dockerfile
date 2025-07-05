@@ -55,6 +55,10 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 # Install the correct npm version globally in this stage as well
 RUN npm install -g npm@11.4.2
 
+
+# Copy Prisma schema and migrations before build and generate
+COPY prisma ./prisma
+
 # Build the application
 RUN npm run build
 
