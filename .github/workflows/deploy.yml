@@ -81,6 +81,10 @@ jobs:
               echo "Warning: .env file not found"
             fi
 
+            # Ensure database and passport table exist
+            echo "Ensuring database and passport table exist..."
+            bash scripts/db-init.sh
+
 
 
             # Ensure .env is present for Docker build
