@@ -20,6 +20,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 COPY public ./public
 COPY prompts ./prompts
+COPY settings ./settings
 
 # Copy .env for build-time environment variables (e.g., OPENAI_API_KEY)
 COPY .env .
