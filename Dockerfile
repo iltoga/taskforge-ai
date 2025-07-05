@@ -90,6 +90,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/prompts ./prompts
+COPY --from=builder /app/settings ./settings
 
 # Create .next directory and set permissions
 RUN chown nextjs:nodejs .next
