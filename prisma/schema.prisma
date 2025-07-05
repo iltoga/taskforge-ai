@@ -1,0 +1,30 @@
+// Prisma schema for the passport table
+// File: prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Passport {
+  id                      Int     @id @default(autoincrement())
+  passport_number         String  @db.VarChar(32)
+  surname                 String  @db.VarChar(64)
+  given_names             String  @db.VarChar(64)
+  nationality             String  @db.VarChar(64)
+  date_of_birth           DateTime
+  sex                     String  @db.Char(1)
+  place_of_birth          String  @db.VarChar(128)
+  date_of_issue           DateTime
+  date_of_expiry          DateTime
+  issuing_authority       String  @db.VarChar(128)
+  holder_signature_present Boolean
+  residence               String? @db.VarChar(128)
+  height_cm               Int?
+  eye_color               String? @db.VarChar(32)
+  type                    String  @db.VarChar(64)
+}

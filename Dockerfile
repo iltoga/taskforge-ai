@@ -80,9 +80,14 @@ RUN adduser --system --uid 1001 nextjs
 COPY package*.json ./
 COPY .env ./
 
+
 # Install production dependencies
 RUN npm install -g npm@11.4.2
 RUN npm ci --only=production && npm cache clean --force
+
+# Generate Prisma client and apply DB migrations (schema)
+RUN npx prisma generate
+RUN npx prisma migrate deploy || echo "Prisma migrate failed (DB may not be reachable at build time, will retry at runtime if needed)"
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
@@ -92,8 +97,10 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/prompts ./prompts
 COPY --from=builder /app/settings ./settings
 
+
 # Create .next directory and set permissions
 RUN chown nextjs:nodejs .next
+
 
 USER nextjs
 
@@ -102,4 +109,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["npm", "start"]
+# Ensure DB schema is up-to-date at container start (runtime)
+ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && exec npm start"]
