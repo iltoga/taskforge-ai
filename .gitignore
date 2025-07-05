@@ -44,4 +44,3 @@ next-env.d.ts
 settings/allowed-emails.json
 settings/client_secret_*
 settings/gptcalendarintegration*
-tmp/*settings/RoomSketcherSetup.dmg
