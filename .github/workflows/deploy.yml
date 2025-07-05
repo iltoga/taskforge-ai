@@ -81,6 +81,13 @@ jobs:
               echo "Warning: .env file not found"
             fi
 
+
+            # Check for .env before building Docker image
+            if [ ! -f .env ]; then
+              echo "❌ ERROR: .env file is missing in the repository root. Aborting deployment."
+              exit 1
+            fi
+
             # Build with cache optimization and git commit for cache busting
             echo "Building Docker image with smart caching..."
             docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-assistant
