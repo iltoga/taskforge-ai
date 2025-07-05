@@ -82,7 +82,8 @@ jobs:
             fi
 
 
-            # Check for .env before building Docker image
+
+            # Ensure .env is present for Docker build
             if [ ! -f .env ]; then
               echo "❌ ERROR: .env file is missing in the repository root. Aborting deployment."
               exit 1
