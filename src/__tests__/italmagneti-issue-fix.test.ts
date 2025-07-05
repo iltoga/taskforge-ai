@@ -104,7 +104,7 @@ If you have specific questions about this project or if the information might be
       query,
       [], // empty chat history
       mockRegistry,
-      'gpt-4.1-mini-2025-04-14', // model
+      'gpt-4.1-mini', // model
       {
         maxSteps: 10,
         maxToolCalls: 5
@@ -176,7 +176,7 @@ Based on your calendar, it appears the Italmagneti project has regular meetings 
       query,
       [], // empty chat history
       mockRegistry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       {
         maxSteps: 10,
         maxToolCalls: 5
@@ -246,7 +246,7 @@ REASONING: Completed calendar search.`))
         query,
         [], // empty chat history
         mockRegistry,
-        'gpt-4.1-mini-2025-04-14',
+        'gpt-4.1-mini',
         {
           maxSteps: 10,
           maxToolCalls: 5
@@ -289,7 +289,7 @@ REASONING: Calendar search completed, can provide response.`))
       query,
       [], // empty chat history
       mockRegistry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       {
         maxSteps: 10,
         maxToolCalls: 5

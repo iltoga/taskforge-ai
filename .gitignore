@@ -42,3 +42,6 @@ next-env.d.ts
 
 # email filter configuration (contains sensitive email addresses)
 settings/allowed-emails.json
+settings/client_secret_*
+settings/gptcalendarintegration*
+tmp/*

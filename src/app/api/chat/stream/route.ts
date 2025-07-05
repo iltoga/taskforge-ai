@@ -34,9 +34,11 @@ export async function POST(request: Request) {
       message,
       messages,
       useTools = false,
-      orchestratorModel = 'gpt-4.1-mini-2025-04-14',
+      orchestratorModel = 'gpt-4.1-mini',
       developmentMode = false,
-      calendarId = 'primary'
+      calendarId = 'primary',
+      fileIds = []
+      // Note: processedFiles not yet implemented in streaming mode
     } = await request.json() as {
       message: string;
       messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
@@ -44,6 +46,15 @@ export async function POST(request: Request) {
       orchestratorModel?: ModelType;
       developmentMode?: boolean;
       calendarId?: string;
+      fileIds?: string[];
+      processedFiles?: Array<{
+        fileName: string;
+        fileSize: number;
+        fileType: string;
+        fileId?: string;
+        imageData?: string;
+        isImage?: boolean;
+      }>;
     };
 
     if (!message || typeof message !== 'string') {
@@ -112,7 +123,8 @@ export async function POST(request: Request) {
               toolRegistry,
               orchestratorModel,
               developmentMode,
-              sendProgress
+              sendProgress,
+              fileIds
             );
 
             // Send final result

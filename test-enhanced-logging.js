@@ -7,7 +7,7 @@ const { ToolOrchestrator } = require('./src/services/tool-orchestrator.ts');
 console.log('📋 Enhanced Orchestrator Logging Features:');
 console.log('');
 console.log('🎯 Starting orchestration for query: "find events for nespola march to june 2025"');
-console.log('⚙️ Using model: gpt-4.1-mini-2025-04-14 | Max steps: 10 | Max tool calls: 5');
+console.log('⚙️ Using model: gpt-4.1-mini | Max steps: 10 | Max tool calls: 5');
 console.log('🔍 Performing initial analysis...');
 console.log('🤔 Iteration 1: Deciding on tool usage (0/5 tools used)...');
 console.log('🔧 Planning to execute 2 tools: searchEvents, getEvents');

@@ -65,10 +65,10 @@ describe('Functional Test: Nespola Events Filtering', () => {
     ];
 
     console.log('Sending message to OpenAI:', userMessage);
-    console.log('Using model: gpt-4.1-mini-2025-04-14');
+    console.log('Using model: gpt-4.1-mini');
 
     // Call the real AI service
-    const result = await aiService.processMessage(userMessage, mockExistingEvents, 'gpt-4.1-mini-2025-04-14');
+    const result = await aiService.processMessage(userMessage, mockExistingEvents, 'gpt-4.1-mini');
 
     console.log('AI Response:', JSON.stringify(result, null, 2));
 

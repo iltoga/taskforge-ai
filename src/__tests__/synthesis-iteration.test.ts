@@ -168,7 +168,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'how is the nespola project going between march and june 2025?',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       {
         developmentMode: true,
         maxSteps: 15
@@ -262,7 +262,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'list all nespola events',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { developmentMode: true }
     );
 

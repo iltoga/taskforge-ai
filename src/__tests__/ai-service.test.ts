@@ -1,5 +1,5 @@
-import { AIService } from '@/services/ai-service';
-import { CalendarEvent } from '@/types/calendar';
+import { AIService } from '../services/ai-service';
+import { CalendarEvent } from '../types/calendar';
 
 // Mock Vercel AI SDK
 jest.mock('@ai-sdk/openai', () => ({
@@ -215,7 +215,7 @@ This week focused primarily on API development and code quality improvements. Su
       mockGenerateText.mockResolvedValue(mockResponse);
 
       // Act
-      const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16', 'gpt-4.1-mini-2025-04-14', 'Stefano');
+      const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16', 'gpt-4.1-mini', 'Stefano');
 
       // Assert
       expect(result).toContain('Stefano\'s Weekly WorkLog for TechCorp');
@@ -227,7 +227,7 @@ This week focused primarily on API development and code quality improvements. Su
           messages: expect.arrayContaining([
             expect.objectContaining({
               role: 'system',
-              content: expect.stringContaining('weekly work report')
+              content: expect.stringContaining('weekly activity report')
             })
           ])
         })

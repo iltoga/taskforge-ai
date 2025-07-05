@@ -1,7 +1,9 @@
-import { Reports } from '@/components/Reports';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { Reports } from '../components/Reports';
+import { CalendarProvider } from '../contexts/CalendarContext';
+import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
 jest.mock('next-auth/react');
@@ -11,6 +13,17 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
+
+// Helper function to render component with required providers
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <DevelopmentProvider>
+      <CalendarProvider>
+        {component}
+      </CalendarProvider>
+    </DevelopmentProvider>
+  );
+};
 
 describe('Reports Component', () => {
   beforeEach(() => {
@@ -24,9 +37,9 @@ describe('Reports Component', () => {
       update: jest.fn(),
     });
 
-    render(<Reports />);
+    renderWithProviders(<Reports />);
 
-    expect(screen.getByText('Please sign in to access work reports')).toBeInTheDocument();
+    expect(screen.getByText('Please sign in to access calendar reports')).toBeInTheDocument();
   });
 
   it('renders report generation form when authenticated', () => {
@@ -44,10 +57,10 @@ describe('Reports Component', () => {
       update: jest.fn(),
     });
 
-    render(<Reports />);
+    renderWithProviders(<Reports />);
 
-    expect(screen.getByText('Work Reports')).toBeInTheDocument();
-    expect(screen.getByText('Company Name')).toBeInTheDocument();
+    expect(screen.getByText('Calendar Reports')).toBeInTheDocument();
+    expect(screen.getByText('Fiter by Words')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /generate report/i })).toBeInTheDocument();
   });
 
@@ -66,7 +79,7 @@ describe('Reports Component', () => {
       update: jest.fn(),
     });
 
-    render(<Reports />);
+    renderWithProviders(<Reports />);
 
     const selectElement = screen.getByDisplayValue('Current Week');
     expect(selectElement).toBeInTheDocument();
@@ -108,10 +121,10 @@ describe('Reports Component', () => {
       json: async () => ({ report: mockReport }),
     });
 
-    render(<Reports />);
+    renderWithProviders(<Reports />);
 
     // Set company name (required for generate button to be enabled)
-    const companyInput = screen.getByPlaceholderText('Enter your company name...');
+    const companyInput = screen.getByPlaceholderText('Enter your query to filter...');
     fireEvent.change(companyInput, { target: { value: 'Test Company' } });
 
     const generateButton = screen.getByRole('button', { name: /generate report/i });
@@ -148,10 +161,10 @@ describe('Reports Component', () => {
     // Mock the fetch to fail
     mockFetch.mockRejectedValueOnce(new Error('Failed to generate report'));
 
-    render(<Reports />);
+    renderWithProviders(<Reports />);
 
     // Set company name (required for generate button to be enabled)
-    const companyInput = screen.getByPlaceholderText('Enter your company name...');
+    const companyInput = screen.getByPlaceholderText('Enter your query to filter...');
     fireEvent.change(companyInput, { target: { value: 'Test Company' } });
 
     const generateButton = screen.getByRole('button', { name: /generate report/i });

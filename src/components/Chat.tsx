@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
-import { ModelType } from '../appconfig/models';
+import { ModelType, supportsFileSearch } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ModelSelector } from './ModelSelector';
 import { OrchestratorModelSelector } from './OrchestratorModelSelector';
@@ -21,6 +21,17 @@ interface ChatMessage {
   steps?: Array<{ id: string; type: string; content: string; reasoning?: string }>;
   progressMessages?: string[];
   approach?: 'legacy' | 'tools' | 'agentic';
+  attachedFiles?: Array<{ id?: string; name: string; size: number; type: string }>;
+}
+
+interface UploadedFile {
+  id?: string;
+  name: string;
+  size: number;
+  type: string;
+  fileId?: string;
+  imageData?: string;
+  isImage?: boolean;
 }
 
 // Utility function to safely stringify unknown values
@@ -65,9 +76,11 @@ export function Chat() {
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
   const [currentProgressMessages, setCurrentProgressMessages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
-  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini');
+  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4.1-mini');
   const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   // Initialize agentic mode from localStorage or default to FALSE (SIMPLE mode)
   const [useAgenticMode, setUseAgenticMode] = useState(() => {
@@ -96,6 +109,7 @@ export function Chat() {
   // Function to clear chat messages and sessionStorage
   const clearChat = () => {
     setMessages([]);
+    setUploadedFiles([]);
     if (typeof window !== 'undefined') {
       try {
         sessionStorage.removeItem('chat-messages');
@@ -224,6 +238,7 @@ export function Chat() {
       type: 'user',
       content: input.trim(),
       timestamp: new Date(),
+      attachedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
     };
 
     setMessages(prev => {
@@ -278,6 +293,15 @@ export function Chat() {
           orchestratorModel: orchestratorModel,
           developmentMode: useAgenticMode,
           calendarId: selectedCalendarId,
+          fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
+          processedFiles: uploadedFiles.map(f => ({
+            fileName: f.name,
+            fileSize: f.size,
+            fileType: f.type,
+            fileId: f.fileId,
+            imageData: f.imageData,
+            isImage: f.isImage
+          })),
         },
       });
 
@@ -297,6 +321,15 @@ export function Chat() {
               orchestratorModel: orchestratorModel,
               developmentMode: useAgenticMode,
               calendarId: selectedCalendarId,
+              fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
+              processedFiles: uploadedFiles.map(f => ({
+                fileName: f.name,
+                fileSize: f.size,
+                fileType: f.type,
+                fileId: f.fileId,
+                imageData: f.imageData,
+                isImage: f.isImage
+              })),
             }),
           });
 
@@ -426,6 +459,15 @@ export function Chat() {
               orchestratorModel: orchestratorModel,
               developmentMode: useAgenticMode,
               calendarId: selectedCalendarId,
+              fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
+              processedFiles: uploadedFiles.map(f => ({
+                fileName: f.name,
+                fileSize: f.size,
+                fileType: f.type,
+                fileId: f.fileId,
+                imageData: f.imageData,
+                isImage: f.isImage
+              })),
             }),
           });
 
@@ -466,6 +508,15 @@ export function Chat() {
             orchestratorModel: orchestratorModel,
             developmentMode: useAgenticMode,
             calendarId: selectedCalendarId,
+            fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
+            processedFiles: uploadedFiles.map(f => ({
+              fileName: f.name,
+              fileSize: f.size,
+              fileType: f.type,
+              fileId: f.fileId,
+              imageData: f.imageData,
+              isImage: f.isImage
+            })),
           }),
         });
 
@@ -512,6 +563,107 @@ export function Chat() {
       setIsLoading(false);
       setLoadingStatus('');
       // Don't clear currentSteps or currentProgressMessages here - let them finish their animation
+    }
+  };
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // Check if current model supports file search
+    if (!supportsFileSearch(selectedModel)) {
+      alert('File upload is only available for OpenAI models that support Assistant API file search (GPT-4o, GPT-4.1 Mini, o4-mini, o4-mini-high).');
+      return;
+    }
+
+    setIsUploadingFiles(true);
+    setLoadingStatus('📁 Uploading files...');
+
+    try {
+      const newFiles: UploadedFile[] = [];
+
+      for (const file of Array.from(files)) {
+        // Check file size (limit to 512MB per OpenAI's limits)
+        if (file.size > 512 * 1024 * 1024) {
+          alert(`File "${file.name}" is too large. Maximum file size is 512MB.`);
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/chat/files', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload file');
+        }
+
+        const result = await response.json();
+
+        // Handle new API response structure with uploads array
+        if (result.success && result.uploads && Array.isArray(result.uploads)) {
+          for (const upload of result.uploads) {
+            newFiles.push({
+              id: upload.fileId || upload.fileName, // Use fileId for documents, fileName for images
+              name: upload.fileName,
+              size: upload.fileSize,
+              type: upload.fileType,
+              fileId: upload.fileId,
+              imageData: upload.imageData,
+              isImage: upload.isImage
+            });
+          }
+        } else {
+          // Fallback to old response structure for compatibility
+          newFiles.push({
+            id: result.fileId,
+            name: result.fileName,
+            size: result.fileSize,
+            type: result.fileType,
+          });
+        }
+      }
+
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      setLoadingStatus('');
+
+      if (newFiles.length > 0) {
+        const fileNames = newFiles.map(f => f.name).join(', ');
+        setLoadingStatus(`✅ Uploaded ${newFiles.length} file(s): ${fileNames}`);
+        setTimeout(() => setLoadingStatus(''), 3000);
+      }
+
+    } catch (error) {
+      console.error('File upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setLoadingStatus(`❌ Error uploading files: ${errorMessage}`);
+      setTimeout(() => setLoadingStatus(''), 5000);
+    } finally {
+      setIsUploadingFiles(false);
+      // Reset file input
+      event.target.value = '';
+    }
+  };
+
+  // Remove uploaded file
+  const removeFile = async (fileId: string) => {
+    try {
+      // Delete file from OpenAI
+      await fetch(`/api/chat/files?fileId=${fileId}`, {
+        method: 'DELETE',
+      });
+
+      // Remove from local state
+      setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    } catch (error) {
+      console.error('Error removing file:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to remove file: ${errorMessage}`);
     }
   };
 
@@ -646,6 +798,26 @@ export function Chat() {
                 </div>
               )}
 
+              {/* Display attached files if available */}
+              {message.attachedFiles && message.attachedFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
+                    📎 <span>Attached Files</span>
+                  </div>
+                  <div className="space-y-1">
+                    {message.attachedFiles.map((file) => (
+                      <div key={file.id} className="flex items-center gap-2 p-2 bg-base-200/30 rounded-lg border border-base-300/30">
+                        <span className="text-sm">📄</span>
+                        <span className="text-sm font-medium">{file.name}</span>
+                        <span className="text-xs opacity-60">
+                          ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Display progress messages if available (agentic mode) - visible to all users */}
               {message.progressMessages && message.progressMessages.length > 0 && (
                 <div className="mt-4 space-y-2">
@@ -658,7 +830,7 @@ export function Chat() {
                     </summary>
                     <div className="collapse-content space-y-1">
                       {message.progressMessages.map((progressMsg, index) => (
-                        <div key={index} className="text-xs p-2 bg-base-100/50 rounded border-l-2 border-accent/30">
+                        <div key={`progress-${message.id}-${index}`} className="text-xs p-2 bg-base-100/50 rounded border-l-2 border-accent/30">
                           {progressMsg}
                         </div>
                       ))}
@@ -673,8 +845,8 @@ export function Chat() {
                   <div className="text-xs font-semibold opacity-70 flex items-center gap-2">
                     🤖 <span>AI Reasoning Steps</span>
                   </div>
-                  {message.steps.map((step, index) => (
-                    <div key={index} className="step-container">
+                  {message.steps.map((step) => (
+                    <div key={`step-${message.id}-${step.id}`} className="step-container">
                       <div className="flex items-center gap-2 mb-2">
                         <span className={`step-badge ${
                           step.type === 'analysis' ? 'badge-info' :
@@ -704,7 +876,7 @@ export function Chat() {
                     🔧 <span>Tool Calls</span>
                   </div>
                   {message.toolCalls.map((toolCall, index) => (
-                    <div key={index} className="step-container">
+                    <div key={`toolcall-${message.id}-${index}`} className="step-container">
                       <div className="text-sm mb-2">
                         <span className="font-mono text-primary font-semibold bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
                           {toolCall.tool}
@@ -856,7 +1028,7 @@ export function Chat() {
                   </div>
                   {currentProgressMessages.map((message, index) => (
                     <div
-                      key={index}
+                      key={`current-progress-${index}`}
                       className="text-sm p-2 bg-base-200/30 rounded-lg border-l-2 border-accent/30 animate-fade-in"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
@@ -874,7 +1046,7 @@ export function Chat() {
                   </div>
                   {currentSteps.map((step, index) => (
                     <div
-                      key={step.id}
+                      key={`current-step-${step.id}-${index}`}
                       className="step-container animate-fade-in"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
@@ -968,12 +1140,57 @@ export function Chat() {
           </div>
         </div>
 
-        <form onSubmit={sendMessage} className="flex gap-2">
+        <form onSubmit={sendMessage} className="flex gap-2 relative">
+          {/* File Upload Button (styled like ChatGPT) */}
+          {supportsFileSearch(selectedModel) && (
+            <div className="relative">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={isLoading || isUploadingFiles}
+                multiple
+                accept="*/*"
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className={`btn btn-square btn-outline ${
+                  isUploadingFiles ? 'btn-disabled' : 'hover:btn-primary'
+                }`}
+                title="Upload files (any type)"
+              >
+                {isUploadingFiles ? (
+                  <span className="loading loading-spinner loading-sm"></span>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                    />
+                  </svg>
+                )}
+              </label>
+            </div>
+          )}
+
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message here..."
+            placeholder={
+              supportsFileSearch(selectedModel)
+                ? "Type your message here... (Files can be uploaded for context)"
+                : "Type your message here..."
+            }
             className="input input-bordered flex-1"
             disabled={isLoading}
           />
@@ -982,9 +1199,58 @@ export function Chat() {
             disabled={isLoading || !input.trim()}
             className="btn btn-primary"
           >
-            Send
+            {isLoading ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : (
+              'Send'
+            )}
           </button>
         </form>
+
+        {/* Display uploaded files */}
+        {uploadedFiles.length > 0 && (
+          <div className="mt-3 p-3 bg-base-200/30 rounded-lg border border-base-300/30">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-base-content/70">
+                📎 {uploadedFiles.length} file(s) attached
+              </span>
+              <button
+                onClick={() => setUploadedFiles([])}
+                className="btn btn-xs btn-ghost text-error"
+                disabled={isLoading}
+              >
+                Clear all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {uploadedFiles.map((file) => (
+                <div key={file.id} className="flex items-center justify-between p-2 bg-base-100/50 rounded border">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📄</span>
+                    <span className="text-sm font-medium">{file.name}</span>
+                    <span className="text-xs opacity-60">
+                      ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => file.id && removeFile(file.id)}
+                    className="btn btn-xs btn-ghost text-error"
+                    disabled={isLoading}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* File search capability notice */}
+        {supportsFileSearch(selectedModel) && uploadedFiles.length === 0 && (
+          <div className="mt-2 text-xs text-info opacity-70">
+            💡 This model supports file search - upload documents to add context to your conversations
+          </div>
+        )}
       </div>
     </div>
   );

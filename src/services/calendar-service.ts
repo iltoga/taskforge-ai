@@ -188,6 +188,42 @@ export class CalendarService {
     }, 'createEvent');
   }
 
+  async getEvent(eventId: string, calendarId?: string): Promise<CalendarEvent> {
+    return this.executeWithRetry(async () => {
+      const startTime = Date.now();
+
+      // Log the request
+      serverDevLogger.log({
+        service: 'calendar',
+        method: 'GET',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${calendarId || 'primary'}/events/${eventId}`,
+      });
+
+      const response = await this.calendar.events.get({
+        calendarId: calendarId || 'primary',
+        eventId,
+      });
+
+      const duration = Date.now() - startTime;
+
+      // Log the successful response
+      serverDevLogger.log({
+        service: 'calendar',
+        method: 'GET',
+        endpoint: `https://www.googleapis.com/calendar/v3/calendars/${calendarId || 'primary'}/events/${eventId}`,
+        response: {
+          eventId: response.data.id,
+          summary: response.data.summary,
+          created: response.data.created,
+          htmlLink: response.data.htmlLink,
+        },
+        duration,
+      });
+
+      return response.data as CalendarEvent;
+    }, 'getEvent');
+  }
+
   async updateEvent(eventId: string, updateData: CalendarEvent, calendarId?: string): Promise<CalendarEvent> {
     return this.executeWithRetry(async () => {
       const response = await this.calendar.events.patch({

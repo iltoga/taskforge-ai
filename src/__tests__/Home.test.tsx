@@ -1,22 +1,23 @@
-import Home from '@/app/page';
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import Home from '../app/page';
+import { CalendarProvider } from '../contexts/CalendarContext';
 import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
 jest.mock('next-auth/react');
 
 // Mock the child components
-jest.mock('@/components/Chat', () => ({
+jest.mock('../components/Chat', () => ({
   Chat: jest.fn(() => <div data-testid="chat-component">Chat Component</div>),
 }));
 
-jest.mock('@/components/Events', () => ({
+jest.mock('../components/Events', () => ({
   Events: jest.fn(() => <div data-testid="events-component">Events Component</div>),
 }));
 
-jest.mock('@/components/Reports', () => ({
+jest.mock('../components/Reports', () => ({
   Reports: jest.fn(() => <div data-testid="reports-component">Reports Component</div>),
 }));
 
@@ -35,7 +36,9 @@ const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <DevelopmentProvider>
-      {component}
+      <CalendarProvider>
+        {component}
+      </CalendarProvider>
     </DevelopmentProvider>
   );
 };

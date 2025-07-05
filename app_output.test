@@ -2,7 +2,7 @@ this is what is in my chat, using tool and multi step process:
 ---
 summarize all events for nespola between march and june 2025
 📅
-CalendarGPT
+Calendar Assistant
 17:31:59
 Hi again! I’ve now been able to search the “Nespola” calendar for the period you specified ( 1 March – 30 June 2025 ). Result: the calendar contains **no meetings, tasks, or other dated items that actually fall within that time-window**. The only items returned by Google’s API were very old recurring “Happy birthday!” placeholders whose original dates are in the 1970-1990s. They are artefacts of a long-running birthday entry and do **not** represent real activity in 2025. ### What this means • There is nothing to summarise for Nespola between March and June 2025. • If you were expecting events to appear, double-check that they were created in the right calendar and carry real 2025 start dates (not just an old recurring series). • Once events are entered with proper 2025 dates, I’ll be able to list or summarise them for you. Let me know if you’d like me to: 1. Look in a different calendar or time-range, 2. Help troubleshoot why certain events aren’t showing up, or 3. Do anything else! Happy to assist.
 🤖 AI Reasoning Steps:

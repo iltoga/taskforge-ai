@@ -118,7 +118,7 @@ Both events show active Nespola project work during Q2 2025.`
       'summarize all events for nespola between march and june 2025',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { developmentMode: true }
     );
 
@@ -248,7 +248,7 @@ CALL_TOOLS:
       'find test events',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14'
+      'gpt-4.1-mini'
     );
 
     expect(result.success).toBe(true);

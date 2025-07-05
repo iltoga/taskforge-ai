@@ -6,7 +6,7 @@ curl -X POST http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
   -d '{
     "message": "summarize last week calendar activities",
-    "model": "gpt-4.1-mini-2025-04-14",
+    "model": "gpt-4.1-mini",
     "useTools": true,
     "developmentMode": false,
     "calendarId": "galaxy73.it@gmail.com"

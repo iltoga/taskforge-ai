@@ -75,7 +75,7 @@ describe('Orchestrator Internal Processing Context', () => {
     const previousSteps = [
       { id: 'step_1', type: 'analysis', content: 'User is asking for calendar data', timestamp: Date.now() }
     ];
-    const model = 'gpt-4.1-mini-2025-04-14';
+    const model = 'gpt-4.1-mini';
     const stepId = 2;
 
     // Call the method with all expected parameters including steps
@@ -116,7 +116,7 @@ describe('Orchestrator Internal Processing Context', () => {
       { id: 'step_1', type: 'analysis', content: 'Initial analysis', timestamp: Date.now() },
       { id: 'step_2', type: 'tool_call', content: 'Executed searchEvents', timestamp: Date.now() }
     ];
-    const model = 'gpt-4.1-mini-2025-04-14';
+    const model = 'gpt-4.1-mini';
     const stepId = 3;
 
     await (orchestrator as any).evaluateProgress(
@@ -156,7 +156,7 @@ describe('Orchestrator Internal Processing Context', () => {
       { id: 'step_1', type: 'analysis', content: 'Analysis step', timestamp: Date.now() },
       { id: 'step_2', type: 'evaluation', content: 'Evaluation step', timestamp: Date.now() }
     ];
-    const model = 'gpt-4.1-mini-2025-04-14';
+    const model = 'gpt-4.1-mini';
     const stepId = 4;
 
     await (orchestrator as any).synthesizeFinalAnswer(

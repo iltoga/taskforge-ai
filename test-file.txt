@@ -1,0 +1,18 @@
+This is a test document for file search debugging.
+
+PERSONAL INFORMATION:
+Name: John Doe
+Date of Birth: January 15, 1990
+Address: 123 Main Street, Anytown, USA 12345
+Phone: (555) 123-4567
+Email: john.doe@example.com
+
+DOCUMENT TYPE: Test Information Sheet
+
+CONTENT SUMMARY:
+This document contains personal information for testing purposes.
+It includes a name, address, contact details, and other identifying information.
+This is NOT a passport or official government document.
+This is a simple text file created for debugging file search functionality.
+
+END OF DOCUMENT

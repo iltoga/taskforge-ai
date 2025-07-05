@@ -175,66 +175,6 @@ View and manage your calendar events:
 
 - `POST /api/reports/weekly` - Generate weekly work reports
 
-## 5. Project Structure and Architecture
-
-```text
-calendar-assistant/
-├── .github/
-│   └── prompts/
-│       └── main_application.prompt.md  # This guide!
-├── public/                             # Static assets
-├── settings/                           # Configuration files (e.g., allowed emails, vector search)
-├── src/
-│   ├── __mocks__/                      # Mock implementations for testing
-│   ├── __tests__/                      # Jest tests (unit, integration, component)
-│   │   ├── functional/                 # Functional tests
-│   │   └── integration/                # Integration tests
-│   ├── app/                            # Next.js App Router
-│   │   ├── api/                        # API routes (backend logic)
-│   │   │   ├── auth/                   # NextAuth.js authentication
-│   │   │   ├── chat/                   # Main chat API endpoint (agentic orchestration)
-│   │   │   │   ├── route.ts            # Chat API route
-│   │   │   │   └── stream/             # Streaming chat API
-│   │   │   │       └── route.ts        # Streaming chat route
-│   │   │   ├── dev/                    # Development-related API endpoints
-│   │   │   ├── reports/                # Reports generation API
-│   │   │   └── test/                   # Test-related API endpoints
-│   │   ├── layout.tsx                  # Root layout
-│   │   ├── globals.css                 # Global styles
-│   │   ├── page-clean.tsx              # Clean page layout
-│   │   └── page.tsx                    # Home page
-│   ├── components/                     # React UI components (client & server)
-│   ├── appconfig/                      # Application configuration and core logic
-│   │   ├── email-filter-manager.ts     # Utility to manage allowed emails configuration
-│   │   ├── models.ts                   # Model type definitions and configuration for supported AI models
-│   ├── contexts/                       # React Contexts for state management
-│   ├── lib/                            # Core libraries, utilities (e.g., auth.ts)
-│   ├── services/                       # Backend service logic
-│   │   ├── ai-service.ts               # AI model interaction
-│   │   ├── calendar-service.ts         # Google Calendar interaction
-│   │   └── tool-orchestrator.ts        # Core agentic reasoning engine
-│   ├── tools/                          # Extensible tool system
-│   │   ├── calendar-tools.ts           # Calendar-specific tools
-│   │   ├── email-tools.ts              # Email-specific tools
-│   │   ├── file-tools.ts               # File-specific tools
-│   │   ├── knowledge-tools.ts          # Knowledge-specific tools
-│   │   ├── tool-definitions.ts         # Zod schemas for tool parameters
-│   │   ├── tool-registry.ts            # Tool registration and management
-│   │   ├── vector-search-tool.ts       # Vector search tool for knowledge base
-│   │   └── web-tools.ts                # Web-related tools (e.g., fetching)
-│   └── types/                          # TypeScript type definitions
-├── eslint.config.mjs                   # ESLint configuration
-├── jest.config.js                      # Jest test runner configuration
-├── next.config.ts                      # Next.js configuration
-├── package.json                        # Project dependencies and scripts
-├── tsconfig.json                       # TypeScript configuration
-├── tsconfig.test.json                  # TypeScript configuration for tests
-├── tsconfig.tsbuildinfo                # TypeScript build info
-├── Dockerfile                          # Docker configuration
-├── docker-compose.yml                  # Docker Compose configuration
-├── README.md                           # General project README
-```
-
 ### 4.1. Agentic Architecture (Key for Copilot)
 
 This is the heart of Calendar Assistant's intelligence. Understand it well.
@@ -561,7 +501,7 @@ To assist in developing Calendar Assistant by generating high-quality, consisten
 2. **OpenAI API Errors**
 
    - Check your API key is valid and has sufficient credits
-   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini-2025-04-14, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
+   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
 
 3. **Authentication Issues**
    - Verify NEXTAUTH_SECRET is set

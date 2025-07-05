@@ -74,9 +74,9 @@ describe('Agentic Mode Routing Fix', () => {
       method: 'POST',
       body: JSON.stringify({
         message: 'summarize all events for nespola between march and june 2025',
-        model: 'gpt-4.1-mini-2025-04-14',
+        model: 'gpt-4.1-mini',
         useTools: true,
-        orchestratorModel: 'gpt-4.1-mini-2025-04-14',
+        orchestratorModel: 'gpt-4.1-mini',
         developmentMode: true  // This should trigger agentic mode
       }),
     });
@@ -90,8 +90,9 @@ describe('Agentic Mode Routing Fix', () => {
       'test message', // translated message
       [], // chat history (empty for this test)
       expect.anything(), // tool registry
-      'gpt-4.1-mini-2025-04-14', // orchestrator model
-      true // development mode
+      'gpt-4.1-mini', // orchestrator model
+      true, // development mode
+      [] // fileIds (empty for this test)
     );
 
     // Verify response indicates agentic approach
@@ -124,9 +125,9 @@ describe('Agentic Mode Routing Fix', () => {
       method: 'POST',
       body: JSON.stringify({
         message: 'summarize all events for nespola between march and june 2025',
-        model: 'gpt-4.1-mini-2025-04-14',
+        model: 'gpt-4.1-mini',
         useTools: true,
-        orchestratorModel: 'gpt-4.1-mini-2025-04-14',
+        orchestratorModel: 'gpt-4.1-mini',
         developmentMode: false  // This should use simple tool mode
       }),
     });

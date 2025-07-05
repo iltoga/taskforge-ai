@@ -4,6 +4,32 @@ import { useCalendar } from '@/contexts/CalendarContext';
 import { Calendar, RefreshCw, Save, Settings, User } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
+// Auth mode display component
+function AuthModeDisplay({ mode }: { mode?: string }) {
+  if (!mode) return null;
+
+  const isServiceAccount = mode === 'service-account';
+
+  return (
+    <div className={`alert ${isServiceAccount ? 'alert-info' : 'alert-success'} mb-4`}>
+      <div className="flex items-start gap-3">
+        <Settings className="w-5 h-5 flex-shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-medium">
+            {isServiceAccount ? 'Service Account Mode' : 'OAuth Mode'}
+          </h3>
+          <p className="text-sm opacity-80">
+            {isServiceAccount
+              ? 'Using predefined calendars with service account authentication'
+              : 'Using your personal Google calendars with OAuth authentication'
+            }
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const {
     selectedCalendarId,
@@ -16,6 +42,7 @@ export function SettingsPage() {
   } = useCalendar();
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [authMode, setAuthMode] = useState<string>('');
 
   const fetchCalendars = useCallback(async () => {
     if (!isInitialized) {
@@ -31,6 +58,7 @@ export function SettingsPage() {
       }
       const data = await response.json();
       setAvailableCalendars(data.calendars || []);
+      setAuthMode(data.mode || ''); // Store the authentication mode
     } catch (error) {
       console.error('Error fetching calendars:', error);
       setSaveStatus('error');
@@ -73,6 +101,9 @@ export function SettingsPage() {
 
       {/* Settings Cards */}
       <div className="grid gap-6">
+
+        {/* Authentication Mode Display */}
+        <AuthModeDisplay mode={authMode} />
 
         {/* Calendar Selection Card */}
         <div className="card bg-base-100 shadow-sm border border-base-300">

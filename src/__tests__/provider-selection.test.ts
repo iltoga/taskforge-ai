@@ -5,7 +5,7 @@ import { getModelInfo } from '../components/ModelSelector';
 
 describe('Provider Selection', () => {
   it('should correctly identify OpenAI models', () => {
-    const gpt4Info = getModelInfo('gpt-4.1-mini-2025-04-14');
+    const gpt4Info = getModelInfo('gpt-4.1-mini');
     expect(gpt4Info?.provider).toBe('openai');
 
     const o3Info = getModelInfo('o3-mini');
@@ -19,7 +19,7 @@ describe('Provider Selection', () => {
 
   it('should return undefined for unknown models', () => {
     // Test with a cast to bypass TypeScript checking for this specific test
-    const unknownInfo = getModelInfo('unknown-model' as 'gpt-4.1-mini-2025-04-14');
+    const unknownInfo = getModelInfo('unknown-model' as 'gpt-4.1-mini');
     expect(unknownInfo).toBeUndefined();
   });
 });

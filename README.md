@@ -333,7 +333,7 @@ Enable comprehensive debugging and transparency:
 const result = await orchestrator.orchestrate(
   userMessage,
   registry,
-  'gpt-4.1-mini-2025-04-14',
+  'gpt-4.1-mini',
   { developmentMode: true }
 );
 
@@ -419,7 +419,7 @@ The application can be deployed on any platform that supports Next.js:
 
 2. **OpenAI API Errors**
    - Check your API key is valid and has sufficient credits
-   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini-2025-04-14, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
+   - Ensure you're using the correct model (gpt-4o, gpt-4.1-mini, gpt-4.1, gpt-4.1-mini, o3, or o3-mini)
 
 3. **Authentication Issues**
    - Verify NEXTAUTH_SECRET is set

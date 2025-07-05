@@ -1,0 +1,21 @@
+{
+  "alternativeAuth": {
+    "enabled": true,
+    "serviceAccount": {
+      "enabled": true,
+      "credentialsFile": "gptcalendarintegration-59a55f630b26.json",
+      "fallbackOnOAuthFailure": true,
+      "domainWideDelegate": false,
+      "subject": null
+    },
+    "apiKey": {
+      "enabled": false,
+      "note": "API key authentication not yet implemented"
+    }
+  },
+  "compatibility": {
+    "preserveOAuthAsDefault": true,
+    "allowMixedAuth": true,
+    "logAuthType": true
+  }
+}

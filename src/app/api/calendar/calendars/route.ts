@@ -1,60 +1,69 @@
-import { authOptions } from '@/lib/auth';
-import { CalendarService } from '@/services/calendar-service';
-import { OAuth2Client } from 'google-auth-library';
+import { authOptions, createGoogleAuth } from '@/lib/auth';
+import { getServiceAccountCalendars, isServiceAccountMode } from '@/lib/calendar-config';
+import { ExtendedSession } from '@/types/auth';
+import { google } from 'googleapis';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
-interface SessionWithTokens {
-  accessToken?: string;
-  refreshToken?: string;
-  user?: {
-    email?: string;
-  };
-}
-
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(authOptions) as ExtendedSession;
+    const useServiceAccountMode = isServiceAccountMode();
 
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Always require user authentication for the app
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
     }
 
-    // Create OAuth2 client with the session token
-    const oauth2Client = new OAuth2Client(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
-    );
+    if (useServiceAccountMode) {
+      // Service Account Mode: Return predefined calendars from config
+      console.log('📅 Fetching calendars from allowed-calendars.json (service account mode)');
+      const calendars = getServiceAccountCalendars();
 
-    // Type assertion to access the custom properties
-    const sessionWithTokens = session as SessionWithTokens;
+      return NextResponse.json({
+        calendars,
+        mode: 'service-account',
+        message: `Found ${calendars.length} allowed calendars`
+      });
+    } else {
+      // OAuth Mode: Fetch calendars from user's Google account
+      console.log('📅 Fetching calendars from Google Calendar API (OAuth mode)');
 
-    oauth2Client.setCredentials({
-      access_token: sessionWithTokens.accessToken,
-      refresh_token: sessionWithTokens.refreshToken,
-    });
+      if (!session.accessToken) {
+        return NextResponse.json(
+          { error: 'OAuth access token missing' },
+          { status: 401 }
+        );
+      }
 
-    const calendarService = new CalendarService(oauth2Client);
-    const calendars = await calendarService.getCalendarList();
+      const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
+      const calendar = google.calendar({ version: 'v3', auth: googleAuth });
 
-    // Transform the data to match our CalendarInfo interface
-    const calendarList = calendars.map(cal => ({
-      id: cal.id || '',
-      summary: cal.summary || 'Unnamed Calendar',
-      primary: cal.primary || false,
-      accessRole: cal.accessRole || 'reader',
-      backgroundColor: cal.backgroundColor,
-    }));
+      const response = await calendar.calendarList.list();
+      const calendars = response.data.items?.map(cal => ({
+        id: cal.id!,
+        summary: cal.summary!,
+        primary: cal.primary || false,
+        accessRole: cal.accessRole,
+        backgroundColor: cal.backgroundColor
+      })) || [];
 
-    return NextResponse.json({
-      calendars: calendarList,
-      count: calendarList.length
-    });
-
+      return NextResponse.json({
+        calendars,
+        mode: 'oauth',
+        message: `Found ${calendars.length} calendars from Google account`
+      });
+    }
   } catch (error) {
     console.error('Error fetching calendars:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch calendars' },
+      {
+        error: 'Failed to fetch calendars',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

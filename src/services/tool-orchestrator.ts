@@ -18,6 +18,7 @@ export interface OrchestrationResult {
   steps: OrchestrationStep[];
   toolCalls: ToolExecution[];
   error?: string;
+  fileProcessingUsed?: boolean;
 }
 
 export interface OrchestratorConfig {
@@ -104,14 +105,63 @@ export class ToolOrchestrator {
     userMessage: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: ToolRegistry,
-    model: ModelType = 'gpt-4.1-mini-2025-04-14',
-    config: OrchestratorConfig = {}
+    model: ModelType = 'gpt-4.1-mini',
+    config: OrchestratorConfig = {},
+    fileIds: string[] = []
   ): Promise<OrchestrationResult> {
     const {
       maxSteps = 10,
       maxToolCalls = 5,
       developmentMode = false
     } = config;
+
+    // Handle file context integration for supported models
+    if (fileIds.length > 0) {
+      console.log(`🗃️ Orchestrator received ${fileIds.length} file IDs for context:`, fileIds);
+
+      // Check if the model supports file search
+      const { supportsFileSearch } = await import('../appconfig/models');
+      const modelSupportsFiles = supportsFileSearch(model);
+
+      if (modelSupportsFiles) {
+        console.log(`📄 Model ${model} supports file search - routing to file processing`);
+
+        // For models that support file search, route to AI service file processing
+        try {
+          const { AIService } = await import('./ai-service');
+          const aiService = new AIService(this.apiKey);
+
+          const fileProcessingResult = await aiService.processMessageWithFiles(
+            userMessage,
+            fileIds,
+            model
+          );
+
+          // Return the file processing result as the final answer
+          return {
+            success: true,
+            finalAnswer: fileProcessingResult,
+            steps: [{
+              id: 'file_processing',
+              type: 'synthesis',
+              timestamp: Date.now(),
+              content: fileProcessingResult,
+              reasoning: 'Processed user message with uploaded files using OpenAI Assistant API'
+            }],
+            toolCalls: [],
+            fileProcessingUsed: true
+          };
+
+        } catch (error) {
+          console.error('File processing failed:', error);
+          // Fall back to regular orchestration with a note about file processing failure
+          this.logProgress(`⚠️ File processing failed: ${error instanceof Error ? error.message : 'Unknown error'} - continuing with regular orchestration`);
+        }
+      } else {
+        console.log(`⚠️ Model ${model} does not support file search - files will be ignored`);
+        this.logProgress(`⚠️ The selected model (${model}) does not support file search. Files will be ignored for this request.`);
+      }
+    }
 
     const steps: OrchestrationStep[] = [];
     const toolCalls: ToolExecution[] = [];

@@ -121,7 +121,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'Show me my calendar events',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { developmentMode: true }
     );
 
@@ -242,7 +242,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'Create a meeting called "New Meeting" for tomorrow at 2pm and verify it was created',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { developmentMode: true }
     );
 
@@ -324,7 +324,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'Show me my events',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { developmentMode: true, maxToolCalls: 1 } // Limit to 1 tool call for this test
     );
 
@@ -382,7 +382,7 @@ CALL_TOOLS:
       'Test message',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini-2025-04-14',
+      'gpt-4.1-mini',
       { maxSteps: 1 }
     );
 

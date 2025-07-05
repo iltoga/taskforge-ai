@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { readFileSync } from 'fs';
+import { compile } from 'handlebars';
 import { join } from 'path';
 import { ModelType } from '../appconfig/models';
 import { CalendarTools } from '../tools/calendar-tools';
@@ -75,7 +76,21 @@ export class AIService {
   private loadSystemPrompt(): string {
     try {
       const promptPath = join(process.cwd(), 'prompts', 'calendar-assistant.md');
-      let prompt = readFileSync(promptPath, 'utf-8');
+      const templateContent = readFileSync(promptPath, 'utf-8');
+      const template = compile(templateContent);
+      // Get timezone from environment variable or default to 'Asia/Makassar'
+      const timezoneEnv = process.env.TIMEZONE || 'Asia/Makassar';
+      const timezoneOffset = process.env.TIMEZONE_OFFSET || '+08:00';
+      let prompt = template({
+        TIMEZONE: timezoneEnv,
+        TIMEZONE_OFFSET: timezoneOffset,
+        CURRENT_DATE: new Date().toLocaleDateString('en-US', {
+          timeZone: timezoneEnv,
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      });
 
       // Add current date to the prompt
       const today = new Date();
@@ -140,7 +155,7 @@ export class AIService {
   async processMessage(
     message: string,
     existingEvents?: CalendarEvent[],
-    model: ModelType = 'gpt-4.1-mini-2025-04-14'
+    model: ModelType = 'gpt-4.1-mini'
   ): Promise<CalendarAction> {
     const systemPrompt = this.loadSystemPrompt();
 
@@ -204,7 +219,7 @@ export class AIService {
     }
   }
 
-  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini-2025-04-14', userName: string = 'User'): Promise<string> {
+  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini', userName: string = 'User'): Promise<string> {
     return this.generateReport(events, company, startDate, endDate, 'weekly', model, userName);
   }
 
@@ -214,7 +229,7 @@ export class AIService {
     startDate: string,
     endDate: string,
     reportType: 'weekly' | 'monthly' | 'quarterly',
-    model: ModelType = 'gpt-4.1-mini-2025-04-14',
+    model: ModelType = 'gpt-4.1-mini',
     userName: string = 'User'
   ): Promise<string> {
     const getSystemPrompt = (type: 'weekly' | 'monthly' | 'quarterly') => {
@@ -364,8 +379,9 @@ Total events in period: ${events.length}
     message: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = 'gpt-4.1-mini-2025-04-14',
-    developmentMode: boolean = false
+    orchestratorModel: ModelType = 'gpt-4.1-mini',
+    developmentMode: boolean = false,
+    fileIds: string[] = []
   ): Promise<{
     response: string;
     steps: unknown[];
@@ -395,7 +411,8 @@ Total events in period: ${events.length}
           maxSteps: 10,
           maxToolCalls: 5,
           developmentMode
-        }
+        },
+        fileIds
       );
 
       return {
@@ -425,9 +442,10 @@ Total events in period: ${events.length}
     message: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = 'gpt-4.1-mini-2025-04-14',
+    orchestratorModel: ModelType = 'gpt-4.1-mini',
     developmentMode: boolean = false,
-    progressCallback: (data: { type: string; message?: string; [key: string]: unknown }) => void
+    progressCallback: (data: { type: string; message?: string; [key: string]: unknown }) => void,
+    fileIds: string[] = []
   ): Promise<{
     response: string;
     steps: unknown[];
@@ -462,7 +480,8 @@ Total events in period: ${events.length}
           maxSteps: 10,
           maxToolCalls: 5,
           developmentMode
-        }
+        },
+        fileIds
       );
 
       return {
@@ -517,7 +536,7 @@ Default rules:
 Return ONLY the JSON object, no other text.`;
 
     try {
-      const model = 'gpt-4.1-mini-2025-04-14';
+      const model = 'gpt-4.1-mini';
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
       const client = this.getProviderClient(model);
 
@@ -795,7 +814,7 @@ Please create an appropriate response based on the user's request.`;
     console.log('🔧 SIMPLE MODE: Generated prompt for AI:', userPrompt.substring(0, 500) + '...');
 
     try {
-      const model = 'gpt-4.1-mini-2025-04-14';
+      const model = 'gpt-4.1-mini';
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
       const client = this.getProviderClient(model);
 
@@ -955,7 +974,7 @@ Please create an appropriate response based on the user's request.`;
     };
   }
 
-  async translateToEnglish(text: string, model: ModelType = 'gpt-4.1-mini-2025-04-14'): Promise<string> {
+  async translateToEnglish(text: string, model: ModelType = 'gpt-4.1-mini'): Promise<string> {
     // If text is already in English or looks like English, don't translate
     const englishPattern = /^[a-zA-Z0-9\s.,!?'"()/-]+$/;
     if (englishPattern.test(text) && text.split(' ').length > 1) {
@@ -990,7 +1009,7 @@ Please create an appropriate response based on the user's request.`;
       const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
 
       const response = await generateText({
-        model: this.openaiClient.languageModel('gpt-4.1-mini-2025-04-14'),
+        model: this.openaiClient.languageModel('gpt-4.1-mini'),
         messages: [
           {
             role: 'user',
@@ -1033,6 +1052,248 @@ Please create an appropriate response based on the user's request.`;
     } catch (error) {
       console.error('Vision analysis error:', error);
       throw new Error(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Method for processing messages with embedded images and files
+  async processMessageWithEmbeddedFiles(
+    message: string,
+    processedFiles: Array<{
+      fileName: string;
+      fileSize: number;
+      fileType: string;
+      fileId?: string;
+      imageData?: string;
+      isImage?: boolean;
+    }>,
+    model: ModelType = 'gpt-4o'
+  ): Promise<string> {
+    try {
+      if (!processedFiles || processedFiles.length === 0) {
+        return "No files were provided for analysis.";
+      }
+
+      console.log(`🗃️ Processing message with ${processedFiles.length} files`);
+
+      // Separate images from other files
+      const images = processedFiles.filter(file => file.isImage && file.imageData);
+      const documents = processedFiles.filter(file => !file.isImage && file.fileId);
+
+      console.log(`📸 Found ${images.length} images and ${documents.length} documents`);
+
+      let response = '';
+
+      // Process images with vision API
+      if (images.length > 0) {
+        console.log('🔍 Processing images with vision API...');
+
+        // Build vision message content
+        const messageContent = [
+          {
+            type: 'text' as const,
+            text: `Please analyze the uploaded image(s) and respond to: "${message}"\n\nProvide detailed information about what you see in the images.`
+          },
+          // Add each image to the message
+          ...images.map(image => ({
+            type: 'image' as const,
+            image: `data:${image.fileType};base64,${image.imageData}`
+          }))
+        ];
+
+        const visionResponse = await generateText({
+          model: this.openaiClient.languageModel(model),
+          messages: [
+            {
+              role: 'user',
+              content: messageContent
+            }
+          ],
+          temperature: 0.3,
+        });
+
+        response += `## 📸 Image Analysis\n\n${visionResponse.text}\n\n`;
+      }
+
+      // Process documents with file search API
+      if (documents.length > 0) {
+        console.log('📄 Processing documents with file search API...');
+
+        const fileIds = documents.map(doc => doc.fileId!);
+
+        // Import FileSearchTool
+        const { FileSearchTool } = await import('./file-search-tool');
+
+        // Create and initialize the file search tool
+        const fileSearchTool = new FileSearchTool(this.apiKey);
+
+        try {
+          const customInstructions = "You are a document analysis expert. Analyze the uploaded documents and provide relevant information to answer the user's question.";
+
+          await fileSearchTool.initialize(fileIds, customInstructions, model);
+          const searchResults = await fileSearchTool.searchFiles(message);
+
+          if (searchResults && searchResults.length > 0) {
+            response += "## 📄 Document Analysis\n\n";
+
+            searchResults.forEach((result, index) => {
+              response += `### ${result.filename ? `From ${result.filename}` : `Result ${index + 1}`}\n\n`;
+              response += `${result.content}\n\n`;
+            });
+          }
+        } finally {
+          await fileSearchTool.cleanup();
+        }
+      }
+
+      if (!response) {
+        response = "I processed your files but couldn't find specific information related to your question. Please try asking more specific questions about the file contents.";
+      }
+
+      response += "\n---\n\n";
+      response += "💡 **Additional help:**\n";
+      response += "- Ask follow-up questions about the file contents\n";
+      response += "- Request specific details or clarifications\n";
+      response += "- Ask me to create calendar events based on the information\n";
+
+      return response;
+
+    } catch (error) {
+      console.error('Embedded file processing error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      return `❌ **File Analysis Error**\n\n` +
+             `I encountered an issue while analyzing your files: ${errorMessage}\n\n` +
+             `**Please try:**\n` +
+             `- Uploading files in supported formats (PDF, images, TXT, etc.)\n` +
+             `- Using smaller files or fewer files at once\n` +
+             `- Asking more general questions about the content`;
+    }
+  }
+
+  // Method for processing messages with uploaded files using OpenAI Assistant API
+  async processMessageWithFiles(
+    message: string,
+    fileIds: string[],
+    model: ModelType = 'gpt-4o'
+  ): Promise<string> {
+    try {
+      if (!fileIds || fileIds.length === 0) {
+        return "No files were provided for analysis.";
+      }
+
+      console.log(`🗃️ Processing message with ${fileIds.length} files:`, fileIds);
+
+      // Import FileSearchTool
+      const { FileSearchTool } = await import('./file-search-tool');
+
+      // Create and initialize the file search tool
+      const fileSearchTool = new FileSearchTool(this.apiKey);
+
+      try {
+        console.log('📋 AIService: About to initialize file search tool...');
+        console.log('📋 AIService: File IDs to process:', fileIds);
+        console.log('📋 AIService: Model to use:', model);
+
+        // Provide more specific instructions based on the user's query
+        const isContentDescriptionQuery = message.toLowerCase().includes('what') &&
+          (message.toLowerCase().includes('see') || message.toLowerCase().includes('show') ||
+           message.toLowerCase().includes('find') || message.toLowerCase().includes('content'));
+
+        const customInstructions = isContentDescriptionQuery
+          ? "You are a document analysis expert. When asked what you see in a file, provide a detailed, comprehensive description of ALL visible content including: " +
+            "- All text, names, numbers, dates, and addresses " +
+            "- Document type, format, and structure " +
+            "- Any official markings, stamps, logos, or signatures " +
+            "- Tables, forms, or organized data " +
+            "- Images or visual elements " +
+            "- Any other notable details or information visible in the document. " +
+            "Be thorough and specific - list actual content rather than generic descriptions."
+          : "You are a helpful assistant that analyzes uploaded files and provides context-aware responses. " +
+            "Search through the file contents to find relevant information that helps answer the user's question.";
+
+        await fileSearchTool.initialize(fileIds, customInstructions, model);
+        console.log('✅ AIService: File search tool initialized successfully');
+
+        console.log('🔍 AIService: File search tool initialized, starting search...');
+        const searchResults = await fileSearchTool.searchFiles(message);
+        console.log('🔍 AIService: Search completed, processing results...');
+
+        console.log('📊 Search results received:', {
+          resultsCount: searchResults?.length || 0,
+          hasResults: !!(searchResults && searchResults.length > 0),
+          firstResultPreview: searchResults?.[0]?.content?.substring(0, 200) || 'No content'
+        });
+
+        // CRITICAL: Check if file search actually worked
+        if (!searchResults || searchResults.length === 0) {
+          console.error('❌ CRITICAL ERROR: File search returned no results - this indicates a failure in processing');
+          throw new Error('File search failed to process the uploaded files. The file may not be readable or there was an API error.');
+        }
+
+        if (searchResults && searchResults.length > 0) {
+          const fileCount = fileIds.length;
+          const fileWord = fileCount === 1 ? 'file' : 'files';
+
+          // Format the response with file search results
+          let response = `I've analyzed your uploaded ${fileWord} and found relevant information for your question: "${message}"\n\n`;
+
+          response += "## 📄 Analysis Results\n\n";
+
+          searchResults.forEach((result, index) => {
+            response += `### ${result.filename ? `From ${result.filename}` : `Result ${index + 1}`}\n\n`;
+            response += `${result.content}\n\n`;
+
+            if (result.relevance && result.relevance < 1.0) {
+              response += `*Relevance: ${Math.round(result.relevance * 100)}%*\n\n`;
+            }
+          });
+
+          response += "---\n\n";
+          response += "💡 **How to use this information:**\n";
+          response += "- You can ask follow-up questions about the file contents\n";
+          response += "- Request specific details or clarifications\n";
+          response += "- Ask me to create calendar events based on the file information\n";
+          response += "- Upload additional files for comparison or context\n\n";
+
+          response += `✅ Successfully analyzed ${fileCount} ${fileWord} using OpenAI Assistant API with file search.`;
+
+          return response;
+        } else {
+          const fileCount = fileIds.length;
+          const fileWord = fileCount === 1 ? 'file' : 'files';
+
+          return `I've processed your uploaded ${fileWord}, but I couldn't find specific information related to your question: "${message}"\n\n` +
+                 "This could mean:\n" +
+                 "- The question might not be directly addressed in the uploaded files\n" +
+                 "- The files might need more processing time\n" +
+                 "- Try rephrasing your question or asking about different aspects\n\n" +
+                 "You can:\n" +
+                 "- Ask more general questions about the file contents\n" +
+                 "- Upload additional relevant files\n" +
+                 "- Use other calendar assistant features while I continue processing\n\n" +
+                 `📁 Files processed: ${fileCount} ${fileWord}`;
+        }
+
+      } finally {
+        // Clean up resources
+        console.log('🧹 Cleaning up file search resources...');
+        await fileSearchTool.cleanup();
+      }
+
+    } catch (error) {
+      console.error('File processing error:', error);
+
+      // Provide a helpful error message to the user
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      return `❌ **File Analysis Error**\n\n` +
+             `I encountered an issue while analyzing your uploaded files: ${errorMessage}\n\n` +
+             `**Possible solutions:**\n` +
+             `- Check if the files are in a supported format (PDF, TXT, DOCX, etc.)\n` +
+             `- Try uploading smaller files or fewer files at once\n` +
+             `- Ensure files contain readable text content\n` +
+             `- Try again in a few moments\n\n` +
+             `**Alternative:** You can still use the regular chat features for calendar management while I work on resolving this issue.`;
     }
   }
 }

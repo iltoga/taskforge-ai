@@ -1,7 +1,8 @@
-import { Events } from '@/components/Events';
 import '@testing-library/jest-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { Events } from '../components/Events';
+import { CalendarProvider } from '../contexts/CalendarContext';
 import { DevelopmentProvider } from '../contexts/DevelopmentContext';
 
 // Mock next-auth
@@ -17,7 +18,9 @@ const mockedUseSession = useSession as jest.MockedFunction<typeof useSession>;
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
     <DevelopmentProvider>
-      {component}
+      <CalendarProvider>
+        {component}
+      </CalendarProvider>
     </DevelopmentProvider>
   );
 };

@@ -1,7 +1,9 @@
 import { ModelType } from '@/appconfig/models';
 import { authOptions, createGoogleAuth } from '@/lib/auth';
+import { isServiceAccountMode } from '@/lib/calendar-config';
 import { AIService } from '@/services/ai-service';
 import { CalendarService } from '@/services/calendar-service';
+import { EnhancedCalendarService } from '@/services/enhanced-calendar-service';
 import { CalendarTools } from '@/tools/calendar-tools';
 import { EmailTools } from '@/tools/email-tools';
 import { FileTools } from '@/tools/file-tools';
@@ -17,15 +19,20 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions) as ExtendedSession;
 
-    if (!session?.accessToken) {
+    // Check authentication mode
+    const useServiceAccountMode = isServiceAccountMode();
+
+    // In service account mode, we still need user authentication for the app
+    // but calendar operations will use service account
+    if (!session && !useServiceAccountMode) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
 
-    // Check for token refresh errors
-    if (session.error === 'RefreshAccessTokenError') {
+    // Check for token refresh errors in OAuth mode
+    if (!useServiceAccountMode && session?.error === 'RefreshAccessTokenError') {
       return NextResponse.json(
         { error: 'Google Calendar authentication expired. Please sign out and sign in again to refresh your permissions.' },
         { status: 401 }
@@ -35,11 +42,13 @@ export async function POST(request: Request) {
     const {
       message,
       messages,
-      model = 'gpt-4.1-mini-2025-04-14',
+      model = 'gpt-4.1-mini',
       useTools = false,
-      orchestratorModel = 'gpt-4.1-mini-2025-04-14',
+      orchestratorModel = 'gpt-4.1-mini',
       developmentMode = false,
-      calendarId = 'primary'
+      calendarId = 'primary',
+      fileIds = [],
+      processedFiles = []
     } = await request.json() as {
       message: string;
       messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
@@ -48,6 +57,15 @@ export async function POST(request: Request) {
       orchestratorModel?: ModelType;
       developmentMode?: boolean;
       calendarId?: string;
+      fileIds?: string[];
+      processedFiles?: Array<{
+        fileName: string;
+        fileSize: number;
+        fileType: string;
+        fileId?: string;
+        imageData?: string;
+        isImage?: boolean;
+      }>;
     };
 
     if (!message || typeof message !== 'string') {
@@ -59,9 +77,26 @@ export async function POST(request: Request) {
 
     console.log(`📅 Using calendar: ${calendarId}`);
 
-    // Initialize services
-    const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
-    const calendarService = new CalendarService(googleAuth);
+    // Initialize calendar service based on authentication mode
+    let calendarService: CalendarService;
+
+    if (useServiceAccountMode) {
+      // Service Account Mode: Use service account for calendar operations
+      const enhancedService = await EnhancedCalendarService.createWithFallback(undefined, true);
+      calendarService = enhancedService as unknown as CalendarService;
+      console.log('🔧 Using service account authentication for calendar operations');
+    } else {
+      // OAuth Mode: Use user OAuth for calendar operations
+      if (!session?.accessToken) {
+        return NextResponse.json(
+          { error: 'Authentication required - OAuth access token missing' },
+          { status: 401 }
+        );
+      }
+      const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
+      calendarService = new CalendarService(googleAuth);
+      console.log('🔐 Using user OAuth authentication for calendar operations');
+    }
     const aiService = new AIService(process.env.OPENAI_API_KEY!);
 
     // Translate message to English if needed
@@ -77,6 +112,46 @@ export async function POST(request: Request) {
 
     // Choose between tool-based approaches
     if (useTools) {
+      // Check if files are uploaded and use appropriate processing method
+      if (fileIds.length > 0 || processedFiles.length > 0) {
+        console.log('📁 Files detected - determining processing approach');
+
+        try {
+          // If we have processedFiles (from new file upload flow), use embedded processing
+          if (processedFiles.length > 0) {
+            console.log('📸 Using embedded file processing for images and documents');
+
+            const fileResponse = await aiService.processMessageWithEmbeddedFiles(
+              englishMessage,
+              processedFiles,
+              model
+            );
+
+            return NextResponse.json({
+              success: true,
+              message: `📁 EMBEDDED FILE RESPONSE: ${fileResponse}`,
+              approach: 'embedded-files'
+            });
+          }
+          // Fallback to legacy file processing for compatibility
+          else if (fileIds.length > 0) {
+            console.log('📁 Using legacy file search for uploaded files');
+
+            const fileResponse = await aiService.processMessageWithFiles(englishMessage, fileIds, model);
+
+            return NextResponse.json({
+              success: true,
+              message: `📁 FILE SEARCH RESPONSE: ${fileResponse}`,
+              approach: 'file-search'
+            });
+          }
+
+        } catch (fileError) {
+          console.error('File processing failed:', fileError);
+          // Fall back to regular processing if file processing fails
+        }
+      }
+
       // Check if this should use the new agentic orchestrator
       if (developmentMode) {
         // NEW: Agentic orchestration approach with all tool categories
@@ -101,7 +176,8 @@ export async function POST(request: Request) {
           messages || [], // Pass chat history
           toolRegistry,
           orchestratorModel,
-          developmentMode
+          developmentMode,
+          fileIds
         );
 
         console.log('🤖 Orchestrator result:', {

@@ -74,7 +74,7 @@ describe('Chat Flow - Orchestrator Triggering (Mocked Session)', () => {
     // Create request body matching exactly what the backend expects
     const requestBody = {
       message: userMessage,
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: 'gpt-4.1-mini',
       useTools: true,        // Backend expects 'useTools' not 'toolMode'
       developmentMode: true  // Enable agentic mode
     };

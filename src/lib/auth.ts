@@ -3,6 +3,7 @@ import { OAuth2Client } from 'google-auth-library';
 import NextAuth, { AuthOptions, Session } from 'next-auth';
 import { JWT } from 'next-auth/jwt';
 import GoogleProvider from 'next-auth/providers/google';
+import { ServiceAccountAuth } from './service-account-auth';
 
 // Interface for the extended JWT token with expiration tracking
 interface ExtendedJWT extends JWT {
@@ -141,6 +142,91 @@ export const authOptions: AuthOptions = {
   // Removed custom pages that don't exist - this was likely causing login issues
 };
 
+/**
+ * Alternative authentication methods
+ * These provide server-to-server authentication options
+ */
+
+// Service account authentication instance
+let serviceAccountAuth: ServiceAccountAuth | null = null;
+
+/**
+ * Initialize service account authentication
+ * This is an alternative to OAuth for server-side operations
+ */
+export function initializeServiceAccountAuth(): ServiceAccountAuth | null {
+  try {
+    if (!serviceAccountAuth) {
+      serviceAccountAuth = new ServiceAccountAuth();
+
+      if (serviceAccountAuth.isAvailable()) {
+        console.log('🔧 Service account authentication initialized:', serviceAccountAuth.getServiceAccountEmail());
+      } else {
+        console.warn('⚠️ Service account authentication not available (credentials missing)');
+        serviceAccountAuth = null;
+      }
+    }
+
+    return serviceAccountAuth;
+  } catch (error) {
+    console.error('❌ Failed to initialize service account authentication:', error);
+    return null;
+  }
+}
+
+/**
+ * Get authenticated OAuth2Client using service account
+ * This is an alternative to user OAuth for server operations
+ */
+export async function getServiceAccountAuth(): Promise<OAuth2Client | null> {
+  try {
+    const serviceAuth = initializeServiceAccountAuth();
+
+    if (!serviceAuth) {
+      return null;
+    }
+
+    return await serviceAuth.getAuthenticatedClient();
+  } catch (error) {
+    console.error('❌ Failed to get service account authentication:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if service account authentication is available
+ */
+export function isServiceAccountAvailable(): boolean {
+  const serviceAuth = initializeServiceAccountAuth();
+  return serviceAuth?.isAvailable() ?? false;
+}
+
+/**
+ * Enhanced version of createGoogleAuth that can fallback to service account
+ * Maintains backward compatibility while adding alternative authentication
+ */
+export const createGoogleAuthWithFallback = async (
+  accessToken?: string,
+  refreshToken?: string,
+  useServiceAccountFallback: boolean = false
+): Promise<OAuth2Client> => {
+  // First, try to use OAuth tokens if provided (existing behavior)
+  if (accessToken) {
+    return createGoogleAuth(accessToken, refreshToken);
+  }
+
+  // If no OAuth tokens and fallback is enabled, try service account
+  if (useServiceAccountFallback) {
+    const serviceAuth = await getServiceAccountAuth();
+    if (serviceAuth) {
+      console.log('🔄 Using service account authentication as fallback');
+      return serviceAuth;
+    }
+  }
+
+  throw new Error('No authentication method available. Provide OAuth tokens or enable service account fallback.');
+};
+
 export const createGoogleAuth = (accessToken: string, refreshToken?: string): OAuth2Client => {
   const oauth2Client = new OAuth2Client(
     process.env.GOOGLE_CLIENT_ID,
@@ -156,3 +242,10 @@ export const createGoogleAuth = (accessToken: string, refreshToken?: string): OA
 };
 
 export default NextAuth(authOptions);
+
+/**
+ * Reset service account authentication (for testing)
+ */
+export function resetServiceAccountAuth(): void {
+  serviceAccountAuth = null;
+}

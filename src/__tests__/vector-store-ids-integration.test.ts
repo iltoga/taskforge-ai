@@ -24,7 +24,7 @@ describe('Vector Store IDs Integration Test', () => {
         userMessage,
         [],
         toolRegistry,
-        'gpt-4.1-mini-2025-04-14',
+        'gpt-4.1-mini',
         { maxSteps: 3, maxToolCalls: 2 }
       );
 

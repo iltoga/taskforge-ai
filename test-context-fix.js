@@ -30,7 +30,7 @@ async function testInternalContext() {
     "what was the core reason for the project I've been working for in Italmagneti in 2025",
     [], // empty chat history
     toolRegistry,
-    'gpt-4.1-mini-2025-04-14',
+    'gpt-4.1-mini',
     { maxSteps: 5, maxToolCalls: 3 }
   );
 

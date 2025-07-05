@@ -81,7 +81,7 @@ describe('Functional Test: OpenRouter Integration', () => {
     console.log('Testing both OpenAI and OpenRouter models...');
 
     // Test with OpenAI model
-    const openAIResult = await aiService.processMessage(userMessage, mockEvents, 'gpt-4.1-mini-2025-04-14');
+    const openAIResult = await aiService.processMessage(userMessage, mockEvents, 'gpt-4.1-mini');
     console.log('OpenAI result:', openAIResult.type);
 
     // Test with OpenRouter Gemini model

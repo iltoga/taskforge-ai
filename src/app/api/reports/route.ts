@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       calendarId = 'primary',
-      model = 'gpt-4.1-mini-2025-04-14',
+      model = 'gpt-4.1-mini',
       reportType = 'weekly'
     } = await request.json() as {
       company?: string;

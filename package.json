@@ -11,6 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:functional": "node --experimental-vm-modules --no-warnings ./node_modules/.bin/jest --config jest.functional.config.js",
+    "test:functional:watch": "node --experimental-vm-modules --no-warnings ./node_modules/.bin/jest --config jest.functional.config.js --watch",
     "email-filter": "node scripts/email-filter.mjs",
     "email-filter:add": "node scripts/email-filter.mjs add",
     "email-filter:remove": "node scripts/email-filter.mjs remove",
@@ -23,21 +25,27 @@
     "@openrouter/ai-sdk-provider": "^0.7.2",
     "@tailwindcss/postcss": "^4.1.10",
     "@tailwindcss/typography": "^0.5.16",
+    "@types/handlebars": "^4.0.40",
     "ai": "^4.3.16",
     "autoprefixer": "^10.4.21",
     "daisyui": "^5.0.43",
     "google-auth-library": "^10.1.0",
     "googleapis": "^150.0.1",
+    "handlebars": "^4.7.8",
     "lucide-react": "^0.515.0",
     "next": "15.3.3",
     "next-auth": "^4.24.11",
     "openai": "^5.3.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-to-png-converter": "^3.7.0",
+    "pdftopic": "^1.0.7-alpha",
     "postcss": "^8.5.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "react-webcam": "^7.2.0",
     "rehype-raw": "^7.0.0",
+    "sharp": "0.33.4",
     "tailwindcss": "^4.1.10",
     "whatwg-fetch": "^3.6.20",
     "zod": "^3.25.64"
@@ -49,6 +57,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^29.5.14",
+    "@types/mime-types": "^3.0.1",
     "@types/node": "^20.19.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -61,7 +70,7 @@
     "typescript": "^5"
   },
   "engines": {
-    "node": ">=18.14.0 <23.0.0",
+    "node": ">=18.14.0",
     "npm": ">=9.0.0"
   }
 }

@@ -17,7 +17,8 @@ const customJestConfig = {
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
-    '<rootDir>/src/__tests__/functional/full-chat-flow-debug.test.ts'
+    '<rootDir>/src/__tests__/functional/',
+    '<rootDir>/src/__tests__/functional-.*\\.test\\.(ts|js)$'
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

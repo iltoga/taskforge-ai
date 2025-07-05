@@ -38,7 +38,7 @@ export function Reports() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current-week');
   const [company, setCompany] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini-2025-04-14');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini');
 
   const periodOptions = [
     { value: 'current-week', label: 'Current Week', icon: Calendar },

@@ -55,8 +55,9 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Install wget for health checks (as used in docker-compose.yml)
-RUN apk add --no-cache wget
+
+# Install wget for health checks (as used in docker-compose.yml), ImageMagick and Ghostscript for PDF/image conversion
+RUN apk add --no-cache wget imagemagick ghostscript
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
