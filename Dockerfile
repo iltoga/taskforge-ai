@@ -56,8 +56,13 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm install -g npm@11.4.2
 
 
+
 # Copy Prisma schema and migrations before build and generate
 COPY prisma ./prisma
+
+# Generate Prisma client and apply DB migrations (schema) before build
+RUN npx prisma generate
+RUN npx prisma migrate deploy || echo "Prisma migrate failed (DB may not be reachable at build time, will retry at runtime if needed)"
 
 # Build the application
 RUN npm run build
@@ -86,16 +91,13 @@ COPY .env ./
 
 
 
+
 # Copy Prisma schema and migrations in runner stage
 COPY prisma ./prisma
 
 # Install production dependencies
 RUN npm install -g npm@11.4.2
 RUN npm ci --only=production && npm cache clean --force
-
-# Generate Prisma client and apply DB migrations (schema)
-RUN npx prisma generate
-RUN npx prisma migrate deploy || echo "Prisma migrate failed (DB may not be reachable at build time, will retry at runtime if needed)"
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
