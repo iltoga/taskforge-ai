@@ -85,6 +85,10 @@ COPY package*.json ./
 COPY .env ./
 
 
+
+# Copy Prisma schema and migrations in runner stage
+COPY prisma ./prisma
+
 # Install production dependencies
 RUN npm install -g npm@11.4.2
 RUN npm ci --only=production && npm cache clean --force
