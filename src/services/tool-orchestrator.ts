@@ -619,7 +619,7 @@ export class ToolOrchestrator {
         rules += `${ruleNumber}. **FOR PASSPORT/DOCUMENT PROCESSING**: Use passport tools for passport data management\n`;
         rules += '   - **IMAGE UPLOADS**: When users upload passport images, analyze the image and extract passport information\n';
         rules += '   - **PASSPORT CREATION**: "store", "save", "add", "create", "register" passport data → Use createPassport tool\n';
-        rules += '   - **PASSPORT LOOKUP**: "find", "search", "get", "show", "display" passport data → Use getPassports tool\n';
+        rules += '   - **PASSPORT LOOKUP**: "find", "search", "get", "show", "display", "list" passport data → Use getPassports tool\n';
         rules += '   - **PASSPORT UPDATE**: "update", "modify", "change", "edit" passport data → Use updatePassport tool\n';
         rules += '   - **PASSPORT DELETION**: "delete", "remove", "clear" passport data → Use deletePassport tool\n';
         rules += '   - **SCHEMA SETUP**: "setup", "initialize", "create table" → Use setupPassportSchema tool\n';

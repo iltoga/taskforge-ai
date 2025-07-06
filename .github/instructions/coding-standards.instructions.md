@@ -11,23 +11,23 @@ This application uses an agentic AI system. Your primary role is to build and ma
 
 ## 2. Tool Development (CRITICAL RULE)
 
-Follow this pattern precisely when creating a new tool:
+**📖 For detailed tool development guidelines, see `.github/prompts/agentic-tool-development.prompt.md`**
 
-1.  **Define Parameters with Zod:** In `src/tools/tool-definitions.ts`, create a Zod schema for the tool's parameters. **Every parameter MUST have a `.describe()`** call explaining its purpose for the AI.
-    ```typescript
-    export const MyToolParamsSchema = z.object({
-      targetId: z.string().describe("The ID of the target entity."),
-    });
-    ```
-2.  **Implement the Tool Executor:** In a `src/tools/*.ts` file, write an `async` function that takes the validated parameters and returns a `ToolResult` object (`{ success: boolean; data?: T; error?: string; message?: string; }`).
-    ```typescript
-    async function myToolExecutor(
-      params: z.infer<typeof MyToolParamsSchema>
-    ): Promise<ToolResult> {
-      // ... logic ...
-    }
-    ```
-3.  **Register the Tool:** In `src/tools/tool-registry.ts`, call `registry.registerTool()` with the tool's name, a clear `description` for the AI, the Zod schema, and the executor function.
+Follow this modular pattern when creating a new tool category:
+
+1.  **Create Tool Implementation:** In `src/tools/*-tools.ts`, implement the business logic class with proper error handling.
+2.  **Define Zod Schemas:** In `src/tools/*-tool-definitions.ts`, create Zod schemas with descriptive `.describe()` calls for the AI.
+3.  **Create Registration Function:** In `src/tools/register-*-tools.ts`, create a modular registration function.
+4.  **Register in Main Registry:** Import and call your registration function in `src/tools/tool-registry.ts`.
+5.  **Update Tool Orchestrator:** Add parameter info and examples in `src/services/tool-orchestrator.ts`.
+6.  **Write Tests:** Create comprehensive tests in `src/__tests__/` following the existing patterns.
+
+**Example Pattern (Passport Tools):**
+
+- Implementation: `src/tools/passport-tools.ts`
+- Definitions: `src/tools/passport-tool-definitions.ts`
+- Registration: `src/tools/register-passport-tools.ts`
+- Integration: Called from `src/tools/tool-registry.ts`
 
 ## 3. Technology Stack
 

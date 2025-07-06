@@ -118,7 +118,10 @@ describe('passport flow via orchestrator', () => {
     });
 
     const deleteRes = await passportTools.deletePassport(createdId as number);
-    expect(deleteRes.success).toBe(false);
+    expect(deleteRes.success).toBe(true);
+
+    const { data: afterDelete } = await passportTools.getPassports({ passport_number: 'YB7658734' });
+    expect((afterDelete as any[]).length).toBe(0);
 
 
   });

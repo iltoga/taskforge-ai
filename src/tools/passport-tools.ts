@@ -98,4 +98,16 @@ export class PassportTools {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
+
+  /**
+   * List all passport records
+   */
+  async listPassports(): Promise<PassportToolResult> {
+    try {
+      const passports = await this.prisma.passport.findMany();
+      return { success: true, data: passports };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 }
