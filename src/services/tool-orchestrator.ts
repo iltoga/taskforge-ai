@@ -126,31 +126,76 @@ export class ToolOrchestrator {
       if (modelSupportsFiles) {
         console.log(`📄 Model ${model} supports file search - routing to file processing`);
 
-        // For models that support file search, route to AI service file processing
+        // Validate file IDs exist before processing
         try {
-          const { AIService } = await import('./ai-service');
-          const aiService = new AIService(this.apiKey);
+          console.log(`🔍 Validating ${fileIds.length} file IDs before processing...`);
+          const OpenAI = (await import('openai')).default;
+          const openaiClient = new OpenAI({ apiKey: this.apiKey });
 
-          const fileProcessingResult = await aiService.processMessageWithFiles(
-            userMessage,
-            fileIds,
-            model
-          );
+          // Separate processed files from regular file IDs
+          const processedFiles = fileIds.filter(id => id.startsWith('processed:'));
+          const regularFileIds = fileIds.filter(id => !id.startsWith('processed:'));
 
-          // Return the file processing result as the final answer
-          return {
-            success: true,
-            finalAnswer: fileProcessingResult,
-            steps: [{
-              id: 'file_processing',
-              type: 'synthesis',
-              timestamp: Date.now(),
-              content: fileProcessingResult,
-              reasoning: 'Processed user message with uploaded files using OpenAI Assistant API'
-            }],
-            toolCalls: [],
-            fileProcessingUsed: true
-          };
+          console.log(`🔍 Found ${regularFileIds.length} regular file IDs and ${processedFiles.length} processed files`);
+
+          const validFileIds: string[] = [];
+
+          // Validate regular file IDs with OpenAI API
+          for (const fileId of regularFileIds) {
+            try {
+              const fileInfo = await openaiClient.files.retrieve(fileId);
+              console.log(`✅ File validated: ${fileInfo.filename} (${fileInfo.bytes} bytes)`);
+              validFileIds.push(fileId);
+            } catch (fileError) {
+              console.warn(`⚠️ Skipping invalid file ID ${fileId}:`, fileError instanceof Error ? fileError.message : 'Unknown error');
+            }
+          }
+
+          // Processed files are assumed valid since they're already processed locally
+          const validProcessedFiles = processedFiles.map(id => {
+            const fileName = id.replace('processed:', '');
+            console.log(`✅ Processed file ${fileName} is valid`);
+            return id;
+          });
+
+          const allValidFiles = [...validFileIds, ...validProcessedFiles];
+
+          if (allValidFiles.length === 0) {
+            console.log(`❌ No valid files found - proceeding with regular orchestration`);
+            this.logProgress(`⚠️ None of the uploaded files are accessible. Proceeding without file context.`);
+          } else {
+            console.log(`✅ ${allValidFiles.length}/${fileIds.length} files are valid - proceeding with file processing`);
+
+            // Check if we have processed files (indicating passport processing should use orchestrator)
+            if (processedFiles.length > 0) {
+              console.log(`📸 Processing ${processedFiles.length} processed files with orchestrator`);
+              // Continue with orchestration to handle passport processing
+              // Don't route to AI service - let orchestrator handle it
+            } else {
+              // For regular file IDs, route to AI service file processing as before
+              const { AIService } = await import('./ai-service');
+              const aiService = new AIService(this.apiKey);
+
+              const fileProcessingResult = await aiService.processMessageWithFiles(
+                userMessage,
+                validFileIds,
+                model
+              );
+
+              // Return the file processing result as the final answer
+              return {
+                success: true,
+                finalAnswer: fileProcessingResult,
+                steps: [{
+                  id: 'file_processing',
+                  type: 'synthesis',
+                  content: fileProcessingResult,
+                  timestamp: Date.now()
+                }],
+                toolCalls: []
+              };
+            }
+          }
 
         } catch (error) {
           console.error('File processing failed:', error);
@@ -481,6 +526,442 @@ export class ToolOrchestrator {
     }
   }
 
+  private generateDecisionRules(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    let rules = '';
+    let ruleNumber = 1;
+
+    // Calendar rules
+    if (availableCategories.includes('calendar')) {
+      const calendarTools = toolRegistry.getToolsByCategory('calendar');
+      const hasCreateEvent = calendarTools.some(t => t.name === 'createEvent');
+      const hasUpdateEvent = calendarTools.some(t => t.name === 'updateEvent');
+      const hasDeleteEvent = calendarTools.some(t => t.name === 'deleteEvent');
+      const hasSearchEvents = calendarTools.some(t => t.name === 'searchEvents');
+      const hasGetEvents = calendarTools.some(t => t.name === 'getEvents');
+
+      if (hasCreateEvent || hasUpdateEvent || hasDeleteEvent) {
+        rules += `${ruleNumber}. **FOR EVENT CREATION/MODIFICATION**: **ALWAYS** use appropriate calendar tools\n`;
+        if (hasCreateEvent) rules += '   - "add", "create", "schedule", "book", "set up", "make", "plan" → Use createEvent tool\n';
+        if (hasUpdateEvent) rules += '   - "update", "change", "modify", "edit", "reschedule", "move" → Use updateEvent tool\n';
+        if (hasDeleteEvent) rules += '   - "delete", "remove", "cancel", "clear" → Use deleteEvent tool\n';
+        if (hasCreateEvent) rules += '   - **CRITICAL**: For createEvent, always include required fields: summary, start, end times\n';
+        rules += '   - Use proper date/time formats: "2025-09-21T09:00:00" for timed events, "2025-09-21" for all-day\n\n';
+        ruleNumber++;
+      }
+
+      if (hasSearchEvents || hasGetEvents) {
+        rules += `${ruleNumber}. **FOR PROJECT/WORK QUERIES**: **ALWAYS** search calendar first using ${hasSearchEvents ? 'searchEvents' : ''}${hasSearchEvents && hasGetEvents ? ' or ' : ''}${hasGetEvents ? 'getEvents' : ''}\n`;
+        rules += '   - Extract project/company names from the query\n';
+        rules += '   - Search calendar data before responding with "I don\'t know"\n';
+        rules += '   - Use broad search terms (e.g., "italmagneti", "nespola", "techcorp")\n\n';
+        ruleNumber++;
+      }
+    }
+
+    // Vector search rules
+    const allTools = toolRegistry.getAvailableTools();
+    const hasVectorSearch = allTools.some(t => t.name === 'vectorFileSearch');
+    if (hasVectorSearch) {
+      rules += `${ruleNumber}. **FOR KNOWLEDGE/DOCUMENTATION QUERIES**: **ALWAYS** use vectorFileSearch for non-calendar information\n`;
+      rules += '   - **IMPORTANT:** For the first tool call, ALWAYS use the user\'s original query as the \'query\' parameter for vectorFileSearch, without rephrasing or summarizing.\n';
+      rules += '   - Only if the first attempt returns no results, try rephrasing or adding extra details for subsequent attempts.\n';
+      rules += '   - **CRITICAL:** When calling vectorFileSearch, ALWAYS include the vectorStoreIds parameter with the actual vector store IDs shown in the tool parameters above. Do NOT omit this parameter.\n';
+      rules += '   - Use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions\n';
+      rules += '   - Examples: visa requirements, company policies, travel guidelines, benefits information\n';
+      rules += '   - Do NOT use web search tools - vectorFileSearch is the primary knowledge tool\n\n';
+      ruleNumber++;
+    }
+
+    // Web tools rules
+    if (availableCategories.includes('web')) {
+      const webTools = toolRegistry.getToolsByCategory('web');
+      if (webTools.length > 0 && !hasVectorSearch) {
+        rules += `${ruleNumber}. **FOR WEB INFORMATION**: Use web tools for online information\n`;
+        webTools.forEach(tool => {
+          rules += `   - ${tool.name}: ${tool.description}\n`;
+        });
+        rules += '\n';
+        ruleNumber++;
+      }
+    }
+
+    // Email tools rules
+    if (availableCategories.includes('email')) {
+      const emailTools = toolRegistry.getToolsByCategory('email');
+      if (emailTools.length > 0) {
+        rules += `${ruleNumber}. **FOR EMAIL OPERATIONS**: Use email tools for email management\n`;
+        emailTools.forEach(tool => {
+          rules += `   - ${tool.name}: ${tool.description}\n`;
+        });
+        rules += '\n';
+        ruleNumber++;
+      }
+    }
+
+    // File tools rules
+    if (availableCategories.includes('file')) {
+      const fileTools = toolRegistry.getToolsByCategory('file');
+      if (fileTools.length > 0) {
+        rules += `${ruleNumber}. **FOR FILE OPERATIONS**: Use file tools for file system management\n`;
+        fileTools.forEach(tool => {
+          rules += `   - ${tool.name}: ${tool.description}\n`;
+        });
+        rules += '\n';
+        ruleNumber++;
+      }
+    }
+
+    // Passport tools rules
+    if (availableCategories.includes('passport')) {
+      const passportTools = toolRegistry.getToolsByCategory('passport');
+      if (passportTools.length > 0) {
+        rules += `${ruleNumber}. **FOR PASSPORT/DOCUMENT PROCESSING**: Use passport tools for passport data management\n`;
+        rules += '   - **IMAGE UPLOADS**: When users upload passport images, analyze the image and extract passport information\n';
+        rules += '   - **PASSPORT CREATION**: "store", "save", "add", "create", "register" passport data → Use createPassport tool\n';
+        rules += '   - **PASSPORT LOOKUP**: "find", "search", "get", "show", "display" passport data → Use getPassports tool\n';
+        rules += '   - **PASSPORT UPDATE**: "update", "modify", "change", "edit" passport data → Use updatePassport tool\n';
+        rules += '   - **PASSPORT DELETION**: "delete", "remove", "clear" passport data → Use deletePassport tool\n';
+        rules += '   - **SCHEMA SETUP**: "setup", "initialize", "create table" → Use setupPassportSchema tool\n';
+        rules += '   - **CRITICAL**: When processing passport images, extract all visible fields and create comprehensive passport records\n';
+        rules += '   - Always validate required fields: passport_number, surname, given_names, nationality, dates\n\n';
+        ruleNumber++;
+      }
+    }
+
+    rules += `${ruleNumber}. **Need more info?** – Plan the *minimal* set of tool calls that will get it.\n`;
+    rules += `${ruleNumber + 1}. **Enough info?** – Say so and explain briefly.\n\n`;
+
+    return rules;
+  }
+
+  private generatePriorityOrder(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    const allTools = toolRegistry.getAvailableTools();
+
+    let priority = '**PRIORITY ORDER**:\n';
+
+    // Calendar tools first
+    if (availableCategories.includes('calendar')) {
+      const calendarTools = toolRegistry.getToolsByCategory('calendar');
+      const eventTools = calendarTools.filter(t => ['createEvent', 'updateEvent', 'deleteEvent'].includes(t.name));
+      const searchTools = calendarTools.filter(t => ['searchEvents', 'getEvents'].includes(t.name));
+
+      if (eventTools.length > 0) {
+        priority += `- Event creation/modification → ${eventTools.map(t => t.name).join(', ')}\n`;
+      }
+      if (searchTools.length > 0) {
+        priority += `- Calendar queries → ${searchTools.map(t => t.name).join(', ')}\n`;
+      }
+    }
+
+    // Vector search
+    if (allTools.some(t => t.name === 'vectorFileSearch')) {
+      priority += '- Knowledge queries → vectorFileSearch\n';
+    }
+
+    // Other categories
+    if (availableCategories.includes('passport')) {
+      priority += '- Passport/document processing → passport tools\n';
+    }
+    if (availableCategories.includes('file')) {
+      priority += '- File operations → file tools\n';
+    }
+    if (availableCategories.includes('email')) {
+      priority += '- Email operations → email tools\n';
+    }
+    if (availableCategories.includes('web')) {
+      priority += '- Web operations → web tools\n';
+    }
+
+    return priority + '\n';
+  }
+
+  private generateAnalysisInstructions(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    const allTools = toolRegistry.getAvailableTools();
+
+    let instructions = '**ALWAYS REMEMBER**:\n';
+    instructions += '- ONLY answer using the tools provided in the tool registry and the context provided. NEVER attempt to answer questions using internal knowledge or guesswork. If you cannot find an answer using the tools, clearly state that no information was found.\n';
+
+    // Calendar tools instructions
+    if (availableCategories.includes('calendar')) {
+      instructions += '- Use calendar tools for calendar-related queries, such as searching for events, creating events, or managing schedules.\n';
+    }
+
+    // Passport tools instructions
+    if (availableCategories.includes('passport')) {
+      instructions += '- Use passport tools for passport and document processing, including extracting data from passport images and managing passport records.\n';
+    }
+
+    // Vector search instructions
+    if (allTools.some(t => t.name === 'vectorFileSearch')) {
+      instructions += '- Use vectorFileSearch for knowledge base queries, such as searching for documentation, policies, or general knowledge.\n';
+      if (!availableCategories.includes('web')) {
+        instructions += '- Do not use web search tools for knowledge queries; always prefer vectorFileSearch.\n';
+      }
+    }
+
+    // Web tools instructions
+    if (availableCategories.includes('web') && !allTools.some(t => t.name === 'vectorFileSearch')) {
+      instructions += '- Use web tools for online information gathering when needed.\n';
+    }
+
+    instructions += '- If the user\'s question is too generic or vague, ask for more details before using any tools.\n\n';
+
+    return instructions;
+  }
+
+  private generateContextInstructions(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    const allTools = toolRegistry.getAvailableTools();
+
+    let context = '';
+
+    // Only include calendar context if calendar tools are available
+    if (availableCategories.includes('calendar')) {
+      context += '**CRITICAL CONTEXT**: This is a calendar management application.\nAny mention of:\n';
+      context += '- Projects (like "progetto Italmagneti", "Nespola project", "TechCorp", etc.)\n';
+      context += '- Companies or client names\n';
+      context += '- Work activities, meetings, or project status\n';
+      context += '- Deadlines for visa or projects or time-sensitive information\n';
+      context += '- Documents expiring or needing updates\n';
+      context += '- "What can you tell me about..." relating to business/work topics\n';
+      context += '- Summary requests about work/project topics\n';
+      context += '- Questions about project progress, timeline, or history\n\n';
+      context += 'Should **ALWAYS** be interpreted as **CALENDAR QUERIES** that require searching calendar data, NOT as translation or general knowledge requests.\n\n';
+    }
+
+    // Only include passport context if passport tools are available
+    if (availableCategories.includes('passport')) {
+      context += '**PASSPORT PROCESSING CONTEXT**: This application can process passport documents and images.\nAny mention of:\n';
+      context += '- Uploaded passport images or document photos\n';
+      context += '- "Analyze this passport", "extract passport data", "read passport information"\n';
+      context += '- "Save passport details", "store passport data", "create passport record"\n';
+      context += '- "Find passport", "search passport", "get passport information"\n';
+      context += '- Passport numbers, expiry dates, personal information from documents\n';
+      context += '- Document processing, data extraction, OCR of identity documents\n\n';
+      context += 'Should **ALWAYS** be interpreted as **PASSPORT PROCESSING REQUESTS** that require using passport tools to analyze images and manage passport data.\n\n';
+    }
+
+    // Only include vector search context if vector search is available
+    if (allTools.some(t => t.name === 'vectorFileSearch')) {
+      context += 'Any questions that:\n';
+      context += '- cannot be answered from calendar data (e.g., asks for documentation, policies, procedures, general knowledge, visa information, travel requirements, or other uploaded information)\n';
+      context += '- requires domain-specific knowledge (e.g., company policies, visa requirements, travel guidelines, document requirements, deadlines and other general knowledge)\n';
+      context += '- asks for documentation, policies, procedures, or general knowledge\n';
+      context += '- asks for information about benefits, travel requirements, or visa types\n\n';
+      context += 'MUST be answered using the vectorFileSearch tool to search the knowledge base, NOT calendar tools.\n\n';
+    }
+
+    return context;
+  }
+
+  private generateAnalysisExamples(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    const allTools = toolRegistry.getAvailableTools();
+    let examples = '';
+
+    // Calendar examples
+    if (availableCategories.includes('calendar')) {
+      examples += '**MANDATORY EXAMPLES FOR CALENDAR QUERIES**:\n';
+      examples += '- "what was the core reason for the project I\'ve been working for in microsoft in 2025" → Use calendar tools to Search for all events containing "microsoft" in 2025\n';
+      examples += '- "tell me about the microsoft project" → Use calendar tools to search for all events containing "microsoft"\n';
+      examples += '- "how is the project going?" → Use calendar tools to search for recent project-related events, limited to the last 20 records/events\n';
+      examples += '- "project status" → Use calendar tools to search for project meetings and updates\n';
+      examples += '- "project status for last quarter" → Use calendar tools to search for project meetings and updates in the last quarter\n\n';
+    }
+
+    // Vector search examples
+    if (allTools.some(t => t.name === 'vectorFileSearch')) {
+      examples += '**MANDATORY EXAMPLES FOR NON-CALENDAR KNOWLEDGE QUERIES**:\n';
+      examples += '- "What is the company policy on remote work?" → Use vectorFileSearch\n';
+      examples += '- "Show me the documentation about visa requirements" → Use vectorFileSearch\n';
+      examples += '- "What are the travel guidelines?" → Use vectorFileSearch\n';
+      examples += '- "I need information about benefits" → Use vectorFileSearch\n';
+      examples += '- "I am italian, what type of visa to indonesia can I get?" → Use vectorFileSearch\n';
+      examples += '- "What documents do I need for travel?" → Use vectorFileSearch\n';
+      examples += '- "I need to know the visa requirements for a business trip to Bali" → Use vectorFileSearch\n';
+      examples += '- "My passport expires next month, can I still apply for a visa? What should I do?" → Use vectorFileSearch\n\n';
+
+      examples += '**CRITICAL RULES FOR KNOWLEDGE QUERIES**:\n';
+      examples += '1. ALWAYS use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions\n';
+      examples += '2. Do NOT use web search tools for knowledge queries\n';
+      examples += '3. Do NOT attempt to answer knowledge questions from internal AI knowledge or guess\n';
+      examples += '4. ONLY return what is found in the vector store via vectorFileSearch\n';
+      examples += '5. If vectorFileSearch returns no results, clearly state that no information was found in the knowledge base\n\n';
+    }
+
+    // Passport tools examples
+    if (availableCategories.includes('passport')) {
+      examples += '**MANDATORY EXAMPLES FOR PASSPORT QUERIES**:\n';
+      examples += '- "create passport record from document" → Use createPassport with extracted passport data\n';
+      examples += '- "save passport information" → Use createPassport with all required fields\n';
+      examples += '- "find passport P12345" → Use getPassports with passport_number: "P12345"\n';
+      examples += '- "search for John Doe passport" → Use getPassports with surname: "DOE" and given_names: "JOHN"\n';
+      examples += '- "update passport details" → Use updatePassport with id and updated fields\n';
+      examples += '- "delete passport record" → Use deletePassport with id\n';
+      examples += '- "list all passports" → Use getPassports with no parameters\n\n';
+
+      examples += '**CRITICAL RULES FOR PASSPORT PROCESSING**:\n';
+      examples += '1. ALWAYS include ALL required fields when using createPassport: passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present (boolean), type (string)\n';
+      examples += '2. For holder_signature_present: use true if signature is mentioned as present, false otherwise\n';
+      examples += '3. For type: use "passport" or specific passport type mentioned in the document\n';
+      examples += '4. Dates must be in ISO format (YYYY-MM-DD)\n';
+      examples += '5. When processing document text, extract all available information and use reasonable defaults for missing required fields\n\n';
+    }
+
+    // Combined usage example only if both calendar and vector search are available
+    if (availableCategories.includes('calendar') && allTools.some(t => t.name === 'vectorFileSearch')) {
+      examples += '**IMPORTANT**:\n';
+      examples += '- You must always prioritize calendar tools for project/work queries, and use vectorFileSearch for knowledge/documentation queries. though the two tools can be combined, in the correct sequence, to produce the best results and answer the user\'s question or perform the requested action/s.\n';
+      examples += '- If the user\'s question is too generic or vague, you should first answer by asking for more information about what you need to know, or what you need to do, before using any tools.\n\n';
+
+      examples += '**EXAMPLE OF COMBINED TOOL USAGE**:\n';
+      examples += '- User asks something like "Set an appointment for next week do discuss about my visa requirements for my trip to Bali" -> The sequence of actions would be:\n';
+      examples += '  1. Ask for more details about the reason for the visit (e.g., "What is the purpose of your trip to Bali? Is it for business or tourism?") and appointment timing (e.g., " and What day and time next week works for you?")\n';
+      examples += '  2. Use vectorSearch to find information about visa requirements (eg. passport validity, processing times and required documents to apply) for user\'s specific purpose, nationality and situation (note: you can rephrase user\'s question and to maximize search effectiveness)\n';
+      examples += '  3. Then use calendar tools to find any free slot of 30 minutes next week or when the user is available.\n';
+      examples += '  4. If there are more than one free slot, ask the user to choose one of them.\n';
+      examples += '  5. Create the event in the calendar with the information found in the vector search (a summary of it) and the original user\'s request.\n\n';
+    }
+
+    return examples;
+  }
+
+  private generateToolExamples(toolRegistry: ToolRegistry): string {
+    const availableCategories = toolRegistry.getAvailableCategories();
+    const allTools = toolRegistry.getAvailableTools();
+    let examples = '';
+
+    // Calendar examples
+    if (availableCategories.includes('calendar')) {
+      const calendarTools = toolRegistry.getToolsByCategory('calendar');
+
+      if (calendarTools.some(t => t.name === 'createEvent')) {
+        examples += '**MANDATORY EXAMPLES FOR EVENT CREATION**:\n';
+        examples += '- "add event on Sep 21, 2025. title: cancel chatgpt subscription" → Use createEvent with summary="Cancel ChatGPT subscription", start/end dates for Sep 21, 2025\n';
+        examples += '- "schedule a meeting tomorrow at 2pm" → Use createEvent with appropriate date/time\n';
+        examples += '- "create appointment next week" → Use createEvent (may need to ask for specific date/time)\n';
+        examples += '- "book time for project review" → Use createEvent\n';
+        examples += '- "plan a call with the team" → Use createEvent\n\n';
+      }
+
+      if (calendarTools.some(t => ['searchEvents', 'getEvents'].includes(t.name))) {
+        examples += '**MANDATORY EXAMPLES FOR CALENDAR SEARCHES**:\n';
+        if (calendarTools.some(t => t.name === 'getEvents')) {
+          examples += '- "show me my events" → Use getEvents with no parameters to get recent events\n';
+          examples += '- "summarize last week calendar activities" → Use getEvents with timeRange: {start: "2025-06-16T00:00:00Z", end: "2025-06-22T23:59:59Z"}\n';
+          examples += '- "events for this month" → Use getEvents with timeRange for current month\n';
+          examples += '- "meetings in March 2025" → Use getEvents with timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-03-31T23:59:59Z"}\n';
+        }
+        if (calendarTools.some(t => t.name === 'searchEvents')) {
+          examples += '- "find events with nespola" → Use searchEvents with query: "nespola"\n';
+          examples += '- "nespola activities from march to june" → Use searchEvents with query: "nespola", timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-06-30T23:59:59Z"}\n';
+          examples += '- "italmagneti project status" → Use searchEvents with query: "italmagneti"\n';
+        }
+        examples += '\n';
+      }
+    }
+
+    // Vector search examples
+    if (allTools.some(t => t.name === 'vectorFileSearch')) {
+      examples += '**MANDATORY EXAMPLES FOR KNOWLEDGE QUERIES**:\n';
+      examples += '- "What is the company policy on remote work?" → Use vectorFileSearch\n';
+      examples += '- "Show me the documentation about visa requirements" → Use vectorFileSearch\n';
+      examples += '- "What are the travel guidelines?" → Use vectorFileSearch\n';
+      examples += '- "I need information about benefits" → Use vectorFileSearch\n';
+      examples += '- "I am italian, what type of visa to indonesia can I get?" → Use vectorFileSearch\n';
+      examples += '- "What documents do I need for travel?" → Use vectorFileSearch\n\n';
+    }
+
+    // Passport tools examples
+    if (availableCategories.includes('passport')) {
+      examples += '**MANDATORY EXAMPLES FOR PASSPORT QUERIES**:\n';
+      examples += '- "create passport record" → Use createPassport with all required fields (passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present, type)\n';
+      examples += '- "extract passport data from document" → Use createPassport with passport information from uploaded document\n';
+      examples += '- "find passport P12345" → Use getPassports with passport_number: "P12345"\n';
+      examples += '- "search for John Doe passport" → Use getPassports with surname: "DOE" and given_names: "JOHN"\n';
+      examples += '- "update passport details" → Use updatePassport with id and updated fields\n';
+      examples += '- "delete passport record" → Use deletePassport with id\n';
+      examples += '- "list all passports" → Use getPassports with no parameters\n\n';
+
+      examples += '**CRITICAL RULES FOR PASSPORT PROCESSING**:\n';
+      examples += '1. ALWAYS include ALL required fields when using createPassport: passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present (boolean), type (string)\n';
+      examples += '2. For holder_signature_present: use true if signature is mentioned as present, false otherwise\n';
+      examples += '3. For type: use "passport" or specific passport type mentioned in the document\n';
+      examples += '4. Dates must be in ISO format (YYYY-MM-DD)\n';
+      examples += '5. When processing uploaded documents, extract all available information and use reasonable defaults for missing required fields\n\n';
+    }
+
+    return examples;
+  }
+
+  private getToolParameterInfo(toolName: string): string {
+    // Provide detailed parameter information for each tool to help the orchestrator
+    // generate correct payloads when calling tools
+    switch (toolName) {
+      // Calendar tools
+      case 'getEvents':
+        return '{ timeRange?: { start?: string (ISO date), end?: string (ISO date) }, filters?: { query?: string, maxResults?: number, showDeleted?: boolean, orderBy?: "startTime" | "updated" } }';
+      case 'searchEvents':
+        return '{ query: string (search term like company/project name), timeRange?: { start?: string (ISO date), end?: string (ISO date) } }';
+      case 'createEvent':
+        return '{ eventData: { summary: string (required), description?: string, start: { dateTime?: string (ISO), date?: string (YYYY-MM-DD), timeZone?: string }, end: { dateTime?: string (ISO), date?: string (YYYY-MM-DD), timeZone?: string }, location?: string, attendees?: [{ email: string, displayName?: string }] } }';
+      case 'updateEvent':
+        return '{ eventId: string (required), changes: { summary?: string, description?: string, start?: { dateTime?: string, date?: string, timeZone?: string }, end?: { dateTime?: string, date?: string, timeZone?: string }, location?: string, attendees?: [{ email: string, displayName?: string }] } }';
+      case 'deleteEvent':
+        return '{ eventId: string (required) }';
+
+      // Email tools
+      case 'sendEmail':
+        return '{ emailData: { to: string[] (required), cc?: string[], bcc?: string[], subject: string (required), body: string (required), priority?: "low" | "normal" | "high", isHtml?: boolean } }';
+      case 'searchEmails':
+        return '{ filters: { from?: string, to?: string, subject?: string, body?: string, hasAttachment?: boolean, isRead?: boolean, dateRange?: { start?: string, end?: string }, maxResults?: number } }';
+      case 'replyToEmail':
+        return '{ emailId: string (required), replyData: { body: string (required), replyAll?: boolean } }';
+
+      // File tools
+      case 'listFiles':
+        return '{ directoryPath: string (required), recursive?: boolean }';
+      case 'readFile':
+        return '{ filePath: string (required) }';
+      case 'writeFile':
+        return '{ filePath: string (required), content: string (required), overwrite?: boolean }';
+      case 'searchFiles':
+        return '{ searchPath: string (required), filters: { name?: string, extension?: string, type?: "file" | "directory", sizeMin?: number, sizeMax?: number, maxResults?: number } }';
+
+      // Web tools
+      case 'searchWeb':
+        return '{ query: string (required), filters?: { site?: string, maxResults?: number } }';
+      case 'getWebPageContent':
+        return '{ url: string (required) }';
+      case 'summarizeWebPage':
+        return '{ url: string (required), maxLength?: number }';
+      case 'checkWebsite':
+        return '{ url: string (required) }';
+
+      // Vector search tools
+      case 'vectorFileSearch':
+        return `{ query: string (required), maxResults?: number, vectorStoreIds: [${this.vectorStoreIds.map(id => `"${id}"`).join(', ')}] (required) }`;
+
+      // Passport tools
+      case 'createPassport':
+        return '{ passport_number: string (required), surname: string (required), given_names: string (required), nationality: string (required), date_of_birth: string (required - ISO format YYYY-MM-DD), sex: string (required), place_of_birth: string (required), date_of_issue: string (required - ISO format YYYY-MM-DD), date_of_expiry: string (required - ISO format YYYY-MM-DD), issuing_authority: string (required), holder_signature_present: boolean (required - true/false), type: string (required - e.g. "passport"), residence?: string, height_cm?: number, eye_color?: string }';
+      case 'getPassports':
+        return '{ passport_number?: string, surname?: string, given_names?: string, nationality?: string, date_of_birth?: string, sex?: string, place_of_birth?: string, date_of_issue?: string, date_of_expiry?: string, issuing_authority?: string, holder_signature_present?: boolean, residence?: string, height_cm?: number, eye_color?: string, type?: string }';
+      case 'updatePassport':
+        return '{ id: number (required), passport_number?: string, surname?: string, given_names?: string, nationality?: string, date_of_birth?: string, sex?: string, place_of_birth?: string, date_of_issue?: string, date_of_expiry?: string, issuing_authority?: string, holder_signature_present?: boolean, type?: string, residence?: string, height_cm?: number, eye_color?: string }';
+      case 'deletePassport':
+        return '{ id: number (required) }';
+      case 'setupPassportSchema':
+        return '{} (no parameters required)';
+
+      default:
+        return 'See tool schema for detailed parameters';
+    }
+  }
+
   private async performAnalysis(
     userMessage: string,
     chatHistory: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>,
@@ -493,14 +974,9 @@ export class ToolOrchestrator {
       .map(category => {
         const tools = toolRegistry.getToolsByCategory(category);
         return `**${category.toUpperCase()}**:\n${tools.map(tool => {
-          // Provide parameter information based on tool name
-          let paramInfo = 'See tool schema';
-          if (tool.name === 'vectorFileSearch') {
-            paramInfo = 'query (required), maxResults (optional)';
-          } else if (tool.name === 'searchEvents') {
-            paramInfo = 'searchTerm (required), startDate, endDate, maxResults';
-          }
-          return `  - ${tool.name}: ${tool.description} (Parameters: ${paramInfo})`;
+          // Provide detailed parameter information for each tool
+          const paramInfo = this.getToolParameterInfo(tool.name);
+          return `  - ${tool.name}: ${tool.description}\n    Parameters: ${paramInfo}`;
         }).join('\n')}`;
       }).join('\n\n');
 
@@ -512,7 +988,7 @@ Today is ${new Date().toLocaleDateString('en-US', {
       day: 'numeric'
     })}.
 
-You are a **CALENDAR ASSISTANT** with intelligent tool orchestration capabilities. Your primary purpose is to help users manage their calendar, events, and schedule-related information, with the help of various tools (e.g., searchEvents for calendar integration and vectorFileSearch for knowledge base queries).
+You are a **CALENDAR ASSISTANT** with intelligent tool orchestration capabilities. Your primary purpose is to help users manage their calendar, events, and schedule-related information, with the help of various tools.
 Your goal is to analyze the user's request and determine the best next steps to answer their query based on available tools and context below.
 ---START OF CONTEXT---
 ${this.formatChatHistory(chatHistory)}
@@ -523,73 +999,11 @@ User Request: "${userMessage}"
 Available Tools by Category:
 ${categorizedToolsList}
 
-**ALWAYS REMEMBER**:
-- ONLY answer using the tools provided in the tool registry and the context provided. NEVER attempt to answer questions using internal knowledge or guesswork. If you cannot find an answer using the tools, clearly state that no information was found.
-- Use calendar tools for calendar-related queries, such as searching for events, creating events, or managing schedules.
-- Use vectorFileSearch for knowledge base queries, such as searching for documentation, policies, or general knowledge.
-- Do not use web search tools for knowledge queries; always prefer vectorFileSearch.
-- If the user's question is too generic or vague, ask for more details before using any tools.
+${this.generateAnalysisInstructions(toolRegistry)}
 
-**CRITICAL CONTEXT**: This is a calendar management application.
-Any mention of:
-- Projects (like "progetto Italmagneti", "Nespola project", "TechCorp", etc.)
-- Companies or client names
-- Work activities, meetings, or project status
-- Deadlines for visa or projects or time-sensitive information
-- Documents expiring or needing updates
-- "What can you tell me about..." relating to business/work topics
-- Summary requests about work/project topics
-- Questions about project progress, timeline, or history
+${this.generateContextInstructions(toolRegistry)}
 
-Should **ALWAYS** be interpreted as **CALENDAR QUERIES** that require searching calendar data, NOT as translation or general knowledge requests.
-
-Any questions that:
-- cannot be answered from calendar data (e.g., asks for documentation, policies, procedures, general knowledge, visa information, travel requirements, or other uploaded information)
-- requires domain-specific knowledge (e.g., company policies, visa requirements, travel guidelines, document requirements, deadlines and other general knowledge)
-- asks for documentation, policies, procedures, or general knowledge
-- asks for information about benefits, travel requirements, or visa types
-
-MUST be answered using the vectorFileSearch tool to search the knowledge base, NOT calendar tools.
-
-
-**MANDATORY EXAMPLES FOR CALENDAR QUERIES**:
-- "what was the core reason for the project I've been working for in microsoft in 2025" → Use calendar tools to Search for all events containing "microsoft" in 2025
-- "tell me about the microsoft project" → Use calendar tools to search for all events containing "microsoft"
-- "how is the project going?" → Use calendar tools to search for recent project-related events, limited to the last 20 records/events
-- "project status" → Use calendar tools to search for project meetings and updates
-- "project status for last quarter" → Use calendar tools to search for project meetings and updates in the last quarter
-
-
-**MANDATORY EXAMPLES FOR NON-CALENDAR KNOWLEDGE QUERIES**:
-- "What is the company policy on remote work?" → Use vectorFileSearch
-- "Show me the documentation about visa requirements" → Use vectorFileSearch
-- "What are the travel guidelines?" → Use vectorFileSearch
-- "I need information about benefits" → Use vectorFileSearch
-- "I am italian, what type of visa to indonesia can I get?" → Use vectorFileSearch
-- "What documents do I need for travel?" → Use vectorFileSearch
-- "I need to know the visa requirements for a business trip to Bali" → Use vectorFileSearch
-- "My passport expires next month, can I still apply for a visa? What should I do?" → Use vectorFileSearch
-
-**CRITICAL RULES FOR KNOWLEDGE QUERIES**:
-1. ALWAYS use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions
-2. Do NOT use web search tools for knowledge queries
-3. Do NOT attempt to answer knowledge questions from internal AI knowledge or guess
-4. ONLY return what is found in the vector store via vectorFileSearch
-5. If vectorFileSearch returns no results, clearly state that no information was found in the knowledge base
-
-**IMPORTANT**:
-- You must always prioritize calendar tools for project/work queries, and use vectorFileSearch for knowledge/documentation queries. though the two tools can be combined, in the correct sequence, to produce the best results and answer the user's question or perform the requested action/s.
-- If the user's question is too generic or vague, you should first answer by asking for more information about what you need to know, or what you need to do, before using any tools.
-
-
-**EXAMPLE OF COMBINED TOOL USAGE**:
-- User asks something like "Set an appointment for next week do discuss about my visa requirements for my trip to Bali" -> The sequence of actions would be:
-  1. Ask for more details about the reason for the visit (e.g., "What is the purpose of your trip to Bali? Is it for business or tourism?") and appointment timing (e.g., " and What day and time next week works for you?")
-  2. Use vectorSearch to find information about visa requirements (eg. passport validity, processing times and required documents to apply) for user's specific purpose, nationality and situation (note: you can rephrase user's question and to maximize search effectiveness)
-  3. Then use calendar tools to find any free slot of 30 minutes next week or when the user is available.
-  4. If there are more than one free slot, ask the user to choose one of them.
-  5. Create the event in the calendar with the information found in the vector search (a summary of it) and the original user's request.
-
+${this.generateAnalysisExamples(toolRegistry)}
 
 Now perform a comprehensive analysis:
 
@@ -661,18 +1075,7 @@ Provide a clear, structured analysis that will guide the tool orchestration proc
       .map(category => {
         const tools = toolRegistry.getToolsByCategory(category);
         return `**${category.toUpperCase()}**:\n${tools.map(tool => {
-          // Provide parameter information based on tool name
-          let paramInfo = 'See tool schema';
-          if (tool.name === 'vectorFileSearch') {
-            const vectorStoreIdsStr = this.vectorStoreIds.length > 0
-              ? JSON.stringify(this.vectorStoreIds)
-              : '["vs_id1", "vs_id2"]';
-            paramInfo = `{ query: "search term", vectorStoreIds?: ${vectorStoreIdsStr}, maxResults?: number }`;
-          } else if (tool.name === 'searchEvents') {
-            paramInfo = '{ query: "term", timeRange?: { start: "YYYY-MM-DDTHH:MM:SSZ", end: "YYYY-MM-DDTHH:MM:SSZ" } }';
-          } else if (tool.name === 'getEvents') {
-            paramInfo = '{ timeRange?: { start: "YYYY-MM-DDTHH:MM:SSZ", end: "YYYY-MM-DDTHH:MM:SSZ" }, filters?: { maxResults: number } }';
-          }
+          const paramInfo = this.getToolParameterInfo(tool.name);
           return `  - ${tool.name}: ${tool.description}\n    Parameters: ${paramInfo}`;
         }).join('\n')}`;
       }).join('\n\n');
@@ -712,58 +1115,18 @@ ${categorizedToolsList}
 
 ### DECISION RULES
 
-1. **FOR EVENT CREATION/MODIFICATION**: **ALWAYS** use appropriate calendar tools
-   - "add", "create", "schedule", "book", "set up", "make", "plan" → Use createEvent tool
-   - "update", "change", "modify", "edit", "reschedule", "move" → Use updateEvent tool
-   - "delete", "remove", "cancel", "clear" → Use deleteEvent tool
-   - **CRITICAL**: For createEvent, always include required fields: summary, start, end times
-   - Use proper date/time formats: "2025-09-21T09:00:00" for timed events, "2025-09-21" for all-day
+${this.generateDecisionRules(toolRegistry)}
 
-2. **FOR PROJECT/WORK QUERIES**: **ALWAYS** search calendar first using searchEvents or getEvents
-   - Extract project/company names from the query
-   - Search calendar data before responding with "I don't know"
-   - Use broad search terms (e.g., "italmagneti", "nespola", "techcorp")
+${this.generatePriorityOrder(toolRegistry)}
 
-3. **FOR KNOWLEDGE/DOCUMENTATION QUERIES**: **ALWAYS** use vectorFileSearch for non-calendar information
-   - **IMPORTANT:** For the first tool call, ALWAYS use the user's original query as the 'query' parameter for vectorFileSearch, without rephrasing or summarizing.
-   - Only if the first attempt returns no results, try rephrasing or adding extra details for subsequent attempts.
-   - **CRITICAL:** When calling vectorFileSearch, ALWAYS include the vectorStoreIds parameter with the actual vector store IDs shown in the tool parameters above. Do NOT omit this parameter.
-   - Use vectorFileSearch for visa, travel, policy, documentation, or general knowledge questions
-   - Examples: visa requirements, company policies, travel guidelines, benefits information
-   - Do NOT use web search tools - vectorFileSearch is the primary knowledge tool
-
-4. **Need more info?** – Plan the *minimal* set of tool calls that will get it.
-5. **Enough info?** – Say so and explain briefly.
-
-**PRIORITY ORDER**:
-- Event creation/modification → createEvent, updateEvent, deleteEvent
-- Calendar queries → searchEvents, getEvents
-- Knowledge queries → vectorFileSearch
-- File operations → file tools
-- Email operations → email tools
-
-**MANDATORY EXAMPLES FOR EVENT CREATION**:
-- "add event on Sep 21, 2025. title: cancel chatgpt subscription" → Use createEvent with summary="Cancel ChatGPT subscription", start/end dates for Sep 21, 2025
-- "schedule a meeting tomorrow at 2pm" → Use createEvent with appropriate date/time
-- "create appointment next week" → Use createEvent (may need to ask for specific date/time)
-- "book time for project review" → Use createEvent
-- "plan a call with the team" → Use createEvent
-
-**MANDATORY EXAMPLES FOR CALENDAR SEARCHES**:
-- "show me my events" → Use getEvents with no parameters to get recent events
-- "summarize last week calendar activities" → Use getEvents with timeRange: {start: "2025-06-16T00:00:00Z", end: "2025-06-22T23:59:59Z"}
-- "events for this month" → Use getEvents with timeRange for current month
-- "meetings in March 2025" → Use getEvents with timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-03-31T23:59:59Z"}
-- "find events with nespola" → Use searchEvents with query: "nespola"
-- "nespola activities from march to june" → Use searchEvents with query: "nespola", timeRange: {start: "2025-03-01T00:00:00Z", end: "2025-06-30T23:59:59Z"}
-- "italmagneti project status" → Use searchEvents with query: "italmagneti"
+${this.generateToolExamples(toolRegistry)}
 
 **CRITICAL DATE PARSING RULES:**
-- "last week" = June 16-22, 2025 (current date: June 23, 2025)
-- "this week" = June 16-22, 2025
-- "next week" = June 23-29, 2025
-- "this month" = June 1-30, 2025
-- "last month" = May 1-31, 2025
+- "last week" = June 30-July 6, 2025 (current date: July 6, 2025)
+- "this week" = June 30-July 6, 2025
+- "next week" = July 7-13, 2025
+- "this month" = July 1-31, 2025
+- "last month" = June 1-30, 2025
 - Always use UTC format: "YYYY-MM-DDTHH:MM:SSZ"
 - For date ranges, use 00:00:00Z for start and 23:59:59Z for end
 

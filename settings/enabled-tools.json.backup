@@ -1,0 +1,6 @@
+{
+  "calendar": true,
+  "email": true,
+  "file": true,
+  "web": true
+}

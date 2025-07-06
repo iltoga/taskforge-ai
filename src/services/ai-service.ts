@@ -381,7 +381,12 @@ Total events in period: ${events.length}
     toolRegistry: unknown,
     orchestratorModel: ModelType = 'gpt-4.1-mini',
     developmentMode: boolean = false,
-    fileIds: string[] = []
+    fileIds: string[] = [],
+    fileContext?: {
+      type: 'processedFiles' | 'fileIds';
+      files?: Array<{ fileName: string; fileContent: string; fileSize: number; }>;
+      ids?: string[];
+    }
   ): Promise<{
     response: string;
     steps: unknown[];
@@ -402,6 +407,11 @@ Total events in period: ${events.length}
         progressMessages.push(message);
       });
 
+      // Determine which files to pass to orchestrator
+      const orchestratorFileIds = fileContext?.type === 'processedFiles'
+        ? fileContext.files?.map(f => `processed:${f.fileName}`) || []
+        : fileIds;
+
       const result = await orchestrator.orchestrate(
         message,
         chatHistory,
@@ -412,7 +422,7 @@ Total events in period: ${events.length}
           maxToolCalls: 5,
           developmentMode
         },
-        fileIds
+        orchestratorFileIds
       );
 
       return {

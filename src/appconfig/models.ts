@@ -56,7 +56,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
     provider: 'openai',
     badge: 'Reasoning',
     supportsAssistantAPI: true,
-    supportsFileSearch: false
+    supportsFileSearch: true
   },
   {
     id: 'o3',
@@ -67,7 +67,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
     provider: 'openai',
     badge: 'Premium-Reasoning',
     supportsAssistantAPI: false,
-    supportsFileSearch: false
+    supportsFileSearch: true
   },
   {
     id: 'o4-mini',

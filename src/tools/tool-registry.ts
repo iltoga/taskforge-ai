@@ -1,8 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 import { CalendarEvent } from '../types/calendar';
 import { CalendarTools } from './calendar-tools';
 import { EmailTools } from './email-tools';
 import { FileTools } from './file-tools';
+import { PassportTools } from './passport-tools';
 import { WebTools } from './web-tools';
 
 // Base interfaces for tools
@@ -95,143 +98,166 @@ export class DefaultToolRegistry implements ToolRegistry {
   }
 }
 
+// Load tool configuration from settings
+export function loadToolConfiguration(): { [key: string]: boolean } {
+  let enabled: { [key: string]: boolean } = { calendar: true, email: false, file: false, web: false, passport: false };
+  try {
+    const configPath = path.resolve(process.cwd(), 'settings/enabled-tools.json');
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      enabled = JSON.parse(configContent);
+    }
+  } catch (err) {
+    // Fallback to all enabled if config missing or invalid
+    console.warn('Could not load enabled-tools.json, defaulting to all enabled:', err);
+  }
+  return enabled;
+}
+
 // Factory function to create and configure a tool registry
 export function createToolRegistry(
   calendarTools: CalendarTools,
   emailTools?: EmailTools,
   fileTools?: FileTools,
-  webTools?: WebTools
+  webTools?: WebTools,
+  passportTools?: PassportTools,
+  configOverride?: { [key: string]: boolean }
 ): ToolRegistry {
   const registry = new DefaultToolRegistry();
 
-  // Register calendar tools
-  registry.registerTool(
-    {
-      name: 'getEvents',
-      description: 'Get calendar events within a time range with optional filters. Returns simplified event objects optimized for AI processing (only essential fields: id, title, description, startDate, endDate, isAllDay, location, attendeeCount, status).',
-      parameters: z.object({
-        timeRange: z.object({
-          start: z.string().optional().describe('ISO date string for start time (e.g., "2025-03-01" or "2025-03-01T00:00:00+08:00")'),
-          end: z.string().optional().describe('ISO date string for end time (e.g., "2025-06-30" or "2025-06-30T23:59:59+08:00")'),
-        }).optional().describe('Time range to search for events'),
-        filters: z.object({
-          query: z.string().optional().describe('Search query to filter events'),
-          maxResults: z.number().optional().describe('Maximum number of results to return (default: 100)'),
-          showDeleted: z.boolean().optional().describe('Whether to include deleted events'),
-          orderBy: z.enum(['startTime', 'updated']).optional().describe('How to order results'),
-        }).optional().describe('Additional filters for events'),
-      }),
-      category: 'calendar'
-    },
-    async (params: Record<string, unknown>) => {
-      const p = params as { timeRange?: { start?: string; end?: string }; filters?: { query?: string; maxResults?: number; showDeleted?: boolean; orderBy?: 'startTime' | 'updated' } };
-      return await calendarTools.getEvents(p.timeRange, p.filters);
-    }
-  );
+  // Load enabled tool categories from settings/enabled-tools.json or use override
+  const enabled = configOverride || loadToolConfiguration();
 
-  registry.registerTool(
-    {
-      name: 'searchEvents',
-      description: 'Search calendar events by query string. Returns simplified event objects optimized for AI processing. Use this to find events containing specific keywords, company names, or project names in title, description, or location.',
-      parameters: z.object({
-        query: z.string().describe('Search query to find events (e.g., company name like "Nespola", project name, keyword)'),
-        timeRange: z.object({
-          start: z.string().optional().describe('ISO date string for start time (e.g., "2025-03-01" or "2025-03-01T00:00:00+08:00")'),
-          end: z.string().optional().describe('ISO date string for end time (e.g., "2025-06-30" or "2025-06-30T23:59:59+08:00")'),
-        }).optional().describe('Time range to search within'),
-      }),
-      category: 'calendar'
-    },
-    async (params: Record<string, unknown>) => {
-      const p = params as { query: string; timeRange?: { start?: string; end?: string } };
-      return await calendarTools.searchEvents(p.query, p.timeRange);
-    }
-  );
+  // Register calendar tools if enabled
+  if (enabled.calendar !== false) {
+    registry.registerTool(
+      {
+        name: 'getEvents',
+        description: 'Get calendar events within a time range with optional filters. Returns simplified event objects optimized for AI processing (only essential fields: id, title, description, startDate, endDate, isAllDay, location, attendeeCount, status).',
+        parameters: z.object({
+          timeRange: z.object({
+            start: z.string().optional().describe('ISO date string for start time (e.g., "2025-03-01" or "2025-03-01T00:00:00+08:00")'),
+            end: z.string().optional().describe('ISO date string for end time (e.g., "2025-06-30" or "2025-06-30T23:59:59+08:00")'),
+          }).optional().describe('Time range to search for events'),
+          filters: z.object({
+            query: z.string().optional().describe('Search query to filter events'),
+            maxResults: z.number().optional().describe('Maximum number of results to return (default: 100)'),
+            showDeleted: z.boolean().optional().describe('Whether to include deleted events'),
+            orderBy: z.enum(['startTime', 'updated']).optional().describe('How to order results'),
+          }).optional().describe('Additional filters for events'),
+        }),
+        category: 'calendar'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as { timeRange?: { start?: string; end?: string }; filters?: { query?: string; maxResults?: number; showDeleted?: boolean; orderBy?: 'startTime' | 'updated' } };
+        return await calendarTools.getEvents(p.timeRange, p.filters);
+      }
+    );
 
-  registry.registerTool(
-    {
-      name: 'createEvent',
-      description: 'Create a new calendar event. Use this when the user wants to schedule, add, or create an event.',
-      parameters: z.object({
-        eventData: z.object({
-          summary: z.string().describe('Event title/summary'),
-          description: z.string().optional().describe('Event description'),
-          start: z.object({
-            dateTime: z.string().optional().describe('Start date-time (ISO format)'),
-            date: z.string().optional().describe('Start date for all-day events (YYYY-MM-DD)'),
-            timeZone: z.string().optional().describe('Time zone'),
-          }).describe('Event start time'),
-          end: z.object({
-            dateTime: z.string().optional().describe('End date-time (ISO format)'),
-            date: z.string().optional().describe('End date for all-day events (YYYY-MM-DD)'),
-            timeZone: z.string().optional().describe('Time zone'),
-          }).describe('Event end time'),
-          location: z.string().optional().describe('Event location'),
-          attendees: z.array(z.object({
-            email: z.string().describe('Attendee email'),
-            displayName: z.string().optional().describe('Attendee display name'),
-          })).optional().describe('Event attendees'),
-        }).describe('Event data to create'),
-      }),
-      category: 'calendar'
-    },
-    async (params: Record<string, unknown>) => {
-      const p = params as { eventData: CalendarEvent };
-      return await calendarTools.createEvent(p.eventData);
-    }
-  );
+    registry.registerTool(
+      {
+        name: 'searchEvents',
+        description: 'Search calendar events by query string. Returns simplified event objects optimized for AI processing. Use this to find events containing specific keywords, company names, or project names in title, description, or location.',
+        parameters: z.object({
+          query: z.string().describe('Search query to find events (e.g., company name like "Nespola", project name, keyword)'),
+          timeRange: z.object({
+            start: z.string().optional().describe('ISO date string for start time (e.g., "2025-03-01" or "2025-03-01T00:00:00+08:00")'),
+            end: z.string().optional().describe('ISO date string for end time (e.g., "2025-06-30" or "2025-06-30T23:59:59+08:00")'),
+          }).optional().describe('Time range to search within'),
+        }),
+        category: 'calendar'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as { query: string; timeRange?: { start?: string; end?: string } };
+        return await calendarTools.searchEvents(p.query, p.timeRange);
+      }
+    );
 
-  registry.registerTool(
-    {
-      name: 'updateEvent',
-      description: 'Update an existing calendar event. Use this when the user wants to modify or change an existing event.',
-      parameters: z.object({
-        eventId: z.string().describe('ID of the event to update'),
-        changes: z.object({
-          summary: z.string().optional().describe('Event title/summary'),
-          description: z.string().optional().describe('Event description'),
-          start: z.object({
-            dateTime: z.string().optional().describe('Start date-time (ISO format)'),
-            date: z.string().optional().describe('Start date for all-day events (YYYY-MM-DD)'),
-            timeZone: z.string().optional().describe('Time zone'),
-          }).optional().describe('Event start time'),
-          end: z.object({
-            dateTime: z.string().optional().describe('End date-time (ISO format)'),
-            date: z.string().optional().describe('End date for all-day events (YYYY-MM-DD)'),
-            timeZone: z.string().optional().describe('Time zone'),
-          }).optional().describe('Event end time'),
-          location: z.string().optional().describe('Event location'),
-          attendees: z.array(z.object({
-            email: z.string().describe('Attendee email'),
-            displayName: z.string().optional().describe('Attendee display name'),
-          })).optional().describe('Event attendees'),
-        }).describe('Changes to apply to the event'),
-      }),
-      category: 'calendar'
-    },
-    async (params: Record<string, unknown>) => {
-      const p = params as { eventId: string; changes: Partial<CalendarEvent> };
-      return await calendarTools.updateEvent(p.eventId, p.changes);
-    }
-  );
+    registry.registerTool(
+      {
+        name: 'createEvent',
+        description: 'Create a new calendar event. Use this when the user wants to schedule, add, or create an event.',
+        parameters: z.object({
+          eventData: z.object({
+            summary: z.string().describe('Event title/summary'),
+            description: z.string().optional().describe('Event description'),
+            start: z.object({
+              dateTime: z.string().optional().describe('Start date-time (ISO format)'),
+              date: z.string().optional().describe('Start date for all-day events (YYYY-MM-DD)'),
+              timeZone: z.string().optional().describe('Time zone'),
+            }).describe('Event start time'),
+            end: z.object({
+              dateTime: z.string().optional().describe('End date-time (ISO format)'),
+              date: z.string().optional().describe('End date for all-day events (YYYY-MM-DD)'),
+              timeZone: z.string().optional().describe('Time zone'),
+            }).describe('Event end time'),
+            location: z.string().optional().describe('Event location'),
+            attendees: z.array(z.object({
+              email: z.string().describe('Attendee email'),
+              displayName: z.string().optional().describe('Attendee display name'),
+            })).optional().describe('Event attendees'),
+          }).describe('Event data to create'),
+        }),
+        category: 'calendar'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as { eventData: CalendarEvent };
+        return await calendarTools.createEvent(p.eventData);
+      }
+    );
 
-  registry.registerTool(
-    {
-      name: 'deleteEvent',
-      description: 'Delete a calendar event. Use this when the user wants to remove or cancel an event.',
-      parameters: z.object({
-        eventId: z.string().describe('ID of the event to delete'),
-      }),
-      category: 'calendar'
-    },
-    async (params: Record<string, unknown>) => {
-      const p = params as { eventId: string };
-      return await calendarTools.deleteEvent(p.eventId);
-    }
-  );
+    registry.registerTool(
+      {
+        name: 'updateEvent',
+        description: 'Update an existing calendar event. Use this when the user wants to modify or change an existing event.',
+        parameters: z.object({
+          eventId: z.string().describe('ID of the event to update'),
+          changes: z.object({
+            summary: z.string().optional().describe('Event title/summary'),
+            description: z.string().optional().describe('Event description'),
+            start: z.object({
+              dateTime: z.string().optional().describe('Start date-time (ISO format)'),
+              date: z.string().optional().describe('Start date for all-day events (YYYY-MM-DD)'),
+              timeZone: z.string().optional().describe('Time zone'),
+            }).optional().describe('Event start time'),
+            end: z.object({
+              dateTime: z.string().optional().describe('End date-time (ISO format)'),
+              date: z.string().optional().describe('End date for all-day events (YYYY-MM-DD)'),
+              timeZone: z.string().optional().describe('Time zone'),
+            }).optional().describe('Event end time'),
+            location: z.string().optional().describe('Event location'),
+            attendees: z.array(z.object({
+              email: z.string().describe('Attendee email'),
+              displayName: z.string().optional().describe('Attendee display name'),
+            })).optional().describe('Event attendees'),
+          }).describe('Changes to apply to the event'),
+        }),
+        category: 'calendar'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as { eventId: string; changes: Partial<CalendarEvent> };
+        return await calendarTools.updateEvent(p.eventId, p.changes);
+      }
+    );
 
-  // Register email tools if provided
-  if (emailTools) {
+    registry.registerTool(
+      {
+        name: 'deleteEvent',
+        description: 'Delete a calendar event. Use this when the user wants to remove or cancel an event.',
+        parameters: z.object({
+          eventId: z.string().describe('ID of the event to delete'),
+        }),
+        category: 'calendar'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as { eventId: string };
+        return await calendarTools.deleteEvent(p.eventId);
+      }
+    );
+  }
+
+  // Register email tools if provided and enabled
+  if (emailTools && enabled.email !== false) {
     registry.registerTool(
       {
         name: 'sendEmail',
@@ -302,8 +328,8 @@ export function createToolRegistry(
     );
   }
 
-  // Register file tools if provided
-  if (fileTools) {
+  // Register file tools if provided and enabled
+  if (fileTools && enabled.file !== false) {
     registry.registerTool(
       {
         name: 'listFiles',
@@ -376,8 +402,8 @@ export function createToolRegistry(
     );
   }
 
-  // Register web tools if provided
-  if (webTools) {
+  // Register web tools if provided and enabled
+  if (webTools && enabled.web !== false) {
     registry.registerTool(
       {
         name: 'searchWeb',
@@ -440,6 +466,174 @@ export function createToolRegistry(
       async (params: Record<string, unknown>) => {
         const p = params as { url: string };
         return await webTools.checkWebsite(p.url);
+      }
+    );
+  }
+
+  // Register passport tools if provided and enabled
+  if (passportTools && enabled.passport !== false) {
+    registry.registerTool(
+      {
+        name: 'setupPassportSchema',
+        description: 'Initialize the passport database schema. Call this first before using other passport operations.',
+        parameters: z.object({}),
+        category: 'passport'
+      },
+      async () => {
+        return await passportTools.setupSchema();
+      }
+    );
+
+    registry.registerTool(
+      {
+        name: 'createPassport',
+        description: 'Create a new passport record in the database. Use this to add passport information.',
+        parameters: z.object({
+          passport_number: z.string().describe('Passport number'),
+          surname: z.string().describe('Surname/family name'),
+          given_names: z.string().describe('Given names/first names'),
+          nationality: z.string().describe('Nationality'),
+          date_of_birth: z.string().describe('Date of birth in ISO format (YYYY-MM-DD)'),
+          sex: z.string().describe('Sex (M/F)'),
+          place_of_birth: z.string().describe('Place of birth'),
+          date_of_issue: z.string().describe('Date of issue in ISO format (YYYY-MM-DD)'),
+          date_of_expiry: z.string().describe('Date of expiry in ISO format (YYYY-MM-DD)'),
+          issuing_authority: z.string().describe('Issuing authority'),
+          holder_signature_present: z.boolean().describe('Whether holder signature is present'),
+          residence: z.string().optional().describe('Residence'),
+          height_cm: z.number().optional().describe('Height in centimeters'),
+          eye_color: z.string().optional().describe('Eye color'),
+          type: z.string().describe('Passport type'),
+        }),
+        category: 'passport'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as {
+          passport_number: string;
+          surname: string;
+          given_names: string;
+          nationality: string;
+          date_of_birth: string;
+          sex: string;
+          place_of_birth: string;
+          date_of_issue: string;
+          date_of_expiry: string;
+          issuing_authority: string;
+          holder_signature_present: boolean;
+          residence?: string;
+          height_cm?: number;
+          eye_color?: string;
+          type: string;
+        };
+
+        // Convert date strings to Date objects
+        const passportData = {
+          ...p,
+          date_of_birth: new Date(p.date_of_birth),
+          date_of_issue: new Date(p.date_of_issue),
+          date_of_expiry: new Date(p.date_of_expiry),
+        };
+
+        return await passportTools.createPassport(passportData);
+      }
+    );
+
+    registry.registerTool(
+      {
+        name: 'getPassports',
+        description: 'Retrieve passport records from the database with optional filters. Use this to search for existing passports.',
+        parameters: z.object({
+          passport_number: z.string().optional().describe('Filter by passport number'),
+          surname: z.string().optional().describe('Filter by surname'),
+          given_names: z.string().optional().describe('Filter by given names'),
+          nationality: z.string().optional().describe('Filter by nationality'),
+          date_of_birth: z.string().optional().describe('Filter by date of birth (ISO format)'),
+          sex: z.string().optional().describe('Filter by sex'),
+          place_of_birth: z.string().optional().describe('Filter by place of birth'),
+          date_of_issue: z.string().optional().describe('Filter by date of issue (ISO format)'),
+          date_of_expiry: z.string().optional().describe('Filter by date of expiry (ISO format)'),
+          issuing_authority: z.string().optional().describe('Filter by issuing authority'),
+          holder_signature_present: z.boolean().optional().describe('Filter by signature presence'),
+          residence: z.string().optional().describe('Filter by residence'),
+          height_cm: z.number().optional().describe('Filter by height in cm'),
+          eye_color: z.string().optional().describe('Filter by eye color'),
+          type: z.string().optional().describe('Filter by passport type'),
+        }),
+        category: 'passport'
+      },
+      async (params: Record<string, unknown>) => {
+        const p = params as Record<string, unknown>;
+
+        // Convert date strings to Date objects if provided
+        const filters: Record<string, unknown> = { ...p };
+        if (filters.date_of_birth && typeof filters.date_of_birth === 'string') {
+          filters.date_of_birth = new Date(filters.date_of_birth);
+        }
+        if (filters.date_of_issue && typeof filters.date_of_issue === 'string') {
+          filters.date_of_issue = new Date(filters.date_of_issue);
+        }
+        if (filters.date_of_expiry && typeof filters.date_of_expiry === 'string') {
+          filters.date_of_expiry = new Date(filters.date_of_expiry);
+        }
+
+        return await passportTools.getPassports(filters);
+      }
+    );
+
+    registry.registerTool(
+      {
+        name: 'updatePassport',
+        description: 'Update an existing passport record by ID. Use this to modify passport information.',
+        parameters: z.object({
+          id: z.number().describe('ID of the passport record to update'),
+          passport_number: z.string().optional().describe('Passport number'),
+          surname: z.string().optional().describe('Surname/family name'),
+          given_names: z.string().optional().describe('Given names/first names'),
+          nationality: z.string().optional().describe('Nationality'),
+          date_of_birth: z.string().optional().describe('Date of birth in ISO format (YYYY-MM-DD)'),
+          sex: z.string().optional().describe('Sex (M/F)'),
+          place_of_birth: z.string().optional().describe('Place of birth'),
+          date_of_issue: z.string().optional().describe('Date of issue in ISO format (YYYY-MM-DD)'),
+          date_of_expiry: z.string().optional().describe('Date of expiry in ISO format (YYYY-MM-DD)'),
+          issuing_authority: z.string().optional().describe('Issuing authority'),
+          holder_signature_present: z.boolean().optional().describe('Whether holder signature is present'),
+          residence: z.string().optional().describe('Residence'),
+          height_cm: z.number().optional().describe('Height in centimeters'),
+          eye_color: z.string().optional().describe('Eye color'),
+          type: z.string().optional().describe('Passport type'),
+        }),
+        category: 'passport'
+      },
+      async (params: Record<string, unknown>) => {
+        const { id, ...updateData } = params as { id: number } & Record<string, unknown>;
+
+        // Convert date strings to Date objects if provided
+        if (updateData.date_of_birth && typeof updateData.date_of_birth === 'string') {
+          updateData.date_of_birth = new Date(updateData.date_of_birth);
+        }
+        if (updateData.date_of_issue && typeof updateData.date_of_issue === 'string') {
+          updateData.date_of_issue = new Date(updateData.date_of_issue);
+        }
+        if (updateData.date_of_expiry && typeof updateData.date_of_expiry === 'string') {
+          updateData.date_of_expiry = new Date(updateData.date_of_expiry);
+        }
+
+        return await passportTools.updatePassport(id, updateData);
+      }
+    );
+
+    registry.registerTool(
+      {
+        name: 'deletePassport',
+        description: 'Delete a passport record by ID. Use this to remove passport information.',
+        parameters: z.object({
+          id: z.number().describe('ID of the passport record to delete'),
+        }),
+        category: 'passport'
+      },
+      async (params: Record<string, unknown>) => {
+        const { id } = params as { id: number };
+        return await passportTools.deletePassport(id);
       }
     );
   }

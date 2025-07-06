@@ -1,5 +1,22 @@
 {
   "typescript.preferences.includePackageJsonAutoImports": "auto",
   "typescript.suggest.autoImports": true,
-  "typescript.preferences.importModuleSpecifier": "relative"
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "dbcode.connections": [
+    {
+      "connectionId": "OkHiTSxb1wrvmNz9gaQkB",
+      "name": "docker-local",
+      "driver": "postgres",
+      "connectionType": "host",
+      "host": "localhost",
+      "port": 5432,
+      "ssl": false,
+      "username": "postgreadmin",
+      "password": "",
+      "savePassword": "secretStorage",
+      "database": "calendar_assistant",
+      "readOnly": false,
+      "connectionTimeout": 30
+    }
+  ]
 }

@@ -15,6 +15,13 @@ if (!global.structuredClone) {
   };
 }
 
+// Add setImmediate polyfill for Prisma (required for functional tests)
+if (!global.setImmediate) {
+  global.setImmediate = (callback, ...args) => {
+    return setTimeout(callback, 0, ...args);
+  };
+}
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter() {

@@ -25,7 +25,12 @@ export interface PassportToolResult {
   message?: string;
 }
 
+/**
+ * Tool category: 'customer-passport'.
+ * Used by the orchestrator to route customer/passport-related queries.
+ */
 export class PassportTools {
+  static category = 'customer-passport';
   private prisma: PrismaClient;
 
   constructor() {
