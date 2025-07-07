@@ -1,50 +1,56 @@
-# Dependencies
+###############################################################################
+# NODE / BUILD ARTEFACTS
+###############################################################################
 node_modules
+.cache
+.next
+out
+coverage
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.tsbuildinfo          # tsc incremental cache
 
-# Next.js build output
-.next/
-out/
+###############################################################################
+# ENVIRONMENT FILES  (pass secrets via --build-arg / -e instead)
+###############################################################################
+.env                    # root .env
+.env.*                  # .env.local, .env.production, etc.
+!.env.example           # keep template for reference
 
-# Environment variables
-.env*.local
-
-# Git
+###############################################################################
+# VERSION-CONTROL METADATA
+###############################################################################
 .git
 .gitignore
+.gitattributes
 
-
-# Docker
+###############################################################################
+# DOCKER / CI FILES  (Docker passes the chosen Dockerfile automatically)
+###############################################################################
 Dockerfile*
-docker-compose*
+docker-compose.*
 .dockerignore
 
-# DO NOT ignore prisma directory or schema.prisma!
-
-# IDE
+###############################################################################
+# EDITOR & OS NOISE
+###############################################################################
 .vscode
 .idea
-
-# OS
 .DS_Store
-*.swp
-*.swo
+*.sw?
 
-# Testing
-coverage
-*.test
-__tests__
+###############################################################################
+# TEST & DEBUG FILES
+###############################################################################
+**/__tests__/
+*.test.*
+debug-*.*
 
-# Logs
-logs
-*.log
-
-# Cache
-.cache
-.eslintcache
-
-# Debug files
-debug-*.js
-debug-*.ts
+###############################################################################
+# KEEP PRISMA SCHEMA & MIGRATIONS
+###############################################################################
+!prisma/
+!prisma/schema.prisma

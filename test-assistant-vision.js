@@ -42,7 +42,7 @@ async function testAssistantVision() {
     const assistant = await openai.beta.assistants.create({
       name: "Vision Test Assistant",
       instructions: "You are a document analysis expert. Analyze the provided content thoroughly.",
-      model: 'gpt-4o',
+      model: 'gpt-4.1-mini',
       tools: [{ type: "file_search" }],
       tool_resources: {
         file_search: {

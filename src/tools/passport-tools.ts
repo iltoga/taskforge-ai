@@ -25,7 +25,12 @@ export interface PassportToolResult {
   message?: string;
 }
 
+/**
+ * Tool category: 'customer-passport'.
+ * Used by the orchestrator to route customer/passport-related queries.
+ */
 export class PassportTools {
+  static category = 'customer-passport';
   private prisma: PrismaClient;
 
   constructor() {
@@ -48,6 +53,7 @@ export class PassportTools {
 
   /**
    * Create a new passport record
+   * All fields except 'surname' and 'given_names' must be translated to English before storing in the database.
    */
   async createPassport(data: PassportInput): Promise<PassportToolResult> {
     try {
@@ -89,6 +95,18 @@ export class PassportTools {
     try {
       const passport = await this.prisma.passport.delete({ where: { id } });
       return { success: true, data: passport };
+    } catch (error: unknown) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * List all passport records
+   */
+  async listPassports(): Promise<PassportToolResult> {
+    try {
+      const passports = await this.prisma.passport.findMany();
+      return { success: true, data: passports };
     } catch (error: unknown) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }

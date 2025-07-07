@@ -9,6 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
 
     steps:
       - name: Add GitHub.com to known hosts
@@ -111,6 +113,6 @@ jobs:
 
             # Clean up - Comment this out initially for debugging
             echo "Cleaning up Docker system..."
-            docker system prune -af --volumes
+            docker system prune -af
 
             echo "🚀 Deployment completed successfully!"

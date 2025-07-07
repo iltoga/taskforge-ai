@@ -16,9 +16,8 @@ const customJestConfig = {
   testEnvironment: 'jsdom',
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
-    '<rootDir>/node_modules/',
-    '<rootDir>/src/__tests__/functional/',
-    '<rootDir>/src/__tests__/functional-.*\\.test\\.(ts|js)$'
+    '<rootDir>/node_modules/'
+    // Removed ignore for functional tests to allow running them
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

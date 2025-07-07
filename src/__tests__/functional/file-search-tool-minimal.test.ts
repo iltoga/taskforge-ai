@@ -47,7 +47,7 @@ describe('FileSearchTool - Minimal TDD Test', () => {
       try {
         await fileSearchTool.initialize([testFile.id],
           "Extract all data from the uploaded file.",
-          'gpt-4o'
+          'gpt-4.1-mini'
         );
         console.log('✅ FileSearchTool initialized successfully with real file');
 

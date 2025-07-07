@@ -3557,7 +3557,7 @@ searchEvents
       "created": "2024-05-27T01:37:56.000Z",
       "updated": "2024-05-27T01:39:17.844Z",
       "summary": "Daily Report - Nespola",
-      "description": "<ul><li>update GPT model to gpt-4o for all workflows</li><li>fix issue with CORS on server</li></ul>",
+      "description": "<ul><li>update GPT model to gpt-4.1-mini for all workflows</li><li>fix issue with CORS on server</li></ul>",
       "creator": {
         "email": "galaxy73.it@gmail.com",
         "self": true
@@ -3599,7 +3599,7 @@ searchEvents
       "created": "2024-05-27T23:26:03.000Z",
       "updated": "2024-05-28T23:16:33.481Z",
       "summary": "Daily Report - Nespola",
-      "description": "<ul><li>update openai api to latest version supporting gpt-4o</li><li>update backend's application logic to comply to breaking changes introduced by the latest openai api: this api allow using new features of gpt such as multimodal prompts (for now image + text)</li><li>fix and test competitor analysis</li><li>fix and test DRA genration</li></ul>",
+      "description": "<ul><li>update openai api to latest version supporting gpt-4.1-mini</li><li>update backend's application logic to comply to breaking changes introduced by the latest openai api: this api allow using new features of gpt such as multimodal prompts (for now image + text)</li><li>fix and test competitor analysis</li><li>fix and test DRA genration</li></ul>",
       "creator": {
         "email": "galaxy73.it@gmail.com",
         "self": true

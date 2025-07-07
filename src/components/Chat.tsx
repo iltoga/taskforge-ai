@@ -9,7 +9,6 @@ import rehypeRaw from 'rehype-raw';
 import { ModelType, supportsFileSearch } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ModelSelector } from './ModelSelector';
-import { OrchestratorModelSelector } from './OrchestratorModelSelector';
 
 interface ChatMessage {
   id: string;
@@ -77,7 +76,9 @@ export function Chat() {
   const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
   const [currentProgressMessages, setCurrentProgressMessages] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini');
-  const [orchestratorModel, setOrchestratorModel] = useState<ModelType>('gpt-4.1-mini');
+
+  // Always use the same model for orchestrator as for chat
+  const orchestratorModel = selectedModel;
   const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
@@ -1082,27 +1083,17 @@ export function Chat() {
       <div className="p-4 border-t">
         {/* Model Selector and Mode Toggles */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-          {/* Chat Model */}
+          {/* Unified Model Selector */}
           <div className="flex flex-col gap-2">
-            <span className="text-sm text-base-content/70">Chat AI Model:</span>
+            <span className="text-sm text-base-content/70">AI Model:</span>
             <ModelSelector
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
             />
           </div>
 
-          {/* Orchestrator Model (shown when tools are enabled) */}
-          {useToolsMode && (
-            <div className="flex flex-col gap-2">
-              <OrchestratorModelSelector
-                selectedModel={orchestratorModel}
-                onModelChange={setOrchestratorModel}
-              />
-            </div>
-          )}
-
           {/* Mode Controls */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:col-span-2">
             {/* Tool Mode Toggle */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-base-content/70">Calendar Tools:</span>

@@ -7,6 +7,7 @@ import { EnhancedCalendarService } from '@/services/enhanced-calendar-service';
 import { CalendarTools } from '@/tools/calendar-tools';
 import { EmailTools } from '@/tools/email-tools';
 import { FileTools } from '@/tools/file-tools';
+import { PassportTools } from '@/tools/passport-tools';
 import { createToolRegistry } from '@/tools/tool-registry';
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
 import { registerKnowledgeTools } from '@/tools/knowledge-tools';
@@ -117,8 +118,19 @@ export async function POST(request: Request) {
         console.log('📁 Files detected - determining processing approach');
 
         try {
-          // If we have processedFiles (from new file upload flow), use embedded processing
-          if (processedFiles.length > 0) {
+          // Check if this is a passport-related request that needs orchestrator
+          const isPassportRequest = englishMessage.toLowerCase().includes('passport') ||
+                                   englishMessage.toLowerCase().includes('add to db') ||
+                                   englishMessage.toLowerCase().includes('save') ||
+                                   englishMessage.toLowerCase().includes('analyze');
+
+          // If we have processedFiles and it's a passport request, prepare for orchestrator
+          if (processedFiles.length > 0 && isPassportRequest) {
+            console.log('📸 Detected passport-related request with processed files - will use orchestrator');
+            // Don't return early - let it fall through to orchestrator with file info
+          }
+          // If we have processedFiles but not passport-related, use embedded processing
+          else if (processedFiles.length > 0) {
             console.log('📸 Using embedded file processing for images and documents');
 
             const fileResponse = await aiService.processMessageWithEmbeddedFiles(
@@ -159,25 +171,47 @@ export async function POST(request: Request) {
         console.log('🤖 Parameters:', { useTools, developmentMode, orchestratorModel });
         console.log('🤖 Message:', englishMessage);
 
+
         const calendarTools = new CalendarTools(calendarService, calendarId);
         const emailTools = new EmailTools();
         const fileTools = new FileTools();
+        const passportTools = new PassportTools();
         // Disabled web tools to force use of vector search for knowledge queries
         // const webTools = new WebTools();
-        // const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, webTools);
-        const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools);
+        // const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, webTools, passportTools);
+        const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, undefined, passportTools);
 
         // Register knowledge tools (including vector search) for non-calendar queries
         registerKnowledgeTools(toolRegistry);
 
         console.log('🤖 Tool registry created, calling orchestrator...');
+
+        // Prepare file context for orchestrator
+        const fileContext: { type: "fileIds" | "processedFiles"; files?: { fileName: string; fileContent: string; fileSize: number; }[]; ids?: string[] } | undefined =
+          processedFiles.length > 0
+            ? {
+                type: "processedFiles",
+                files: processedFiles.map(f => ({
+                  fileName: f.fileName,
+                  fileContent: f.imageData ?? "", // or another property if file content is elsewhere
+                  fileSize: f.fileSize
+                }))
+              }
+            : fileIds.length > 0
+            ? {
+                type: "fileIds",
+                ids: fileIds
+              }
+            : undefined;
+
         const result = await aiService.processMessageWithOrchestrator(
           englishMessage,
           messages || [], // Pass chat history
           toolRegistry,
           orchestratorModel,
           developmentMode,
-          fileIds
+          fileIds, // Keep for backward compatibility
+          fileContext // New parameter with file information
         );
 
         console.log('🤖 Orchestrator result:', {

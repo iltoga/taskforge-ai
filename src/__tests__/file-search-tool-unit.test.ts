@@ -26,7 +26,7 @@ describe('FileSearchTool - Unit Tests', () => {
     it('should handle empty file IDs list', async () => {
       // Should not throw for empty array
       await expect(
-        fileSearchTool.initialize([], 'test instructions', 'gpt-4o')
+        fileSearchTool.initialize([], 'test instructions', 'gpt-4.1-mini')
       ).resolves.not.toThrow();
     });
 
