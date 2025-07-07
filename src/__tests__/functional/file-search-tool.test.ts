@@ -86,7 +86,7 @@ describe('FileSearchTool - Real OpenAI API Integration', () => {
       console.log('🚀 Testing FileSearchTool initialization...');
 
       await expect(
-        fileSearchTool.initialize([testFileId], undefined, 'gpt-4o')
+        fileSearchTool.initialize([testFileId], undefined, 'gpt-4.1-mini')
       ).resolves.not.toThrow();
 
       console.log('✅ FileSearchTool initialized successfully');
@@ -202,7 +202,7 @@ describe('FileSearchTool - Real OpenAI API Integration', () => {
       const invalidFileSearchTool = new FileSearchTool(process.env.OPENAI_API_KEY!);
 
       await expect(
-        invalidFileSearchTool.initialize(['file-invalid123'], undefined, 'gpt-4o')
+        invalidFileSearchTool.initialize(['file-invalid123'], undefined, 'gpt-4.1-mini')
       ).rejects.toThrow();
 
       console.log('✅ Invalid file ID handled correctly');
@@ -213,7 +213,7 @@ describe('FileSearchTool - Real OpenAI API Integration', () => {
 
       // Should not throw for empty file list (early return)
       await expect(
-        emptyFileSearchTool.initialize([], undefined, 'gpt-4o')
+        emptyFileSearchTool.initialize([], undefined, 'gpt-4.1-mini')
       ).resolves.not.toThrow();
 
       console.log('✅ Empty file list handled correctly');

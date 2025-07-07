@@ -56,7 +56,7 @@ describe('FileSearchTool - Simple Test', () => {
     console.log('🚀 Testing FileSearchTool initialization...');
 
     // This should complete without hanging
-    await fileSearchTool.initialize([testFileId], undefined, 'gpt-4o');
+    await fileSearchTool.initialize([testFileId], undefined, 'gpt-4.1-mini');
 
     console.log('✅ Initialization completed');
 

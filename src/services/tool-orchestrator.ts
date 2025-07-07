@@ -692,6 +692,7 @@ export class ToolOrchestrator {
     // Passport tools instructions
     if (availableCategories.includes('passport')) {
       instructions += '- Use passport tools for passport and document processing, including extracting data from passport images and managing passport records.\n';
+      instructions += '- When creating a new passport record, all fields except `surname` and `given_names` must be translated to English before uploading to the database.\n';
     }
 
     // Vector search instructions
@@ -801,7 +802,9 @@ export class ToolOrchestrator {
       examples += '- "search for John Doe passport" → Use getPassports with surname: "DOE" and given_names: "JOHN"\n';
       examples += '- "update passport details" → Use updatePassport with id and updated fields\n';
       examples += '- "delete passport record" → Use deletePassport with id\n';
-      examples += '- "list all passports" → Use getPassports with no parameters\n\n';
+      examples += '- "list all passports" → Use listPassports without filters\n';
+      examples += '- "analyze passport image" → Use createPassport with extracted data from the image\n';
+      examples += '- "extract passport data from uploaded image" → Use createPassport with extracted data from the image\n';
 
       examples += '**CRITICAL RULES FOR PASSPORT PROCESSING**:\n';
       examples += '1. ALWAYS include ALL required fields when using createPassport: passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present (boolean), type (string)\n';
@@ -879,12 +882,12 @@ export class ToolOrchestrator {
     if (availableCategories.includes('passport')) {
       examples += '**MANDATORY EXAMPLES FOR PASSPORT QUERIES**:\n';
       examples += '- "create passport record" → Use createPassport with all required fields (passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present, type)\n';
-      examples += '- "extract passport data from document" → Use createPassport with passport information from uploaded document\n';
+      examples += '- "extract passport data from document (or image or PDF)" → Use createPassport with passport information from uploaded document\n';
       examples += '- "find passport P12345" → Use getPassports with passport_number: "P12345"\n';
       examples += '- "search for John Doe passport" → Use getPassports with surname: "DOE" and given_names: "JOHN"\n';
       examples += '- "update passport details" → Use updatePassport with id and updated fields\n';
       examples += '- "delete passport record" → Use deletePassport with id\n';
-      examples += '- "list all passports" → Use getPassports with no parameters\n\n';
+      examples += '- "list all passports" → Use listPassports and summarize the results for names, passport numbers, expiration dates grouped by nationality\n\n';
 
       examples += '**CRITICAL RULES FOR PASSPORT PROCESSING**:\n';
       examples += '1. ALWAYS include ALL required fields when using createPassport: passport_number, surname, given_names, nationality, date_of_birth, sex, place_of_birth, date_of_issue, date_of_expiry, issuing_authority, holder_signature_present (boolean), type (string)\n';
@@ -947,7 +950,7 @@ export class ToolOrchestrator {
 
       // Passport tools
       case 'createPassport':
-        return '{ passport_number: string (required), surname: string (required), given_names: string (required), nationality: string (required), date_of_birth: string (required - ISO format YYYY-MM-DD), sex: string (required), place_of_birth: string (required), date_of_issue: string (required - ISO format YYYY-MM-DD), date_of_expiry: string (required - ISO format YYYY-MM-DD), issuing_authority: string (required), holder_signature_present: boolean (required - true/false), type: string (required - e.g. "passport"), residence?: string, height_cm?: number, eye_color?: string }';
+        return '{ passport_number: string (required), surname: string (required), given_names: string (required), nationality: string (required, translated to English before submission), date_of_birth: string (required - ISO format YYYY-MM-DD), sex: string (required), place_of_birth: string (required, translated to English before submission), date_of_issue: string (required - ISO format YYYY-MM-DD), date_of_expiry: string (required - ISO format YYYY-MM-DD), issuing_authority: string (required, translated to English before submission), holder_signature_present: boolean (required - true/false), type: string (required - e.g. "passport"), residence?: string (optional, translated to English before submission), height_cm?: number, eye_color?: string (optional, translated to English before submission) }';
       case 'getPassports':
         return '{ passport_number?: string, surname?: string, given_names?: string, nationality?: string, date_of_birth?: string, sex?: string, place_of_birth?: string, date_of_issue?: string, date_of_expiry?: string, issuing_authority?: string, holder_signature_present?: boolean, residence?: string, height_cm?: number, eye_color?: string, type?: string }';
       case 'updatePassport':

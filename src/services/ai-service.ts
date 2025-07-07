@@ -1076,7 +1076,7 @@ Please create an appropriate response based on the user's request.`;
       imageData?: string;
       isImage?: boolean;
     }>,
-    model: ModelType = 'gpt-4o'
+    model: ModelType = 'gpt-4.1-mini'
   ): Promise<string> {
     try {
       if (!processedFiles || processedFiles.length === 0) {
@@ -1184,7 +1184,7 @@ Please create an appropriate response based on the user's request.`;
   async processMessageWithFiles(
     message: string,
     fileIds: string[],
-    model: ModelType = 'gpt-4o'
+    model: ModelType = 'gpt-4.1-mini'
   ): Promise<string> {
     try {
       if (!fileIds || fileIds.length === 0) {
@@ -1209,17 +1209,40 @@ Please create an appropriate response based on the user's request.`;
           (message.toLowerCase().includes('see') || message.toLowerCase().includes('show') ||
            message.toLowerCase().includes('find') || message.toLowerCase().includes('content'));
 
-        const customInstructions = isContentDescriptionQuery
-          ? "You are a document analysis expert. When asked what you see in a file, provide a detailed, comprehensive description of ALL visible content including: " +
-            "- All text, names, numbers, dates, and addresses " +
-            "- Document type, format, and structure " +
-            "- Any official markings, stamps, logos, or signatures " +
-            "- Tables, forms, or organized data " +
-            "- Images or visual elements " +
-            "- Any other notable details or information visible in the document. " +
-            "Be thorough and specific - list actual content rather than generic descriptions."
-          : "You are a helpful assistant that analyzes uploaded files and provides context-aware responses. " +
-            "Search through the file contents to find relevant information that helps answer the user's question.";
+        const isContentAuthenticityQuery = message.toLowerCase().includes('authenticity') ||
+          message.toLowerCase().includes('authentic') ||
+          message.toLowerCase().includes('real') ||
+          message.toLowerCase().includes('genuine') ||
+          message.toLowerCase().includes('verify') ||
+          message.toLowerCase().includes('legitimacy') ||
+          message.toLowerCase().includes('original') ||
+          message.toLowerCase().includes('fraud') ||
+          message.toLowerCase().includes('counterfeit') ||
+          message.toLowerCase().includes('forgery') ||
+          message.toLowerCase().includes('scam') ||
+          message.toLowerCase().includes('fraudulent') ||
+          message.toLowerCase().includes('fake');
+
+        let customInstructions = isContentDescriptionQuery
+          ? "You are a document analysis expert. When asked what you see in a file, provide a detailed, comprehensive description of ALL visible content including:\n" +
+            "- All text, names, numbers, dates, and addresses\n" +
+            "- Document type, format, and structure\n" +
+            "- Any official markings, stamps, logos, or signatures\n" +
+            "- Tables, forms, or organized data\n" +
+            "- Images or visual elements\n" +
+            "- Any other notable details or information visible in the document.\n" +
+            "Be thorough and specific - list actual content rather than generic descriptions.\n"
+          : "You are a helpful assistant that analyzes uploaded files and provides context-aware responses.\n" +
+            "Search through the file contents to find relevant information that helps answer the user's question.\n";
+
+        // add terms about document authenticity
+        if (isContentAuthenticityQuery) {
+          customInstructions += "Additionally, focus on verifying the authenticity of the document by checking for:\n" +
+            "- Watermarks or security features\n" +
+            "- Consistency of information (e.g., dates, names)\n" +
+            "- Any signs of tampering or alteration\n" +
+            "- Cross-referencing with known authentic documents\n";
+        }
 
         await fileSearchTool.initialize(fileIds, customInstructions, model);
         console.log('✅ AIService: File search tool initialized successfully');
@@ -1265,7 +1288,7 @@ Please create an appropriate response based on the user's request.`;
           response += "- Ask me to create calendar events based on the file information\n";
           response += "- Upload additional files for comparison or context\n\n";
 
-          response += `✅ Successfully analyzed ${fileCount} ${fileWord} using OpenAI Assistant API with file search.`;
+          response += `✅ Successfully analyzed ${fileCount} ${fileWord} using file search tool.`;
 
           return response;
         } else {

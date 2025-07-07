@@ -53,6 +53,7 @@ export class PassportTools {
 
   /**
    * Create a new passport record
+   * All fields except 'surname' and 'given_names' must be translated to English before storing in the database.
    */
   async createPassport(data: PassportInput): Promise<PassportToolResult> {
     try {

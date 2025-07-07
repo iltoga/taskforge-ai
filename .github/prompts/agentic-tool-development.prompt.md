@@ -224,11 +224,12 @@ describe("MyCategoryTools", () => {
 
 ## Best Practices
 
-### 1. Parameter Validation
+### 1. Parameter Validation & Data Normalization
 
 - Always use Zod schemas for parameter validation
 - Include descriptive `.describe()` calls for AI guidance
 - Handle both required and optional parameters properly
+- **For tools that store user-provided data (e.g., passport creation), ensure that all fields except for personal names (e.g., 'surname', 'given_names') are translated to English before uploading to the database.**
 
 ### 2. Error Handling
 
@@ -269,6 +270,10 @@ The passport tools serve as a good example of this pattern:
 3. **Registration**: `src/tools/register-passport-tools.ts`
 4. **Integration**: Used in `src/tools/tool-registry.ts`
 5. **Tests**: `src/__tests__/functional/passport-orchestrator.test.ts`
+
+**Special Note:**
+
+> When creating a new passport record, all fields except 'surname' and 'given_names' must be translated to English before storing in the database. This ensures data consistency and searchability. Make this requirement explicit in tool descriptions, orchestrator prompts, and test payloads.
 
 ## Common Pitfalls to Avoid
 

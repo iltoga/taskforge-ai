@@ -56,7 +56,19 @@ All tool categories now follow this pattern:
 3. **Registration**: `register-*-tools.ts` (modular registration)
 4. **Integration**: Called from `tool-registry.ts`
 
-## Future Recommendations
+
+## Special Data Normalization Requirement: Passport Creation
+
+**When creating a new passport record, all fields except 'surname' and 'given_names' must be translated to English before storing in the database.**
+
+- This requirement should be made explicit in:
+  - Tool descriptions (e.g., in `register-passport-tools.ts`)
+  - Orchestrator prompt logic (analysis instructions, tool parameter info, and examples)
+  - Test payloads for passport creation
+
+This ensures data consistency and searchability for all passport records.
+
+---
 
 ### 📋 Optional Enhancement: Knowledge Tools Integration
 While knowledge tools already use modular registration, they could be better integrated into the main registry pattern:

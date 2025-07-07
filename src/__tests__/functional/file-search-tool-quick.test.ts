@@ -69,7 +69,7 @@ describe('FileSearchTool - Quick TDD Test', () => {
     console.log('🚀 Initializing FileSearchTool...');
     await fileSearchTool.initialize([uploadedFileId],
       "You are a document analysis expert. Extract all visible data from the uploaded file and provide a comprehensive summary.",
-      'gpt-4o'
+      'gpt-4.1-mini'
     );
 
     // Step 4: Test file search with data extraction query
