@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 // removed fs and path – not needed after refactor
-import sharp from 'sharp';
+
+import { bufferToBase64ImageDataUrl } from '../lib/image-helpers';
 
 const DEFAULT_FILE_SEARCH_MODEL = process.env.OPENAI_DEFAULT_FILE_SEARCH_MODEL || 'gpt-4.1';
 
@@ -102,12 +103,10 @@ export class FileSearchTool {
     const imgParts: InputImg[] = [];
 
     const pushImg = async (buf: Buffer, mime: string) => {
-      const resized = await sharp(buf)
-        .resize({ width: 1600, withoutEnlargement: true })
-        .toBuffer();
+      const image_url = await bufferToBase64ImageDataUrl(buf, mime);
       imgParts.push({
         type: 'input_image',
-        image_url: `data:${mime};base64,${resized.toString('base64')}`,
+        image_url,
         detail: 'auto',
       });
     };

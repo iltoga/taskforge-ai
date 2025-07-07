@@ -1,4 +1,5 @@
 import { authOptions } from '@/lib/auth';
+import { bufferToBase64ImageDataUrl } from '@/lib/image-helpers';
 import { openai } from '@/lib/openai'; // singleton client
 import { PdfConverter } from '@/services/pdf-converter';
 import { lookup as mimeLookup } from 'mime-types';
@@ -103,8 +104,8 @@ export async function POST(request: NextRequest) {
           const pageFileName = `${file.name.replace(/\.pdf$/i, '')}_p${page.pageNumber}.png`;
           console.log(`📄 Encoding page ${page.pageNumber} as base64: ${pageFileName} (${page.buffer.length} bytes)`);
 
-          // Convert to base64 for vision API
-          const base64Data = page.buffer.toString('base64');
+          // Resize and convert the page buffer to base64 png data URL
+          const base64Data = await bufferToBase64ImageDataUrl(page.buffer, 'image/png');
 
           processed.push({
             fileName: pageFileName,
@@ -128,12 +129,13 @@ export async function POST(request: NextRequest) {
         );
       }
 
+
     } else if (isImage) {
       // ── Handle regular images - encode as base64 for vision instead of uploading
       console.log(`🖼️ Encoding image ${file.name} as base64 for vision`);
 
       try {
-        const base64Data = buffer.toString('base64');
+        const base64Data = await bufferToBase64ImageDataUrl(buffer, mimeType);
 
         processed.push({
           fileName: file.name,
@@ -151,23 +153,29 @@ export async function POST(request: NextRequest) {
       }
 
     } else {
-      // ── Regular non-image documents - upload to OpenAI for file search
-      try {
-        const uploadedFile = await uploadToOpenAI(openai, buffer, file, 'user_data');
+      // ── Regular non-image, non-PDF documents - upload to OpenAI for file search
+      if (mimeType === 'application/pdf' || lowerName.endsWith('.pdf')) {
+        // PDF files are already handled above (converted to images), do not upload
+        // Log that PDF files are skipped for upload since they are converted to images
+        console.log(`PDF file "${file.name}" is not uploaded directly; converted to images for vision processing.`);
+      } else {
+        try {
+          const uploadedFile = await uploadToOpenAI(openai, buffer, file, 'user_data');
 
-        processed.push({
-          fileId: uploadedFile.id,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          isImage: false,
-        });
+          processed.push({
+            fileId: uploadedFile.id,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            isImage: false,
+          });
 
-      } catch (err) {
-        console.error('File upload error:', err);
-        const msg = err instanceof Error ? err.message : 'Failed to upload';
-        return NextResponse.json({ success: false, message: msg, uploads: [] } as ApiResponse,
-                                 { status: 500 });
+        } catch (err) {
+          console.error('File upload error:', err);
+          const msg = err instanceof Error ? err.message : 'Failed to upload';
+          return NextResponse.json({ success: false, message: msg, uploads: [] } as ApiResponse,
+                                   { status: 500 });
+        }
       }
     }
 
