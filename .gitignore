@@ -45,3 +45,4 @@ settings/allowed-emails.json
 settings/client_secret_*
 settings/gptcalendarintegration*
 tmp/*
+.vscode/

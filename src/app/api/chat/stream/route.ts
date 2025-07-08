@@ -38,8 +38,8 @@ export async function POST(request: Request) {
       orchestratorModel = 'gpt-4.1-mini',
       developmentMode = false,
       calendarId = 'primary',
-      fileIds = []
-      // Note: processedFiles not yet implemented in streaming mode
+      fileIds = [],
+      processedFiles = []
     } = await request.json() as {
       message: string;
       messages?: Array<{ id: string; type: 'user' | 'assistant'; content: string; timestamp: number; }>;
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
-    const aiService = new AIService(process.env.OPENAI_API_KEY!);
+    const aiService = new AIService();
 
     // Translate message to English if needed
     console.log('🔤 Original message:', message);
@@ -118,6 +118,23 @@ export async function POST(request: Request) {
             // Register knowledge tools (including vector search) for non-calendar queries
             registerKnowledgeTools(toolRegistry);
 
+            // Build file context for orchestrator
+            const fileContext = processedFiles.length > 0
+              ? {
+                  type: "processedFiles" as const,
+                  files: processedFiles.map(f => ({
+                    fileName: f.fileName,
+                    fileContent: f.imageData ?? "", // or another property if file content is elsewhere
+                    fileSize: f.fileSize
+                  }))
+                }
+              : fileIds.length > 0
+              ? {
+                  type: "fileIds" as const,
+                  ids: fileIds
+                }
+              : undefined;
+
             // Process with streaming progress
             const result = await aiService.processMessageWithOrchestratorStreaming(
               englishMessage,
@@ -126,7 +143,8 @@ export async function POST(request: Request) {
               orchestratorModel,
               developmentMode,
               sendProgress,
-              fileIds
+              processedFiles.length > 0 ? [] : fileIds, // Only pass fileIds if no processedFiles
+              fileContext
             );
 
             // Send final result

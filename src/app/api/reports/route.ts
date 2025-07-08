@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
-    const aiService = new AIService(process.env.OPENAI_API_KEY!);
+    const aiService = new AIService();
 
     // Get work report events for the specified date range
     const events = await calendarService.getEvents(startDate, endDate, 250, undefined, false, 'startTime', undefined, calendarId);

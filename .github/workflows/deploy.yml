@@ -46,7 +46,7 @@ jobs:
 
             # Ensure remote URL is correct using the custom SSH configuration
             echo "Setting git remote URL..."
-            git remote set-url origin git@github.com-deploy-calendargpt:iltoga/calendarGPT.git
+            git remote set-url origin git@github.com-deploy-calendar-assistant:iltoga/calendar-assistant.git
 
             # Ensure we're on the main branch and clean any local changes
             echo "Fetching latest changes..."

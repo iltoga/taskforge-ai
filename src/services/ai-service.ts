@@ -1,19 +1,10 @@
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { generateTextWithProvider, type AIProviderConfig } from '@/lib/openai';
 import { readFileSync } from 'fs';
 import { compile } from 'handlebars';
 import { join } from 'path';
 import { ModelType } from '../appconfig/models';
 import { CalendarTools } from '../tools/calendar-tools';
 import { CalendarAction, CalendarEvent, SimplifiedEvent } from '../types/calendar';
-
-export type ProviderType = 'openai' | 'openrouter';
-
-export interface AIProviderConfig {
-  provider: ProviderType;
-  apiKey: string;
-  baseURL?: string;
-}
 
 export interface ExtractedEvent {
   title: string;
@@ -25,40 +16,6 @@ export interface ExtractedEvent {
 }
 
 export class AIService {
-  private apiKey: string;
-  private openaiClient: ReturnType<typeof createOpenAI>;
-  private openrouterClient?: ReturnType<typeof createOpenAI>;
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-    this.openaiClient = createOpenAI({
-      apiKey: apiKey,
-    });
-
-    // Initialize OpenRouter client if API key is available
-    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-    if (openrouterApiKey) {
-      this.openrouterClient = createOpenAI({
-        apiKey: openrouterApiKey,
-        baseURL: 'https://openrouter.ai/api/v1',
-      });
-    }
-  }
-
-  private getProviderClient(model: ModelType) {
-    // Determine provider based on model
-    if (model.includes('/') || model.includes(':')) {
-      // OpenRouter model format (e.g., "deepseek/deepseek-chat-v3-0324:free")
-      if (!this.openrouterClient) {
-        throw new Error('OpenRouter API key not configured. Please set OPENROUTER_API_KEY in your environment variables.');
-      }
-      return this.openrouterClient;
-    }
-
-    // Default to OpenAI for standard models
-    return this.openaiClient;
-  }
-
   // Limit context to prevent token overflow
   private limitEventsContext(events: CalendarEvent[], maxEvents: number = 20): CalendarEvent[] {
     // Sort by date (most recent first) and limit
@@ -155,46 +112,46 @@ export class AIService {
   async processMessage(
     message: string,
     existingEvents?: CalendarEvent[],
-    model: ModelType = 'gpt-4.1-mini'
+    model: ModelType = 'gpt-4.1-mini',
+    providerConfig?: AIProviderConfig
   ): Promise<CalendarAction> {
     const systemPrompt = this.loadSystemPrompt();
 
-    const messages = [
-      { role: 'system' as const, content: systemPrompt },
-      { role: 'user' as const, content: message }
-    ];
-
+    // Build the system message content including events if provided
+    let systemContent = systemPrompt;
     if (existingEvents && existingEvents.length > 0) {
       // Limit events to prevent token overflow
       const limitedEvents = this.limitEventsContext(existingEvents);
-      messages.push({
-        role: 'system' as const,
-        content: `Recent events for context (${limitedEvents.length} most recent): ${JSON.stringify(limitedEvents, null, 2)}`
-      });
+      systemContent += `\n\nRecent events for context (${limitedEvents.length} most recent): ${JSON.stringify(limitedEvents, null, 2)}`;
     }
 
     try {
       // Use temperature only for models that support it (some reasoning models don't support temperature)
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
-      const client = this.getProviderClient(model);
 
-      const response = await generateText({
-        model: client.languageModel(model),
-        messages,
-        ...(supportsTemperature && { temperature: 0.1 }),
-      });
+      const { text } = await generateTextWithProvider(
+        message,
+        providerConfig || { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemContent },
+            { role: 'user', content: message }
+          ],
+          temperature: supportsTemperature ? 0.1 : undefined,
+        }
+      );
 
-      const content = response.text;
-      if (!content) {
+      if (!text) {
         throw new Error('No response from AI');
       }
 
       // Debug logging to understand AI responses
       console.log('User message:', message);
-      console.log('AI response:', content);
+      console.log('AI response:', text);
 
       // Clean up the response - handle markdown code blocks
-      let cleanedContent = content.trim();
+      let cleanedContent = text.trim();
 
       // Remove markdown code block formatting if present
       const codeBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -219,8 +176,16 @@ export class AIService {
     }
   }
 
-  async generateWeeklyReport(events: CalendarEvent[], company: string, startDate: string, endDate: string, model: ModelType = 'gpt-4.1-mini', userName: string = 'User'): Promise<string> {
-    return this.generateReport(events, company, startDate, endDate, 'weekly', model, userName);
+  async generateWeeklyReport(
+    events: CalendarEvent[],
+    company: string,
+    startDate: string,
+    endDate: string,
+    model: ModelType = 'gpt-4.1-mini',
+    userName: string = 'User',
+    providerConfig?: AIProviderConfig
+  ): Promise<string> {
+    return this.generateReport(events, company, startDate, endDate, 'weekly', model, userName, providerConfig);
   }
 
   async generateReport(
@@ -230,7 +195,8 @@ export class AIService {
     endDate: string,
     reportType: 'weekly' | 'monthly' | 'quarterly',
     model: ModelType = 'gpt-4.1-mini',
-    userName: string = 'User'
+    userName: string = 'User',
+    providerConfig?: AIProviderConfig
   ): Promise<string> {
     const getSystemPrompt = (type: 'weekly' | 'monthly' | 'quarterly') => {
       const companyText = company ? ` for ${company}` : '';
@@ -357,18 +323,21 @@ Total events in period: ${events.length}
     try {
       // Use temperature only for models that support it (some reasoning models don't support temperature)
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
-      const client = this.getProviderClient(model);
 
-      const response = await generateText({
-        model: client.languageModel(model),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        ...(supportsTemperature && { temperature: 0.3 }),
-      });
+      const { text } = await generateTextWithProvider(
+        userPrompt,
+        providerConfig || { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: supportsTemperature ? 0.3 : undefined,
+        }
+      );
 
-      return response.text || '';
+      return text || '';
     } catch (error) {
       throw error;
     }
@@ -399,7 +368,7 @@ Total events in period: ${events.length}
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import('./tool-orchestrator');
 
-      const orchestrator = new ToolOrchestrator(this.apiKey);
+      const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
       // Capture progress messages
       const progressMessages: string[] = [];
@@ -422,7 +391,8 @@ Total events in period: ${events.length}
           maxToolCalls: 5,
           developmentMode
         },
-        orchestratorFileIds
+        orchestratorFileIds,
+        fileContext
       );
 
       return {
@@ -455,7 +425,12 @@ Total events in period: ${events.length}
     orchestratorModel: ModelType = 'gpt-4.1-mini',
     developmentMode: boolean = false,
     progressCallback: (data: { type: string; message?: string; [key: string]: unknown }) => void,
-    fileIds: string[] = []
+    fileIds: string[] = [],
+    fileContext?: {
+      type: 'processedFiles' | 'fileIds';
+      files?: Array<{ fileName: string; fileContent: string; fileSize: number; }>;
+      ids?: string[];
+    }
   ): Promise<{
     response: string;
     steps: unknown[];
@@ -468,7 +443,7 @@ Total events in period: ${events.length}
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import('./tool-orchestrator');
 
-      const orchestrator = new ToolOrchestrator(this.apiKey);
+      const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
       // Capture progress messages and stream them in real-time
       const progressMessages: string[] = [];
@@ -481,6 +456,11 @@ Total events in period: ${events.length}
         });
       });
 
+      // Determine which files to pass to orchestrator
+      const orchestratorFileIds = fileContext?.type === 'processedFiles'
+        ? fileContext.files?.map(f => `processed:${f.fileName}`) || []
+        : fileIds;
+
       const result = await orchestrator.orchestrate(
         message,
         chatHistory,
@@ -491,7 +471,8 @@ Total events in period: ${events.length}
           maxToolCalls: 5,
           developmentMode
         },
-        fileIds
+        orchestratorFileIds,
+        fileContext
       );
 
       return {
@@ -548,18 +529,21 @@ Return ONLY the JSON object, no other text.`;
     try {
       const model = 'gpt-4.1-mini';
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
-      const client = this.getProviderClient(model);
 
-      const response = await generateText({
-        model: client.languageModel(model),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        ...(supportsTemperature && { temperature: 0.1 }),
-      });
+      const { text } = await generateTextWithProvider(
+        message,
+        { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: message }
+          ],
+          temperature: supportsTemperature ? 0.1 : undefined,
+        }
+      );
 
-      const content = response.text.trim();
+      const content = text?.trim() || '';
 
       // Clean up the response - handle markdown code blocks
       let cleanedContent = content;
@@ -826,19 +810,23 @@ Please create an appropriate response based on the user's request.`;
     try {
       const model = 'gpt-4.1-mini';
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
-      const client = this.getProviderClient(model);
 
-      const response = await generateText({
-        model: client.languageModel(model),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        ...(supportsTemperature && { temperature: 0.3 }),
-      });
+      const { text } = await generateTextWithProvider(
+        userPrompt,
+        { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: supportsTemperature ? 0.3 : undefined,
+        }
+      );
 
-      console.log('🔧 SIMPLE MODE: AI response for summary:', response.text?.substring(0, 200) + '...');
-      return response.text || `I found ${events.length} ${contextDescription}.`;
+      const aiText = text;
+      console.log('🔧 SIMPLE MODE: AI response for summary:', aiText?.substring(0, 200) + '...');
+      return aiText || `I found ${events.length} ${contextDescription}.`;
     } catch (error) {
       console.error('Error generating event summary:', error);
       // Fallback to simple list format
@@ -984,7 +972,7 @@ Please create an appropriate response based on the user's request.`;
     };
   }
 
-  async translateToEnglish(text: string, model: ModelType = 'gpt-4.1-mini'): Promise<string> {
+  async translateToEnglish(text: string, model: ModelType = 'gpt-4.1-mini', providerConfig?: AIProviderConfig): Promise<string> {
     // If text is already in English or looks like English, don't translate
     const englishPattern = /^[a-zA-Z0-9\s.,!?'"()/-]+$/;
     if (englishPattern.test(text) && text.split(' ').length > 1) {
@@ -995,74 +983,30 @@ Please create an appropriate response based on the user's request.`;
 
     try {
       const supportsTemperature = !['o4-mini', 'o4-mini-high', 'o3', 'o3-mini'].includes(model);
-      const client = this.getProviderClient(model);
 
-      const response = await generateText({
-        model: client.languageModel(model),
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: text }
-        ],
-        ...(supportsTemperature && { temperature: 0.1 }),
-      });
+      const { text: translatedText } = await generateTextWithProvider(
+        text,
+        providerConfig || { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        {
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text }
+          ],
+          temperature: supportsTemperature ? 0.1 : undefined,
+        }
+      );
 
-      return response.text || text;
+      return translatedText || text;
     } catch (error) {
       console.error('Translation error:', error);
       return text; // Return original text on error
     }
   }
 
-  async analyzeImageForEvents(imageBase64: string, prompt: string): Promise<ExtractedEvent[]> {
-    try {
-      // Remove data URL prefix if present
-      const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-
-      const response = await generateText({
-        model: this.openaiClient.languageModel('gpt-4.1-mini'),
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: prompt
-              },
-              {
-                type: 'image',
-                image: `data:image/jpeg;base64,${base64Data}`
-              }
-            ]
-          }
-        ],
-        temperature: 0.3,
-      });
-
-      // Parse the JSON response
-      const responseText = response.text.trim();
-
-      // Try to extract JSON from the response
-      let jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        // If no array found, try to find any JSON object and wrap it
-        jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonMatch[0] = `[${jsonMatch[0]}]`;
-        }
-      }
-
-      if (!jsonMatch) {
-        console.error('No JSON found in response:', responseText);
-        return [];
-      }
-
-      const eventsData = JSON.parse(jsonMatch[0]);
-      return Array.isArray(eventsData) ? eventsData : [eventsData];
-
-    } catch (error) {
-      console.error('Vision analysis error:', error);
-      throw new Error(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  async analyzeImageForEvents(): Promise<ExtractedEvent[]> {
+    // Vision API not supported in official OpenAI Node SDK as of 2025-07
+    throw new Error('Vision/image analysis is not supported by the official OpenAI Node SDK.');
   }
 
   // Method for processing messages with embedded images and files
@@ -1093,60 +1037,36 @@ Please create an appropriate response based on the user's request.`;
 
       let response = '';
 
-      // Process images with vision API
-      if (images.length > 0) {
-        console.log('🔍 Processing images with vision API...');
+      // Process files with the new FileSearchTool API
+      if (documents.length > 0 || images.length > 0) {
+        console.log('📄 Processing files with FileSearchTool...');
 
-        // Build vision message content
-        const messageContent = [
-          {
-            type: 'text' as const,
-            text: `Please analyze the uploaded image(s) and respond to: "${message}"\n\nProvide detailed information about what you see in the images.`
-          },
-          // Add each image to the message
-          ...images.map(image => ({
-            type: 'image' as const,
-            image: `data:${image.fileType};base64,${image.imageData}`
-          }))
-        ];
-
-        const visionResponse = await generateText({
-          model: this.openaiClient.languageModel(model),
-          messages: [
-            {
-              role: 'user',
-              content: messageContent
-            }
-          ],
-          temperature: 0.3,
-        });
-
-        response += `## 📸 Image Analysis\n\n${visionResponse.text}\n\n`;
-      }
-
-      // Process documents with file search API
-      if (documents.length > 0) {
-        console.log('📄 Processing documents with file search API...');
-
-        const fileIds = documents.map(doc => doc.fileId!);
+        const documentFileIds = documents.map(doc => doc.fileId!);
+        const imageDataArray = images.map(img => ({
+          imageData: img.imageData!,
+          mimeType: img.fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
+        }));
 
         // Import FileSearchTool
         const { FileSearchTool } = await import('./file-search-tool');
 
-        // Create and initialize the file search tool
-        const fileSearchTool = new FileSearchTool(this.apiKey);
+        // Create and initialize the file search tool with provider config
+        const fileSearchTool = new FileSearchTool(
+          { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+          model
+        );
 
         try {
-          const customInstructions = "You are a document analysis expert. Analyze the uploaded documents and provide relevant information to answer the user's question.";
+          const customInstructions = "You are a document analysis expert. Analyze the uploaded documents and images and provide relevant information to answer the user's question.";
 
-          await fileSearchTool.initialize(fileIds, customInstructions, model);
+          await fileSearchTool.initializeWithFiles(documentFileIds, imageDataArray, customInstructions, model);
           const searchResults = await fileSearchTool.searchFiles(message);
 
           if (searchResults && searchResults.length > 0) {
-            response += "## 📄 Document Analysis\n\n";
+            response += "## 📄 File Analysis\n\n";
 
             searchResults.forEach((result, index) => {
-              response += `### ${result.filename ? `From ${result.filename}` : `Result ${index + 1}`}\n\n`;
+              response += `### ${result.filename ? `From ${result.filename}` : `Result ${index + 1}`} (${result.method})\n\n`;
               response += `${result.content}\n\n`;
             });
           }
@@ -1196,8 +1116,11 @@ Please create an appropriate response based on the user's request.`;
       // Import FileSearchTool
       const { FileSearchTool } = await import('./file-search-tool');
 
-      // Create and initialize the file search tool
-      const fileSearchTool = new FileSearchTool(this.apiKey);
+      // Create and initialize the file search tool with provider config
+      const fileSearchTool = new FileSearchTool(
+        { provider: 'openai', apiKey: process.env.OPENAI_API_KEY! },
+        model
+      );
 
       try {
         console.log('📋 AIService: About to initialize file search tool...');
@@ -1244,8 +1167,11 @@ Please create an appropriate response based on the user's request.`;
             "- Cross-referencing with known authentic documents\n";
         }
 
-        await fileSearchTool.initialize(fileIds, customInstructions, model);
-        console.log('✅ AIService: File search tool initialized successfully');
+        // Since we only have file IDs, we cannot determine image vs document types here
+        // All file IDs will be treated as documents for file_search
+        // For proper image/document separation, use processMessageWithEmbeddedFiles instead
+        await fileSearchTool.initializeWithFiles(fileIds, [], customInstructions, model);
+        console.log('✅ AIService: File search tool initialized successfully with document files');
 
         console.log('🔍 AIService: File search tool initialized, starting search...');
         const searchResults = await fileSearchTool.searchFiles(message);

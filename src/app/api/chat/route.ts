@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       calendarService = new CalendarService(googleAuth);
       console.log('🔐 Using user OAuth authentication for calendar operations');
     }
-    const aiService = new AIService(process.env.OPENAI_API_KEY!);
+    const aiService = new AIService();
 
     // Translate message to English if needed
     console.log('🔤 Original message:', message);
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
           toolRegistry,
           orchestratorModel,
           developmentMode,
-          fileIds, // Keep for backward compatibility
+          processedFiles.length > 0 ? [] : fileIds, // Only pass fileIds if no processedFiles
           fileContext // New parameter with file information
         );
 

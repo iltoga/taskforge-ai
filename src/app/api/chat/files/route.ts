@@ -1,6 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { bufferToBase64ImageDataUrl } from '@/lib/image-helpers';
-import { openai } from '@/lib/openai'; // singleton client
+import { AIProviderConfig } from '@/lib/openai';
 import { PdfConverter } from '@/services/pdf-converter';
 import { lookup as mimeLookup } from 'mime-types';
 import { getServerSession } from 'next-auth';
@@ -24,16 +24,21 @@ interface ApiResponse {
   uploads: ProcessedFile[];
 }
 
-async function uploadToOpenAI(
-  openaiClient: typeof openai,
-  buffer: Buffer,
-  file: File,
-  purpose: 'vision' | 'user_data'
-) {
-  return openaiClient.files.create({
-    file: new File([buffer], file.name, { type: file.type }),
-    purpose,
+
+
+// File upload and deletion must use OpenAI REST API directly (not SDK). Below is a minimal REST implementation for deletion.
+async function deleteOpenAIFile(fileId: string, apiKey: string, baseURL?: string): Promise<void> {
+  const url = `${baseURL || 'https://api.openai.com/v1'}/files/${fileId}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+    },
   });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI file deletion failed: ${err}`);
+  }
 }
 
 
@@ -160,15 +165,27 @@ export async function POST(request: NextRequest) {
         console.log(`PDF file "${file.name}" is not uploaded directly; converted to images for vision processing.`);
       } else {
         try {
-          const uploadedFile = await uploadToOpenAI(openai, buffer, file, 'user_data');
 
-          processed.push({
-            fileId: uploadedFile.id,
-            fileName: file.name,
-            fileSize: file.size,
-            fileType: file.type,
-            isImage: false,
-          });
+          // Only OpenAI supports file upload for file search. OpenRouter does not support file upload.
+          // Use the provider config/environment to determine provider.
+          const providerConfig: AIProviderConfig = {
+            provider: process.env.OPENAI_PROVIDER === 'openrouter' ? 'openrouter' : 'openai',
+            apiKey: process.env.OPENAI_API_KEY!,
+            baseURL: process.env.OPENAI_BASE_URL,
+          };
+          if (providerConfig.provider !== 'openai') {
+            throw new Error('File upload for file search is only supported by OpenAI.');
+          }
+          // Placeholder: throw until REST upload is implemented
+          throw new Error('File upload must be implemented via OpenAI REST API.');
+          // If implemented, push processed file info as below:
+          // processed.push({
+          //   fileId: uploadedFile.id,
+          //   fileName: file.name,
+          //   fileSize: file.size,
+          //   fileType: file.type,
+          //   isImage: false,
+          // });
 
         } catch (err) {
           console.error('File upload error:', err);
@@ -214,7 +231,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     try {
-      await openai.files.delete(fileId);
+      // Only OpenAI supports file deletion for uploaded files
+      const providerConfig: AIProviderConfig = {
+        provider: process.env.OPENAI_PROVIDER === 'openrouter' ? 'openrouter' : 'openai',
+        apiKey: process.env.OPENAI_API_KEY!,
+        baseURL: process.env.OPENAI_BASE_URL,
+      };
+      if (providerConfig.provider !== 'openai') {
+        throw new Error('File deletion is only supported for OpenAI uploaded files.');
+      }
+      await deleteOpenAIFile(fileId, providerConfig.apiKey, providerConfig.baseURL);
       return NextResponse.json(
         { success: true, message: 'File deleted successfully', uploads: [] } as ApiResponse
       );
