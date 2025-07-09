@@ -29,26 +29,6 @@ export function getToolParameterInfo(
     case "replyToEmail":
       return "{ emailId: string (required), replyData: { body: string (required), replyAll?: boolean } }";
 
-    /* File */
-    case "listFiles":
-      return "{ directoryPath: string (required), recursive?: boolean }";
-    case "readFile":
-      return "{ filePath: string (required) }";
-    case "writeFile":
-      return "{ filePath: string (required), content: string (required), overwrite?: boolean }";
-    case "searchFiles":
-      return '{ searchPath: string (required), filters: { name?: string, extension?: string, type?: "file" | "directory", sizeMin?: number, sizeMax?: number, maxResults?: number } }';
-
-    /* Web */
-    case "searchWeb":
-      return "{ query: string (required), filters?: { site?: string, maxResults?: number } }";
-    case "getWebPageContent":
-      return "{ url: string (required) }";
-    case "summarizeWebPage":
-      return "{ url: string (required), maxLength?: number }";
-    case "checkWebsite":
-      return "{ url: string (required) }";
-
     /* Vector search */
     case "vectorFileSearch":
       return `{ query: string (required), maxResults?: number, vectorStoreIds: [${vectorStoreIds

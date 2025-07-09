@@ -82,8 +82,8 @@ export function Chat() {
   const orchestratorModel = selectedModel;
   // useToolsMode is now initialized based on enabled tools from API
   const [useToolsMode, setUseToolsMode] = useState<boolean | null>(null);
-  // Store enabled tools object for badge rendering
-  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({});
+  // Store enabled tool categories for badge rendering
+  const [enabledTools, setEnabledTools] = useState<string[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
@@ -94,17 +94,19 @@ export function Chat() {
         const res = await fetch('/api/enabled-tools');
         if (!res.ok) throw new Error('Failed to fetch enabled tools');
         const data = await res.json();
-        // If at least one tool is enabled, set useToolsMode true
-        if (data && data.enabledTools && typeof data.enabledTools === 'object') {
-          setEnabledTools(data.enabledTools);
-          const atLeastOneEnabled = Object.values(data.enabledTools).some(Boolean);
-          setUseToolsMode(atLeastOneEnabled);
+        // API returns an array of tool definitions; extract unique categories
+        if (data && Array.isArray(data.enabledTools)) {
+          type ToolDefinition = { category: string };
+          const enabledToolsArr = data.enabledTools as ToolDefinition[];
+          const categories: string[] = Array.from(new Set(enabledToolsArr.map((t) => t.category)));
+          setEnabledTools(categories);
+          setUseToolsMode(categories.length > 0);
         } else {
-          setEnabledTools({});
+          setEnabledTools([]);
           setUseToolsMode(false);
         }
       } catch {
-        setEnabledTools({});
+        setEnabledTools([]);
         setUseToolsMode(false);
       }
     }
@@ -1135,10 +1137,7 @@ export function Chat() {
                 {useAgenticMode ? 'AGENTIC' : 'SIMPLE'}
               </span>
             </div>
-            {/* EnabledToolsBadges distributed horizontally */}
-            <div className="flex-1 flex items-center min-w-0">
-              <EnabledToolsBadges enabledTools={enabledTools} />
-            </div>
+            {/* (Removed: EnabledToolsBadges now shown below input) */}
           </div>
         </div>
 
@@ -1254,7 +1253,10 @@ export function Chat() {
           </div>
         )}
 
-        {/* ...existing code... */}
+        {/* EnabledToolsBadges now shown below the chat input */}
+        <div className="mt-4">
+          <EnabledToolsBadges enabledTools={enabledTools} />
+        </div>
       </div>
     </div>
   );

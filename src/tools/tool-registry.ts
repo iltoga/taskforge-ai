@@ -3,11 +3,9 @@ import path from "path";
 import { z } from "zod";
 import { CalendarTools } from "./calendar-tools";
 import { EmailTools } from "./email-tools";
-import { FileTools } from "./file-tools";
 import { PassportTools } from "./passport-tools";
 import { registerCalendarTools } from "./register-calendar-tools";
 import { registerEmailTools } from "./register-email-tools";
-import { registerFileTools } from "./register-file-tools";
 import { registerPassportTools } from "./register-passport-tools";
 import { registerSynthesisTools } from "./register-synthesis-tools";
 import { registerWebTools } from "./register-web-tools";
@@ -66,6 +64,7 @@ export class DefaultToolRegistry implements ToolRegistry {
   }
 
   getAvailableTools(): ToolDefinition[] {
+    // Only return tools that are actually registered (and thus enabled)
     return Array.from(this.tools.values()).map((tool) => tool.definition);
   }
 
@@ -80,6 +79,7 @@ export class DefaultToolRegistry implements ToolRegistry {
   }
 
   getAvailableCategories(): string[] {
+    // Only return categories for registered/enabled tools
     const categories = new Set<string>();
     this.tools.forEach((tool) => categories.add(tool.definition.category));
     return Array.from(categories).sort();
@@ -119,7 +119,6 @@ export function loadToolConfiguration(): { [key: string]: boolean } {
   let enabled: { [key: string]: boolean } = {
     calendar: true,
     email: false,
-    file: false,
     web: false,
     passport: false,
   };
@@ -146,7 +145,6 @@ export function loadToolConfiguration(): { [key: string]: boolean } {
 export function createToolRegistry(
   calendarTools: CalendarTools,
   emailTools?: EmailTools,
-  fileTools?: FileTools,
   webTools?: WebTools,
   passportTools?: PassportTools,
   configOverride?: { [key: string]: boolean }
@@ -156,26 +154,17 @@ export function createToolRegistry(
   // Load enabled tool categories from settings/enabled-tools.json or use override
   const enabled = configOverride || loadToolConfiguration();
 
-  // Register calendar tools if enabled
-  if (enabled.calendar !== false) {
+  // Only register tools for enabled categories
+  if (enabled.calendar) {
     registerCalendarTools(registry, calendarTools);
   }
-
-  // Register email tools if provided and enabled
-  if (emailTools && enabled.email !== false) {
+  if (emailTools && enabled.email) {
     registerEmailTools(registry, emailTools);
-  } // Register file tools if provided and enabled
-  if (fileTools && enabled.file !== false) {
-    registerFileTools(registry, fileTools);
   }
-
-  // Register web tools if provided and enabled
-  if (webTools && enabled.web !== false) {
+  if (webTools && enabled.web) {
     registerWebTools(registry, webTools);
   }
-
-  // Register passport tools if provided and enabled
-  if (passportTools && enabled.passport !== false) {
+  if (passportTools && enabled.passport) {
     registerPassportTools(registry, passportTools);
   }
 

@@ -61,12 +61,6 @@ export function generateDecisionRules(registry: ToolRegistry): string {
     );
   }
 
-  if (cat.includes("file")) {
-    rules.push(
-      `${n++}. **File-system operations** → use file tools (\`readFile\`, \`listFiles\`, …).`
-    );
-  }
-
   rules.push(
     `${n++}. If unsure which tool yields the required info, choose the **cheapest** query tool first.`,
     `${n++}. If no tool can help, reply with **SUFFICIENT_INFO** explaining why.`
@@ -87,7 +81,6 @@ export function generatePriorityOrder(registry: ToolRegistry): string {
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch"))
     parts.push(`${parts.length}. Knowledge (vectorFileSearch)`);
   if (cat.includes("passport")) parts.push(`${parts.length}. Passport`);
-  if (cat.includes("file")) parts.push(`${parts.length}. File`);
   if (cat.includes("email")) parts.push(`${parts.length}. Email`);
   if (cat.includes("web")) parts.push(`${parts.length}. Web`);
 
