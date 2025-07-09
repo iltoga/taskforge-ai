@@ -1,4 +1,4 @@
-export type ModelType = 'gpt-4.1-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash-preview-05-20:thinking' | 'google/gemini-2.5-flash-preview-05-20' | 'google/gemini-2.5-flash-lite-preview-06-17' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'deepseek/deepseek-r1-0528-qwen3-8b' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
+export type ModelType = 'gpt-4.1-mini' | 'gpt-4.1' | 'gpt-4.1-nano' | 'gpt-4o' | 'o3' | 'o3-mini' | 'o4-mini' | 'o4-mini-high' | 'google/gemini-2.0-flash-001' | 'nousresearch/hermes-2-pro-llama-3-8b' | 'google/gemini-2.5-flash' | 'google/gemini-2.5-flash-lite-preview-06-17' | 'microsoft/phi-4-reasoning-plus:free' | 'meta-llama/llama-4-maverick:free' | 'google/gemini-2.5-pro-preview' | 'deepseek/deepseek-r1-0528:free' | 'deepseek/deepseek-r1-0528-qwen3-8b' | 'anthropic/claude-sonnet-4' | 'qwen/qwen3-30b-a3b:free';
 
 export interface ModelInfo {
   id: ModelType;
@@ -49,7 +49,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
     supportsFileSearch: true
   },
   {
-    id: 'gpt-4.1-mini',
+    id: 'gpt-4o',
     name: 'GPT-4o',
     description: 'Multimodal, great for complex tasks',
     pricing: '$5/1M tokens',
@@ -125,18 +125,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, 'icon'>[] = [
     supportsFileSearch: false
   },
   {
-    id: 'google/gemini-2.5-flash-preview-05-20:thinking',
-    name: 'Gemini 2.5 Flash (Thinking)',
-    description: 'Advanced reasoning with thinking capability',
-    pricing: '$0.15/1M input, $3.50/1M output',
-    contextWindow: '1M',
-    provider: 'openrouter',
-    badge: 'Reasoning',
-    supportsAssistantAPI: false,
-    supportsFileSearch: false
-  },
-  {
-    id: 'google/gemini-2.5-flash-preview-05-20',
+    id: 'google/gemini-2.5-flash',
     name: 'Gemini 2.5 Flash',
     description: 'State-of-the-art reasoning and coding',
     pricing: '$0.15/1M tokens',

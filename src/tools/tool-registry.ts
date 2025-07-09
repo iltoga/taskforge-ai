@@ -1,16 +1,17 @@
-import fs from 'fs';
-import path from 'path';
-import { z } from 'zod';
-import { CalendarTools } from './calendar-tools';
-import { EmailTools } from './email-tools';
-import { FileTools } from './file-tools';
-import { PassportTools } from './passport-tools';
-import { registerCalendarTools } from './register-calendar-tools';
-import { registerEmailTools } from './register-email-tools';
-import { registerFileTools } from './register-file-tools';
-import { registerPassportTools } from './register-passport-tools';
-import { registerWebTools } from './register-web-tools';
-import { WebTools } from './web-tools';
+import fs from "fs";
+import path from "path";
+import { z } from "zod";
+import { CalendarTools } from "./calendar-tools";
+import { EmailTools } from "./email-tools";
+import { FileTools } from "./file-tools";
+import { PassportTools } from "./passport-tools";
+import { registerCalendarTools } from "./register-calendar-tools";
+import { registerEmailTools } from "./register-email-tools";
+import { registerFileTools } from "./register-file-tools";
+import { registerPassportTools } from "./register-passport-tools";
+import { registerSynthesisTools } from "./register-synthesis-tools";
+import { registerWebTools } from "./register-web-tools";
+import { WebTools } from "./web-tools";
 
 // Base interfaces for tools
 export interface ToolDefinition {
@@ -41,23 +42,31 @@ export interface ToolRegistry {
   registerTool(definition: ToolDefinition, executor: ToolExecutor): void;
   getAvailableTools(): ToolDefinition[];
   getToolDefinition(name: string): ToolDefinition | undefined;
-  executeTool(name: string, parameters: Record<string, unknown>): Promise<ToolResult>;
+  executeTool(
+    name: string,
+    parameters: Record<string, unknown>
+  ): Promise<ToolResult>;
   getToolsByCategory(category: string): ToolDefinition[];
   getAvailableCategories(): string[];
 }
 
-export type ToolExecutor = (parameters: Record<string, unknown>) => Promise<ToolResult>;
+export type ToolExecutor = (
+  parameters: Record<string, unknown>
+) => Promise<ToolResult>;
 
 // Implementation of the tool registry
 export class DefaultToolRegistry implements ToolRegistry {
-  private tools = new Map<string, { definition: ToolDefinition; executor: ToolExecutor }>();
+  private tools = new Map<
+    string,
+    { definition: ToolDefinition; executor: ToolExecutor }
+  >();
 
   registerTool(definition: ToolDefinition, executor: ToolExecutor): void {
     this.tools.set(definition.name, { definition, executor });
   }
 
   getAvailableTools(): ToolDefinition[] {
-    return Array.from(this.tools.values()).map(tool => tool.definition);
+    return Array.from(this.tools.values()).map((tool) => tool.definition);
   }
 
   getToolDefinition(name: string): ToolDefinition | undefined {
@@ -66,23 +75,26 @@ export class DefaultToolRegistry implements ToolRegistry {
 
   getToolsByCategory(category: string): ToolDefinition[] {
     return Array.from(this.tools.values())
-      .filter(tool => tool.definition.category === category)
-      .map(tool => tool.definition);
+      .filter((tool) => tool.definition.category === category)
+      .map((tool) => tool.definition);
   }
 
   getAvailableCategories(): string[] {
     const categories = new Set<string>();
-    this.tools.forEach(tool => categories.add(tool.definition.category));
+    this.tools.forEach((tool) => categories.add(tool.definition.category));
     return Array.from(categories).sort();
   }
 
-  async executeTool(name: string, parameters: Record<string, unknown>): Promise<ToolResult> {
+  async executeTool(
+    name: string,
+    parameters: Record<string, unknown>
+  ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {
       return {
         success: false,
         error: `Tool '${name}' not found`,
-        message: `Unknown tool: ${name}`
+        message: `Unknown tool: ${name}`,
       };
     }
 
@@ -95,8 +107,8 @@ export class DefaultToolRegistry implements ToolRegistry {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        message: `Failed to execute tool: ${name}`
+        error: error instanceof Error ? error.message : "Unknown error",
+        message: `Failed to execute tool: ${name}`,
       };
     }
   }
@@ -104,16 +116,28 @@ export class DefaultToolRegistry implements ToolRegistry {
 
 // Load tool configuration from settings
 export function loadToolConfiguration(): { [key: string]: boolean } {
-  let enabled: { [key: string]: boolean } = { calendar: true, email: false, file: false, web: false, passport: false };
+  let enabled: { [key: string]: boolean } = {
+    calendar: true,
+    email: false,
+    file: false,
+    web: false,
+    passport: false,
+  };
   try {
-    const configPath = path.resolve(process.cwd(), 'settings/enabled-tools.json');
+    const configPath = path.resolve(
+      process.cwd(),
+      "settings/enabled-tools.json"
+    );
     if (fs.existsSync(configPath)) {
-      const configContent = fs.readFileSync(configPath, 'utf-8');
+      const configContent = fs.readFileSync(configPath, "utf-8");
       enabled = JSON.parse(configContent);
     }
   } catch (err) {
     // Fallback to all enabled if config missing or invalid
-    console.warn('Could not load enabled-tools.json, defaulting to all enabled:', err);
+    console.warn(
+      "Could not load enabled-tools.json, defaulting to all enabled:",
+      err
+    );
   }
   return enabled;
 }
@@ -140,7 +164,7 @@ export function createToolRegistry(
   // Register email tools if provided and enabled
   if (emailTools && enabled.email !== false) {
     registerEmailTools(registry, emailTools);
-  }  // Register file tools if provided and enabled
+  } // Register file tools if provided and enabled
   if (fileTools && enabled.file !== false) {
     registerFileTools(registry, fileTools);
   }
@@ -155,19 +179,22 @@ export function createToolRegistry(
     registerPassportTools(registry, passportTools);
   }
 
+  // Register synthesis tools (always enabled for orchestration)
+  registerSynthesisTools(registry);
+
   return registry;
 }
 
 // Helper function to convert tool definitions to AI function call format
 export function toolDefinitionsToAIFunctions(tools: ToolDefinition[]) {
-  return tools.map(tool => ({
+  return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
     parameters: {
-      type: 'object',
+      type: "object",
       properties: zodSchemaToJsonSchema(tool.parameters),
-      required: getRequiredProperties(tool.parameters)
-    }
+      required: getRequiredProperties(tool.parameters),
+    },
   }));
 }
 
@@ -187,32 +214,32 @@ function zodSchemaToJsonSchema(schema: z.ZodSchema<any>): any {
     }
 
     return {
-      type: 'object',
-      properties
+      type: "object",
+      properties,
     };
   } else if (schema instanceof z.ZodString) {
-    return { type: 'string', description: schema.description };
+    return { type: "string", description: schema.description };
   } else if (schema instanceof z.ZodNumber) {
-    return { type: 'number', description: schema.description };
+    return { type: "number", description: schema.description };
   } else if (schema instanceof z.ZodBoolean) {
-    return { type: 'boolean', description: schema.description };
+    return { type: "boolean", description: schema.description };
   } else if (schema instanceof z.ZodArray) {
     return {
-      type: 'array',
+      type: "array",
       items: zodSchemaToJsonSchema(schema.element),
-      description: schema.description
+      description: schema.description,
     };
   } else if (schema instanceof z.ZodOptional) {
     return zodSchemaToJsonSchema(schema.unwrap());
   } else if (schema instanceof z.ZodEnum) {
     return {
-      type: 'string',
+      type: "string",
       enum: schema.options,
-      description: schema.description
+      description: schema.description,
     };
   }
 
-  return { type: 'string' }; // fallback
+  return { type: "string" }; // fallback
 }
 
 // Helper function to get required properties from Zod schema

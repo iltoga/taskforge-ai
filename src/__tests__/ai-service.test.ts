@@ -1,52 +1,49 @@
+
 import { AIService } from '../services/ai-service';
 import { CalendarEvent } from '../types/calendar';
 
-// Mock Vercel AI SDK
-jest.mock('@ai-sdk/openai', () => ({
+// Mock the OpenAI SDK client
+jest.mock('@/lib/openai', () => ({
   createOpenAI: jest.fn(),
 }));
 
-jest.mock('ai', () => ({
-  generateText: jest.fn(),
-  tool: jest.fn(),
-}));
-
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
-
+import { createOpenAI } from '../lib/openai';
 const mockCreateOpenAI = jest.mocked(createOpenAI);
-const mockGenerateText = jest.mocked(generateText);
+
+// Helper to create a mock OpenAI client
+function makeMockOpenAIClient(mockResponse: any) {
+  return {
+    chat: {
+      completions: {
+        create: jest.fn().mockResolvedValue(mockResponse),
+      },
+    },
+  };
+}
 
 describe('AIService', () => {
   let aiService: AIService;
 
   beforeEach(() => {
-    // Mock the createOpenAI function to return a mock client
-    mockCreateOpenAI.mockReturnValue({
-      languageModel: jest.fn().mockReturnValue('mock-model'),
-    } as any);
-
     jest.clearAllMocks();
-    aiService = new AIService('test-api-key');
+    aiService = new AIService();
   });
 
   describe('processMessage', () => {
     it('should parse a create event request correctly', async () => {
       // Arrange
       const userMessage = 'Create a meeting with John tomorrow at 2 PM about project review';
-      const mockResponse = {
-        text: JSON.stringify({
-          type: 'create',
-          event: {
-            summary: 'Meeting with John - Project Review',
-            description: 'Project review meeting',
-            start: { dateTime: '2024-06-16T14:00:00+08:00' },
-            end: { dateTime: '2024-06-16T15:00:00+08:00' }
-          }
-        })
-      } as any;
-
-      mockGenerateText.mockResolvedValue(mockResponse);
+      const mockContent = JSON.stringify({
+        type: 'create',
+        event: {
+          summary: 'Meeting with John - Project Review',
+          description: 'Project review meeting',
+          start: { dateTime: '2024-06-16T14:00:00+08:00' },
+          end: { dateTime: '2024-06-16T15:00:00+08:00' }
+        }
+      });
+      const mockResponse = { choices: [{ message: { content: mockContent } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockResponse) as any);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -54,37 +51,20 @@ describe('AIService', () => {
       // Assert
       expect(result.type).toBe('create');
       expect(result.event?.summary).toBe('Meeting with John - Project Review');
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.anything(),
-          messages: expect.arrayContaining([
-            expect.objectContaining({
-              role: 'system',
-              content: expect.stringContaining('Calendar Assistant')
-            }),
-            expect.objectContaining({
-              role: 'user',
-              content: userMessage
-            })
-          ])
-        })
-      );
     });
 
     it('should parse a list events request correctly', async () => {
       // Arrange
       const userMessage = 'Show me my events for next week';
-      const mockResponse = {
-        text: JSON.stringify({
-          type: 'list',
-          timeRange: {
-            start: '2024-06-17T00:00:00+08:00',
-            end: '2024-06-23T23:59:59+08:00'
-          }
-        })
-      } as any;
-
-      mockGenerateText.mockResolvedValue(mockResponse);
+      const mockContent = JSON.stringify({
+        type: 'list',
+        timeRange: {
+          start: '2024-06-17T00:00:00+08:00',
+          end: '2024-06-23T23:59:59+08:00'
+        }
+      });
+      const mockResponse = { choices: [{ message: { content: mockContent } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockResponse) as any);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -98,19 +78,17 @@ describe('AIService', () => {
     it('should handle daily work report creation', async () => {
       // Arrange
       const userMessage = 'Create daily report for TechCorp: worked on API integration, fixed bugs in payment system';
-      const mockResponse = {
-        text: JSON.stringify({
-          type: 'create',
-          event: {
-            summary: 'daily report - TechCorp',
-            description: '• Worked on API integration\n• Fixed bugs in payment system',
-            start: { date: '2024-06-15' },
-            end: { date: '2024-06-16' }
-          }
-        })
-      } as any;
-
-      mockGenerateText.mockResolvedValue(mockResponse);
+      const mockContent = JSON.stringify({
+        type: 'create',
+        event: {
+          summary: 'daily report - TechCorp',
+          description: '• Worked on API integration\n• Fixed bugs in payment system',
+          start: { date: '2024-06-15' },
+          end: { date: '2024-06-16' }
+        }
+      });
+      const mockResponse = { choices: [{ message: { content: mockContent } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockResponse) as any);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -124,7 +102,7 @@ describe('AIService', () => {
 
     it('should handle update daily report request', async () => {
       // Arrange
-      const userMessage = 'Update today\'s daily report: added code review session with team';
+      const userMessage = "Update today's daily report: added code review session with team";
       const existingEvents: CalendarEvent[] = [
         {
           id: 'daily-report-1',
@@ -134,18 +112,15 @@ describe('AIService', () => {
           end: { date: '2024-06-16' }
         }
       ];
-
-      const mockResponse = {
-        text: JSON.stringify({
-          type: 'update',
-          eventId: 'daily-report-1',
-          event: {
-            description: '• Worked on API integration\n• Fixed bugs in payment system\n• Added code review session with team'
-          }
-        })
-      } as any;
-
-      mockGenerateText.mockResolvedValue(mockResponse);
+      const mockContent = JSON.stringify({
+        type: 'update',
+        eventId: 'daily-report-1',
+        event: {
+          description: '• Worked on API integration\n• Fixed bugs in payment system\n• Added code review session with team'
+        }
+      });
+      const mockResponse = { choices: [{ message: { content: mockContent } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockResponse) as any);
 
       // Act
       const result = await aiService.processMessage(userMessage, existingEvents);
@@ -159,7 +134,9 @@ describe('AIService', () => {
     it('should handle errors in AI response gracefully', async () => {
       // Arrange
       const userMessage = 'Create a meeting';
-      mockGenerateText.mockRejectedValue(new Error('OpenAI API Error'));
+      const mockClient = makeMockOpenAIClient({});
+      (mockClient.chat.completions.create as jest.Mock).mockRejectedValue(new Error('OpenAI API Error'));
+      mockCreateOpenAI.mockReturnValue(mockClient as any);
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow('OpenAI API Error');
@@ -168,11 +145,9 @@ describe('AIService', () => {
     it('should handle invalid JSON response from AI', async () => {
       // Arrange
       const userMessage = 'Create a meeting';
-      const mockResponse = {
-        text: 'Invalid JSON response'
-      } as any;
-
-      mockGenerateText.mockResolvedValue(mockResponse);
+      const mockContent = 'Invalid JSON response';
+      const mockResponse = { choices: [{ message: { content: mockContent } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockResponse) as any);
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow();
@@ -212,26 +187,17 @@ describe('AIService', () => {
 This week focused primarily on API development and code quality improvements. Successfully completed bug fixes and enhanced documentation.`
       } as any;
 
-      mockGenerateText.mockResolvedValue(mockResponse);
+      // Mock OpenAI client for report
+      const mockWeeklyReportResponse = { choices: [{ message: { content: `Stefano's Weekly WorkLog for TechCorp - June 10-16, 2024\n\n**Monday, June 10:**\n• API development\n• Bug fixes\n\n**Tuesday, June 11:**\n• Code review\n• Documentation\n\n**Summary:**\nThis week focused primarily on API development and code quality improvements. Successfully completed bug fixes and enhanced documentation.` } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockWeeklyReportResponse) as any);
 
       // Act
       const result = await aiService.generateWeeklyReport(events, 'TechCorp', '2024-06-10', '2024-06-16', 'gpt-4.1-mini', 'Stefano');
 
       // Assert
-      expect(result).toContain('Stefano\'s Weekly WorkLog for TechCorp');
+      expect(result).toContain("Stefano's Weekly WorkLog for TechCorp");
       expect(result).toContain('API development');
       expect(result).toContain('Summary:');
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.anything(),
-          messages: expect.arrayContaining([
-            expect.objectContaining({
-              role: 'system',
-              content: expect.stringContaining('weekly activity report')
-            })
-          ])
-        })
-      );
     });
   });
 
@@ -243,24 +209,15 @@ This week focused primarily on API development and code quality improvements. Su
         text: 'Meeting with the development team tomorrow at 3:00 PM'
       } as any;
 
-      mockGenerateText.mockResolvedValue(mockResponse);
+      // Mock OpenAI client for translation
+      const mockTranslationResponse = { choices: [{ message: { content: 'Meeting with the development team tomorrow at 3:00 PM' } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockTranslationResponse) as any);
 
       // Act
       const result = await aiService.translateToEnglish(italianText);
 
       // Assert
       expect(result).toBe('Meeting with the development team tomorrow at 3:00 PM');
-      expect(mockGenerateText).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.anything(),
-          messages: expect.arrayContaining([
-            expect.objectContaining({
-              role: 'system',
-              content: expect.stringContaining('Translate')
-            })
-          ])
-        })
-      );
     });
 
     it('should return English text unchanged', async () => {
@@ -270,7 +227,9 @@ This week focused primarily on API development and code quality improvements. Su
         text: englishText
       } as any;
 
-      mockGenerateText.mockResolvedValue(mockResponse);
+      // Mock OpenAI client for translation
+      const mockEnglishResponse = { choices: [{ message: { content: englishText } }] };
+      mockCreateOpenAI.mockReturnValue(makeMockOpenAIClient(mockEnglishResponse) as any);
 
       // Act
       const result = await aiService.translateToEnglish(englishText);

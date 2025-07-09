@@ -3,9 +3,16 @@
   "compilerOptions": {
     "types": ["jest", "@testing-library/jest-dom"]
   },
+  "baseUrl": "./src",
+  "paths": {
+    "@/*": ["./*"]
+  },
   "include": [
     "src/**/*",
-    "jest.setup.js"
+    "jest.setup.js",
+    "next-env.d.ts",
+    "**/*.ts", "**/*.tsx",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

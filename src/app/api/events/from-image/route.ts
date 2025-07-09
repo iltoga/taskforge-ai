@@ -43,65 +43,11 @@ export async function POST(request: Request) {
     // Initialize services
     const googleAuth = createGoogleAuth(session.accessToken, session.refreshToken);
     const calendarService = new CalendarService(googleAuth);
-    const aiService = new AIService(process.env.OPENAI_API_KEY!);
+    const aiService = new AIService();
 
     // Create a specialized prompt for extracting calendar events from images
-    const today = new Date();
-    const todayFormatted = today.toISOString().split('T')[0];
-    const todayFull = today.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    const analysisPrompt = `You are an AI assistant that analyzes images containing notes, schedules, appointments, or any text that could be converted into calendar events.
-
-IMPORTANT: Today is ${todayFull} (${todayFormatted}).
-
-Your task:
-1. Analyze this image carefully for any dates, times, appointments, meetings, deadlines, events, or scheduled activities
-2. Extract all relevant information and return a JSON array of events with the following structure:
-   - title: Event title/description
-   - date: Date in YYYY-MM-DD format (convert relative dates based on the current date above)
-   - startTime: Time in HH:MM format (24-hour) or null for all-day events
-   - endTime: Time in HH:MM format (24-hour) or null for all-day events
-   - location: Location if mentioned, or null
-   - description: Any additional details
-
-3. Handle relative dates intelligently:
-   - "today" = ${todayFormatted}
-   - "tomorrow" = ${new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-   - "next week" = add 7 days from today
-   - "Monday", "Tuesday", etc. = find the next occurrence of that day
-   - "next Monday" = find the Monday of next week
-
-4. Be smart about interpreting handwritten notes, abbreviations, and informal language
-5. If no specific time is mentioned, set startTime and endTime to null (all-day event)
-6. Return only valid JSON array, no other text
-
-Example output:
-[
-  {
-    "title": "Doctor appointment",
-    "date": "2025-06-25",
-    "startTime": "14:30",
-    "endTime": "15:30",
-    "location": "Medical Center",
-    "description": "Annual checkup"
-  },
-  {
-    "title": "Team meeting",
-    "date": "2025-06-24",
-    "startTime": null,
-    "endTime": null,
-    "location": null,
-    "description": "Project review"
-  }
-]`;
-
     // First, use GPT-4 Vision to analyze the image and extract event data
-    const visionResponse = await aiService.analyzeImageForEvents(image, analysisPrompt);
+    const visionResponse = await aiService.analyzeImageForEvents();
 
     if (!visionResponse || !visionResponse.length) {
       return NextResponse.json({

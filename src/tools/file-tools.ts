@@ -21,7 +21,7 @@ export interface FileInfo {
 export interface FileSearchFilters {
   name?: string;
   extension?: string;
-  type?: 'file' | 'directory';
+  type?: "file" | "directory";
   sizeMin?: number;
   sizeMax?: number;
   createdAfter?: string;
@@ -31,66 +31,67 @@ export interface FileSearchFilters {
   maxResults?: number;
 }
 
-export interface FileContent {
-  content: string;
-  encoding?: 'utf8' | 'base64';
-  contentType?: string;
-}
-
 export class FileTools {
   /**
    * List files in a directory
    */
-  async listFiles(directoryPath: string, recursive?: boolean): Promise<FileToolResult> {
+  async listFiles(
+    directoryPath: string,
+    recursive?: boolean
+  ): Promise<FileToolResult> {
     try {
-      console.log('📁 Listing files in:', directoryPath, recursive ? '(recursive)' : '');
+      console.log(
+        "📁 Listing files in:",
+        directoryPath,
+        recursive ? "(recursive)" : ""
+      );
 
       // In a real implementation, this would use fs or cloud storage API
       // For now, we'll simulate the operation
       const mockFiles: FileInfo[] = [
         {
-          id: 'file_1',
-          name: 'document.pdf',
+          id: "file_1",
+          name: "document.pdf",
           path: `${directoryPath}/document.pdf`,
           size: 1024000,
-          type: 'file',
-          mimeType: 'application/pdf',
-          createdAt: '2024-06-15T10:30:00Z',
-          modifiedAt: '2024-06-15T11:00:00Z',
-          isDirectory: false
+          type: "file",
+          mimeType: "application/pdf",
+          createdAt: "2024-06-15T10:30:00Z",
+          modifiedAt: "2024-06-15T11:00:00Z",
+          isDirectory: false,
         },
         {
-          id: 'file_2',
-          name: 'project_notes.txt',
+          id: "file_2",
+          name: "project_notes.txt",
           path: `${directoryPath}/project_notes.txt`,
           size: 2048,
-          type: 'file',
-          mimeType: 'text/plain',
-          createdAt: '2024-06-14T09:00:00Z',
-          modifiedAt: '2024-06-15T10:15:00Z',
-          isDirectory: false
+          type: "file",
+          mimeType: "text/plain",
+          createdAt: "2024-06-14T09:00:00Z",
+          modifiedAt: "2024-06-15T10:15:00Z",
+          isDirectory: false,
         },
         {
-          id: 'dir_1',
-          name: 'subfolder',
+          id: "dir_1",
+          name: "subfolder",
           path: `${directoryPath}/subfolder`,
-          type: 'directory',
-          createdAt: '2024-06-10T08:00:00Z',
-          modifiedAt: '2024-06-15T09:30:00Z',
-          isDirectory: true
-        }
+          type: "directory",
+          createdAt: "2024-06-10T08:00:00Z",
+          modifiedAt: "2024-06-15T09:30:00Z",
+          isDirectory: true,
+        },
       ];
 
       return {
         success: true,
         data: mockFiles,
-        message: `Found ${mockFiles.length} items in ${directoryPath}`
+        message: `Found ${mockFiles.length} items in ${directoryPath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to list files',
-        message: 'Failed to list directory contents'
+        error: error instanceof Error ? error.message : "Failed to list files",
+        message: "Failed to list directory contents",
       };
     }
   }
@@ -100,7 +101,7 @@ export class FileTools {
    */
   async readFile(filePath: string): Promise<FileToolResult> {
     try {
-      console.log('📄 Reading file:', filePath);
+      console.log("📄 Reading file:", filePath);
 
       // In a real implementation, this would read from filesystem or cloud storage
       const mockContent = `This is the content of ${filePath}.\n\nFile created on ${new Date().toISOString()}\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit.`;
@@ -109,16 +110,16 @@ export class FileTools {
         success: true,
         data: {
           content: mockContent,
-          encoding: 'utf8',
-          size: mockContent.length
+          encoding: "utf8",
+          size: mockContent.length,
         },
-        message: `Successfully read ${filePath}`
+        message: `Successfully read ${filePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to read file',
-        message: 'Failed to read file content'
+        error: error instanceof Error ? error.message : "Failed to read file",
+        message: "Failed to read file content",
       };
     }
   }
@@ -126,12 +127,23 @@ export class FileTools {
   /**
    * Write content to a file
    */
-  async writeFile(filePath: string, content: string, overwrite?: boolean): Promise<FileToolResult> {
+  async writeFile(
+    filePath: string,
+    content: string,
+    overwrite?: boolean
+  ): Promise<FileToolResult> {
     try {
-      console.log('✏️ Writing file:', filePath, `(${content.length} chars)`, overwrite ? '(overwrite)' : '');
+      console.log(
+        "✏️ Writing file:",
+        filePath,
+        `(${content.length} chars)`,
+        overwrite ? "(overwrite)" : ""
+      );
 
       // In a real implementation, this would write to filesystem or cloud storage
-      const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const fileId = `file_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
 
       return {
         success: true,
@@ -139,15 +151,15 @@ export class FileTools {
           fileId,
           path: filePath,
           size: content.length,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        message: `Successfully wrote ${content.length} characters to ${filePath}`
+        message: `Successfully wrote ${content.length} characters to ${filePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to write file',
-        message: 'Failed to write file content'
+        error: error instanceof Error ? error.message : "Failed to write file",
+        message: "Failed to write file content",
       };
     }
   }
@@ -155,46 +167,55 @@ export class FileTools {
   /**
    * Search for files
    */
-  async searchFiles(searchPath: string, filters: FileSearchFilters): Promise<FileToolResult> {
+  async searchFiles(
+    searchPath: string,
+    filters: FileSearchFilters
+  ): Promise<FileToolResult> {
     try {
-      console.log('🔍 Searching files in:', searchPath, 'with filters:', filters);
+      console.log(
+        "🔍 Searching files in:",
+        searchPath,
+        "with filters:",
+        filters
+      );
 
       // In a real implementation, this would search the filesystem or cloud storage
       const mockResults: FileInfo[] = [
         {
-          id: 'search_1',
-          name: 'meeting_notes.txt',
+          id: "search_1",
+          name: "meeting_notes.txt",
           path: `${searchPath}/documents/meeting_notes.txt`,
           size: 1024,
-          type: 'file',
-          mimeType: 'text/plain',
-          createdAt: '2024-06-15T10:30:00Z',
-          modifiedAt: '2024-06-15T11:00:00Z',
-          isDirectory: false
+          type: "file",
+          mimeType: "text/plain",
+          createdAt: "2024-06-15T10:30:00Z",
+          modifiedAt: "2024-06-15T11:00:00Z",
+          isDirectory: false,
         },
         {
-          id: 'search_2',
-          name: 'project_plan.pdf',
+          id: "search_2",
+          name: "project_plan.pdf",
           path: `${searchPath}/projects/project_plan.pdf`,
           size: 2048000,
-          type: 'file',
-          mimeType: 'application/pdf',
-          createdAt: '2024-06-14T09:00:00Z',
-          modifiedAt: '2024-06-15T10:15:00Z',
-          isDirectory: false
-        }
+          type: "file",
+          mimeType: "application/pdf",
+          createdAt: "2024-06-14T09:00:00Z",
+          modifiedAt: "2024-06-15T10:15:00Z",
+          isDirectory: false,
+        },
       ].slice(0, filters.maxResults || 10);
 
       return {
         success: true,
         data: mockResults,
-        message: `Found ${mockResults.length} files matching your criteria`
+        message: `Found ${mockResults.length} files matching your criteria`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to search files',
-        message: 'Failed to search for files'
+        error:
+          error instanceof Error ? error.message : "Failed to search files",
+        message: "Failed to search for files",
       };
     }
   }
@@ -204,24 +225,27 @@ export class FileTools {
    */
   async createDirectory(directoryPath: string): Promise<FileToolResult> {
     try {
-      console.log('📁 Creating directory:', directoryPath);
+      console.log("📁 Creating directory:", directoryPath);
 
-      const dirId = `dir_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const dirId = `dir_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
 
       return {
         success: true,
         data: {
           dirId,
           path: directoryPath,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        message: `Successfully created directory: ${directoryPath}`
+        message: `Successfully created directory: ${directoryPath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create directory',
-        message: 'Failed to create directory'
+        error:
+          error instanceof Error ? error.message : "Failed to create directory",
+        message: "Failed to create directory",
       };
     }
   }
@@ -229,19 +253,22 @@ export class FileTools {
   /**
    * Delete a file or directory
    */
-  async deleteFile(filePath: string, recursive?: boolean): Promise<FileToolResult> {
+  async deleteFile(
+    filePath: string,
+    recursive?: boolean
+  ): Promise<FileToolResult> {
     try {
-      console.log('🗑️ Deleting:', filePath, recursive ? '(recursive)' : '');
+      console.log("🗑️ Deleting:", filePath, recursive ? "(recursive)" : "");
 
       return {
         success: true,
-        message: `Successfully deleted: ${filePath}`
+        message: `Successfully deleted: ${filePath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete file',
-        message: 'Failed to delete file or directory'
+        error: error instanceof Error ? error.message : "Failed to delete file",
+        message: "Failed to delete file or directory",
       };
     }
   }
@@ -249,11 +276,16 @@ export class FileTools {
   /**
    * Copy a file
    */
-  async copyFile(sourcePath: string, destinationPath: string): Promise<FileToolResult> {
+  async copyFile(
+    sourcePath: string,
+    destinationPath: string
+  ): Promise<FileToolResult> {
     try {
-      console.log('📋 Copying file from:', sourcePath, 'to:', destinationPath);
+      console.log("📋 Copying file from:", sourcePath, "to:", destinationPath);
 
-      const copyId = `copy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const copyId = `copy_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
 
       return {
         success: true,
@@ -261,15 +293,15 @@ export class FileTools {
           copyId,
           sourcePath,
           destinationPath,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        message: `Successfully copied ${sourcePath} to ${destinationPath}`
+        message: `Successfully copied ${sourcePath} to ${destinationPath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to copy file',
-        message: 'Failed to copy file'
+        error: error instanceof Error ? error.message : "Failed to copy file",
+        message: "Failed to copy file",
       };
     }
   }
@@ -277,11 +309,16 @@ export class FileTools {
   /**
    * Move or rename a file
    */
-  async moveFile(sourcePath: string, destinationPath: string): Promise<FileToolResult> {
+  async moveFile(
+    sourcePath: string,
+    destinationPath: string
+  ): Promise<FileToolResult> {
     try {
-      console.log('📦 Moving file from:', sourcePath, 'to:', destinationPath);
+      console.log("📦 Moving file from:", sourcePath, "to:", destinationPath);
 
-      const moveId = `move_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const moveId = `move_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
 
       return {
         success: true,
@@ -289,15 +326,15 @@ export class FileTools {
           moveId,
           sourcePath,
           destinationPath,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
-        message: `Successfully moved ${sourcePath} to ${destinationPath}`
+        message: `Successfully moved ${sourcePath} to ${destinationPath}`,
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to move file',
-        message: 'Failed to move file'
+        error: error instanceof Error ? error.message : "Failed to move file",
+        message: "Failed to move file",
       };
     }
   }

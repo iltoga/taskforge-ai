@@ -1,0 +1,178 @@
+import {
+  SynthesisToolInput,
+  SynthesisToolOutput,
+} from "@/tools/synthesis-tool-definitions";
+import { generateTextWithProvider } from "../lib/openai";
+
+export class SynthesisTools {
+  static async synthesizeFinalAnswer(
+    input: SynthesisToolInput
+  ): Promise<SynthesisToolOutput> {
+    const { userMessage, chatHistory, toolCalls, previousSteps, model } = input;
+
+    // Types for toolCalls and previousSteps
+    type ToolCall = {
+      tool: string;
+      parameters: Record<string, unknown>;
+      result: {
+        success: boolean;
+        data?: unknown;
+        error?: string;
+        message?: string;
+      };
+      startTime: number;
+      endTime: number;
+      duration: number;
+    };
+    type Step = {
+      id: string;
+      type: string;
+      content: string;
+    };
+    const toolCallsTyped = toolCalls as ToolCall[];
+    const previousStepsTyped = previousSteps as Step[];
+
+    const toolResults = toolCallsTyped
+      .map((call) => {
+        const summary = call.result.success
+          ? `✅ **${call.tool}** completed successfully`
+          : `❌ **${call.tool}** failed`;
+        const timing = ` (${call.duration}ms)`;
+        const data = call.result.data
+          ? typeof call.result.data === "object"
+            ? JSON.stringify(call.result.data, null, 2)
+            : call.result.data
+          : "No data returned";
+        return `${summary}${timing}\n**Parameters:** ${JSON.stringify(
+          call.parameters,
+          null,
+          2
+        )}\n**Result:** ${data}\n**Message:** ${
+          call.result.message || "N/A"
+        }\n${call.result.error ? `**Error:** ${call.result.error}` : ""}`;
+      })
+      .join("\n\n---\n\n");
+
+    const previousStepsContext =
+      previousStepsTyped.length > 0
+        ? `\n**Processing Steps Summary:**\n${previousStepsTyped
+            .map((step) => {
+              const content =
+                step.content.length > 150
+                  ? step.content.substring(0, 150) + "..."
+                  : step.content;
+              return `[${step.id}] ${step.type.toUpperCase()}: ${content}`;
+            })
+            .join("\n")}\n`
+        : "";
+
+    const prompt = `
+## RESPONSE SYNTHESIS TASK
+
+
+${chatHistory
+  .map(
+    (msg: { type: "user" | "assistant"; content: string }) =>
+      `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`
+  )
+  .join("\n")}
+
+**User's Original Request:** "${userMessage}"
+${previousStepsContext}
+
+**Available Data from Tools:**
+${toolResults}
+
+## SYNTHESIS REQUIREMENTS
+
+### 1. COMPREHENSIVE RESPONSE
+Create a helpful, conversational response that:
+
+### 2. MARKDOWN FORMATTING REQUIREMENTS
+
+**CRITICAL**: Your response MUST be properly formatted using Markdown syntax:
+
+**For Calendar Events and Data:**
+
+**For Structured Information:**
+
+**Example Structure:**
+## Events Summary for [Company/Project] ([Date Range])
+
+### [Event Title]
+**Date:** [Actual date from tool results]
+**Description:** [Actual description from calendar data]
+**Status:** [Actual status from tools]
+
+## Summary
+[Based only on retrieved data from tools]
+
+## Important Note
+All information above comes from actual calendar data retrieved by tools. If no relevant events were found, this will be clearly stated.
+
+### 3. RESPONSE STRUCTURE
+
+## QUALITY STANDARDS
+
+## CRITICAL RULE FOR CALENDAR ASSISTANT
+**NEVER CLAIM ACTIONS WERE COMPLETED UNLESS TOOLS WERE ACTUALLY CALLED AND SUCCEEDED**
+
+If the user requested an action (create, update, delete) but no tools were called:
+
+If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information. NEVER provide translation services - this is a calendar application.
+
+**Examples of FORBIDDEN responses when no tools were called:**
+
+**Examples of CORRECT responses when no tools were called:**
+
+Create your comprehensive, well-formatted markdown response below:
+`;
+
+    // Defensive: Only pass a valid AIProviderConfig if present
+    // Use type from openai.ts
+    function isAIProviderConfig(
+      obj: unknown
+    ): obj is import("../lib/openai").AIProviderConfig {
+      return (
+        typeof obj === "object" &&
+        obj !== null &&
+        (obj as import("../lib/openai").AIProviderConfig).provider !==
+          undefined &&
+        (obj as import("../lib/openai").AIProviderConfig).apiKey !== undefined
+      );
+    }
+    let config: import("../lib/openai").AIProviderConfig;
+    if (isAIProviderConfig(input.aiConfig)) {
+      // Normalize provider to ProviderType
+      const provider =
+        input.aiConfig.provider === "openai" ||
+        input.aiConfig.provider === "openrouter"
+          ? input.aiConfig.provider
+          : "openai";
+      config = {
+        ...input.aiConfig,
+        provider,
+      } as import("../lib/openai").AIProviderConfig;
+    } else {
+      // fallback dummy config (should not be used in production)
+      config = { provider: "openai", apiKey: "dummy" };
+    }
+    const supportsTemperature = ![
+      "o4-mini",
+      "o4-mini-high",
+      "o3",
+      "o3-mini",
+    ].includes(model);
+
+    const response = await generateTextWithProvider(prompt, config, {
+      model,
+      ...(supportsTemperature && { temperature: 0.3 }),
+    });
+
+    return {
+      content: response?.text || "No response text available",
+      reasoning:
+        "Comprehensive synthesis of all gathered information into a user-friendly response",
+    };
+  }
+}

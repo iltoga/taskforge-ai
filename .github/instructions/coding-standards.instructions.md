@@ -87,7 +87,7 @@ a. **Analyze & Clarify:**
 
 b. **Plan Ahead:**
 
-    - Before writing any code, present a concise, step-by-step implementation plan.
+    - Before writing any code, present a concise, step-by-step implementation plan (each step should be numbered and structured as: `<step_number.><step_heading>\n<step_description (with context and bullet points)>`).
     - Mention which files you will create or modify.
     - **Identify if any documentation in the `docs/` folder or prompts in `.github/prompts/` need updating as part of your plan.**
     - Use your web search tool to find up-to-date information on any libraries or APIs involved.
@@ -95,7 +95,7 @@ b. **Plan Ahead:**
 
 c. **Execute Step-by-Step:**
 
-    - Implement the plan one step at a time.
+    - Implement the plan one step at a time (if applicable, add in the step to `use web search to find <relevant information> or <related documentation> or <code examples>`).
     - After each significant code generation, briefly state what you did and what the next step is.
     - Always reference the existing code and the project's instructions to ensure consistency.
     - **After applying changes, check the `#problems` panel to ensure no new errors or warnings were introduced.**

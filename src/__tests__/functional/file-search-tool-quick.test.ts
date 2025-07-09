@@ -15,7 +15,7 @@ describe('FileSearchTool - Quick TDD Test', () => {
     }
 
     fileSearchTool = new FileSearchTool(apiKey);
-    openai = new OpenAI({ apiKey });
+    openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
   });
 
   afterAll(async () => {

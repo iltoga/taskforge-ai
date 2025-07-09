@@ -15,7 +15,7 @@ describe('FileSearchTool - Simple Test', () => {
       throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
     fileSearchTool = new FileSearchTool(process.env.OPENAI_API_KEY);
 
     if (!fs.existsSync(testFilePath)) {
