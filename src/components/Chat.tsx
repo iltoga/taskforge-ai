@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import { ModelType, supportsFileSearch } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ModelSelector } from './ModelSelector';
+import { EnabledToolsBadges } from './EnabledToolsBadges';
 
 interface ChatMessage {
   id: string;
@@ -79,9 +80,36 @@ export function Chat() {
 
   // Always use the same model for orchestrator as for chat
   const orchestratorModel = selectedModel;
-  const [useToolsMode, setUseToolsMode] = useState(true); // Default to ON for calendar access
+  // useToolsMode is now initialized based on enabled tools from API
+  const [useToolsMode, setUseToolsMode] = useState<boolean | null>(null);
+  // Store enabled tools object for badge rendering
+  const [enabledTools, setEnabledTools] = useState<Record<string, boolean>>({});
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
+
+  // Fetch enabled tools on mount and set useToolsMode accordingly
+  useEffect(() => {
+    async function fetchEnabledTools() {
+      try {
+        const res = await fetch('/api/enabled-tools');
+        if (!res.ok) throw new Error('Failed to fetch enabled tools');
+        const data = await res.json();
+        // If at least one tool is enabled, set useToolsMode true
+        if (data && data.enabledTools && typeof data.enabledTools === 'object') {
+          setEnabledTools(data.enabledTools);
+          const atLeastOneEnabled = Object.values(data.enabledTools).some(Boolean);
+          setUseToolsMode(atLeastOneEnabled);
+        } else {
+          setEnabledTools({});
+          setUseToolsMode(false);
+        }
+      } catch {
+        setEnabledTools({});
+        setUseToolsMode(false);
+      }
+    }
+    fetchEnabledTools();
+  }, []);
 
   // Initialize agentic mode from localStorage or default to FALSE (SIMPLE mode)
   const [useAgenticMode, setUseAgenticMode] = useState(() => {
@@ -668,7 +696,8 @@ export function Chat() {
     }
   };
 
-  if (status === 'loading') {
+
+  if (status === 'loading' || useToolsMode === null) {
     return (
       <div className="flex items-center justify-center h-64">
         <span className="loading loading-spinner loading-lg"></span>
@@ -687,9 +716,8 @@ export function Chat() {
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
-      {/* Top bar with Clear Chat button */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="text-lg font-semibold text-high-contrast"></div>
+      {/* Top bar with Clear Chat button only */}
+      <div className="flex items-center justify-end px-4 pt-4 pb-2">
         <button
           type="button"
           onClick={clearChat}
@@ -1093,41 +1121,24 @@ export function Chat() {
           </div>
 
           {/* Mode Controls */}
-          <div className="flex flex-col gap-3 md:col-span-2">
-            {/* Tool Mode Toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-base-content/70">Calendar Tools:</span>
+          <div className="flex items-center gap-8 md:col-span-2 w-full">
+            {/* Agentic Mode Toggle */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-sm text-base-content/70">AI Mode:</span>
               <input
                 type="checkbox"
-                className="toggle toggle-primary toggle-sm"
-                checked={useToolsMode}
-                onChange={(e) => {
-                  setUseToolsMode(e.target.checked);
-                  if (!e.target.checked) {
-                    setUseAgenticMode(false); // Disable agentic mode if tools are disabled
-                  }
-                }}
+                className="toggle toggle-accent toggle-sm"
+                checked={useAgenticMode}
+                onChange={(e) => setUseAgenticMode(e.target.checked)}
               />
-              <span className={`text-xs ${useToolsMode ? 'text-success' : 'text-warning'}`}>
-                {useToolsMode ? 'CALENDAR ACCESS' : 'NO CALENDAR'}
+              <span className={`text-xs ${useAgenticMode ? 'text-accent' : 'text-base-content/50'}`}>
+                {useAgenticMode ? 'AGENTIC' : 'SIMPLE'}
               </span>
             </div>
-
-            {/* Agentic Mode Toggle (only shown when tools are enabled) */}
-            {useToolsMode && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-base-content/70">AI Mode:</span>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-accent toggle-sm"
-                  checked={useAgenticMode}
-                  onChange={(e) => setUseAgenticMode(e.target.checked)}
-                />
-                <span className={`text-xs ${useAgenticMode ? 'text-accent' : 'text-base-content/50'}`}>
-                  {useAgenticMode ? 'AGENTIC' : 'SIMPLE'}
-                </span>
-              </div>
-            )}
+            {/* EnabledToolsBadges distributed horizontally */}
+            <div className="flex-1 flex items-center min-w-0">
+              <EnabledToolsBadges enabledTools={enabledTools} />
+            </div>
           </div>
         </div>
 
@@ -1242,6 +1253,8 @@ export function Chat() {
             💡 This model supports file search - upload documents to add context to your conversations
           </div>
         )}
+
+        {/* ...existing code... */}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { AllowedEmailsConfig } from './email-filter';
+import { AllowedEmailsConfig } from '../../appconfig/email-filter';
 
 /**
  * Utility to manage allowed emails configuration
@@ -9,7 +9,7 @@ export class EmailFilterManager {
   private configPath: string;
 
   constructor() {
-    this.configPath = path.join(process.cwd(), 'config', 'allowed-emails.json');
+    this.configPath = path.join(process.cwd(), 'settings', 'allowed-emails.json');
   }
 
   /**

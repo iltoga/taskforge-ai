@@ -9,14 +9,14 @@
 import fs from 'fs';
 import path from 'path';
 import { isEmailAllowed, loadAllowedEmails } from '../appconfig/email-filter';
-import { EmailFilterManager } from '../appconfig/email-filter-manager';
+import { EmailFilterManager } from './helpers/email-filter-manager';
 
 // Mock file system for testing
 jest.mock('fs');
 const mockFs = fs as jest.Mocked<typeof fs>;
 
 describe('Email Filtering', () => {
-  const testConfigPath = path.join(process.cwd(), 'config', 'allowed-emails.json');
+  const testConfigPath = path.join(process.cwd(), 'settings-test', 'allowed-emails.json');
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -119,12 +119,12 @@ describe('Email Filtering', () => {
         mockFs.existsSync.mockReturnValue(false);
         mockFs.writeFileSync.mockImplementation(() => {});
 
-        const result = manager.addEmail('new@gmail.com');
+        const result = manager.addEmail('example@example.com');
 
         expect(result).toBe(true);
         expect(mockFs.writeFileSync).toHaveBeenCalledWith(
           expect.stringContaining('allowed-emails.json'),
-          JSON.stringify({ allowedEmails: ['new@gmail.com'] }, null, 2)
+          JSON.stringify({ allowedEmails: ['example@example.com'] }, null, 2)
         );
       });
 
@@ -135,12 +135,12 @@ describe('Email Filtering', () => {
         mockFs.readFileSync.mockReturnValue(JSON.stringify(existingConfig));
         mockFs.writeFileSync.mockImplementation(() => {});
 
-        const result = manager.addEmail('new@gmail.com');
+        const result = manager.addEmail('example@example.com');
 
         expect(result).toBe(true);
         expect(mockFs.writeFileSync).toHaveBeenCalledWith(
           expect.stringContaining('allowed-emails.json'),
-          JSON.stringify({ allowedEmails: ['existing@gmail.com', 'new@gmail.com'] }, null, 2)
+          JSON.stringify({ allowedEmails: ['existing@gmail.com', 'example@example.com'] }, null, 2)
         );
       });
 

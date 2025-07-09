@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-const configPath = join(process.cwd(), 'config', 'allowed-emails.json');
+const configPath = join(process.cwd(), 'settings', 'allowed-emails.json');
 
 function loadConfig() {
   if (!existsSync(configPath)) {

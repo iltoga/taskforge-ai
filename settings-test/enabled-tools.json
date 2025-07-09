@@ -1,7 +1,7 @@
 {
   "calendar": true,
   "email": false,
-  "file": true,
+  "file": false,
   "web": false,
   "passport": true
 }

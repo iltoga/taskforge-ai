@@ -106,6 +106,8 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/prompts ./prompts
 COPY --from=builder /app/settings ./settings
+# create tmp_data directory for file uploads if it doesn't exist
+RUN mkdir -p /app/tmp_data && chown nextjs:nodejs /app/tmp_data
 
 
 # Create .next directory and set permissions
