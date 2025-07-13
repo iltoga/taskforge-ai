@@ -26,7 +26,7 @@ const mockWebTools = {
 } as unknown as WebTools;
 
 describe("Tool Configuration Integration", () => {
-  it("should respect the current enabled-tools.json configuration", () => {
+  it("should respect the current enabled-tools-categories.json configuration", () => {
     // Create registry with all possible tools
     const registry = createToolRegistry(
       mockCalendarTools,

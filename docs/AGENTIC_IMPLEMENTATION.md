@@ -120,8 +120,8 @@ registry.registerTool({
 // Future File Tools
 registry.registerTool({
   name: 'searchFiles',
-  description: 'Search files in cloud storage',
-  parameters: FileSearchSchema,
+  description: 'Search uploaded files against a query and images using LLM',
+  parameters: SearchFilesSchema,
   category: 'file'
 }, fileExecutor);
 ```

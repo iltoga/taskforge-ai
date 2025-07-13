@@ -1,8 +1,8 @@
 import { MODEL_CONFIGS, ModelType } from "@/appconfig/models";
 import { openai as legacyOpenai } from "@/services/_openai-client";
-import { z } from "zod";
-import path from "path";
 import fs from "fs/promises";
+import path from "path";
+import { z } from "zod";
 
 const FILE_UPLOAD_DIR = process.env.FILE_UPLOAD_DIR || "/app/tmp_data";
 // Minimal valid tool object for OpenAI file_search tool (for Vercel AI SDK ToolSet)
@@ -135,8 +135,8 @@ export function getProviderConfigByModel(
  * @param options - { images, fileIds, model, ... }
  */
 export interface ImageInput {
-  imageData: string;
-  mimeType: string;
+  imageData: string; // Base64 data URL (e.g., "data:image/png;base64,...")
+  mimeType?: string; // Optional MIME type (e.g., "image/png")
 }
 
 import type { ToolSet } from "ai";
@@ -146,6 +146,7 @@ export interface GenerateTextOptions {
   fileIds?: string[];
   model?: string;
   tools?: ToolSet;
+  enableFileSearch?: boolean; // Flag to control automatic file_search tool addition
   [key: string]: unknown;
 }
 
@@ -159,7 +160,14 @@ export async function generateTextWithProvider(
   config: AIProviderConfig,
   options: GenerateTextOptions = {}
 ): Promise<GenerateTextResult> {
-  const { images, fileIds, tools, model: modelName, ...rest } = options;
+  const {
+    images,
+    fileIds,
+    tools,
+    model: modelName,
+    enableFileSearch = true,
+    ...rest
+  } = options;
   let model: ModelType = modelName as ModelType;
 
   // Build messages array for text, images, and files
@@ -214,7 +222,12 @@ export async function generateTextWithProvider(
 
   // For file search, add the file_search tool (as a string identifier) and pass file_ids in the request body
   let finalTools = tools;
-  if (config.provider === "openai" && fileIds && fileIds.length) {
+  if (
+    config.provider === "openai" &&
+    fileIds &&
+    fileIds.length &&
+    enableFileSearch
+  ) {
     // Check if we have a vector store ID (starts with 'vs_')
     const hasVectorStore = fileIds.some((id) => id.startsWith("vs_"));
     if (hasVectorStore) {
@@ -230,6 +243,14 @@ export async function generateTextWithProvider(
     }
     // Use a minimal valid tool object for file_search
     finalTools = { ...(tools || {}), file_search: fileSearchTool };
+  } else if (
+    config.provider === "openai" &&
+    fileIds &&
+    fileIds.length &&
+    !enableFileSearch
+  ) {
+    // Just pass file IDs for context without enabling the file_search tool
+    rest.file_ids = fileIds;
   }
 
   // Build the argument object for generateText
@@ -348,4 +369,76 @@ export function getProviderByModel(model: ModelType): "openai" | "openrouter" {
   const config = MODEL_CONFIGS.find((m) => m.id === model);
   if (!config) throw new Error(`Unknown model: ${model}`);
   return config.provider;
+}
+
+// -------------------------------
+// Document categorization via LLM
+// -------------------------------
+
+/**
+ * Exactly one of `text` or `images` **must** be provided.
+ */
+export type CategorizeInput =
+  | { text: string; images?: never }
+  | { text?: never; images: string[] };
+
+/**
+ * Categorize a document (plain text OR array of base-64 “data:image/...;base64,” URLs) using an LLM.
+ * If `opts.model` is omitted, the function falls back to:
+ *   1. process.env.OPENAI_DEFAULT_CATEGORIZATION_MODEL
+ *   2. process.env.OPENAI_DEFAULT_MODEL
+ *   3. "gpt-4.1-mini"
+ */
+export async function categorizeDocument(
+  input: CategorizeInput,
+  opts: { model?: ModelType } = {}
+): Promise<string> {
+  const model: ModelType = (opts.model ||
+    (process.env.OPENAI_DEFAULT_CATEGORIZATION_MODEL as ModelType) ||
+    (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+    "gpt-4.1-mini") as ModelType;
+
+  const providerConfig = getProviderConfigByModel(model);
+  const categories = await readDocumentCategories();
+
+  const promptHeader =
+    `You are a document-categorization assistant.\n` +
+    `Choose **exactly one** of the following categories for the given document:\n` +
+    `${categories.join(", ")}\n` +
+    `If none apply, answer "uncategorized".`;
+
+  let userPrompt = "";
+  let imagesPayload: ImageInput[] | undefined;
+
+  if ("text" in input) {
+    userPrompt = `${promptHeader}\n\nDocument:\n${input.text}`;
+  } else {
+    userPrompt = `${promptHeader}\n\nThe document is provided as images below.`;
+    imagesPayload = input.images.map((dataUrl) => {
+      const mimeMatch = dataUrl.match(/^data:(.+?);base64,/);
+      return {
+        imageData: dataUrl,
+        mimeType: mimeMatch ? mimeMatch[1] : "image/png",
+      };
+    });
+  }
+
+  const { text: llmReply } = await generateTextWithProvider(
+    userPrompt,
+    providerConfig,
+    { model, images: imagesPayload }
+  );
+
+  const normalized = llmReply.trim().toLowerCase();
+  const match = categories.find((c) => normalized.includes(c.toLowerCase()));
+  return match || "uncategorized";
+}
+
+// function to read all categories from #environment
+async function readDocumentCategories(): Promise<string[]> {
+  const categories = await fs.readFile(
+    path.resolve(process.cwd(), "settings/document-categories.json"),
+    "utf-8"
+  );
+  return JSON.parse(categories).categories;
 }

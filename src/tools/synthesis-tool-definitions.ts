@@ -22,6 +22,25 @@ export const SynthesisToolInputSchema = z.object({
     .unknown()
     .optional()
     .describe("Optional AI config for the provider."),
+  validationFeedback: z
+    .string()
+    .optional()
+    .describe("Optional validation feedback to address in the synthesis."),
+  enhancedContext: z
+    .string()
+    .optional()
+    .describe(
+      "Enhanced context string with formatted tool outputs for better LLM consumption."
+    ),
+  conversationHistory: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string(),
+      })
+    )
+    .optional()
+    .describe("Internal conversation history including tool outputs."),
 });
 
 export type SynthesisToolInput = z.infer<typeof SynthesisToolInputSchema>;

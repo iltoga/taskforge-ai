@@ -3,9 +3,11 @@ import path from "path";
 import { z } from "zod";
 import { CalendarTools } from "./calendar-tools";
 import { EmailTools } from "./email-tools";
+import { FileSearchTools } from "./file-search-tools";
 import { PassportTools } from "./passport-tools";
 import { registerCalendarTools } from "./register-calendar-tools";
 import { registerEmailTools } from "./register-email-tools";
+import { registerFileSearchTools } from "./register-file-search-tools";
 import { registerPassportTools } from "./register-passport-tools";
 import { registerSynthesisTools } from "./register-synthesis-tools";
 import { registerWebTools } from "./register-web-tools";
@@ -121,11 +123,12 @@ export function loadToolConfiguration(): { [key: string]: boolean } {
     email: false,
     web: false,
     passport: false,
+    "file-search": false,
   };
   try {
     const configPath = path.resolve(
       process.cwd(),
-      "settings/enabled-tools.json"
+      "settings/enabled-tools-categories.json"
     );
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, "utf-8");
@@ -134,7 +137,7 @@ export function loadToolConfiguration(): { [key: string]: boolean } {
   } catch (err) {
     // Fallback to all enabled if config missing or invalid
     console.warn(
-      "Could not load enabled-tools.json, defaulting to all enabled:",
+      "Could not load enabled-tools-categories.json, defaulting to all enabled:",
       err
     );
   }
@@ -147,11 +150,12 @@ export function createToolRegistry(
   emailTools?: EmailTools,
   webTools?: WebTools,
   passportTools?: PassportTools,
+  fileSearchTools?: FileSearchTools,
   configOverride?: { [key: string]: boolean }
 ): ToolRegistry {
   const registry = new DefaultToolRegistry();
 
-  // Load enabled tool categories from settings/enabled-tools.json or use override
+  // Load enabled tool categories from settings/enabled-tools-categories.json or use override
   const enabled = configOverride || loadToolConfiguration();
 
   // Only register tools for enabled categories
@@ -166,6 +170,9 @@ export function createToolRegistry(
   }
   if (passportTools && enabled.passport) {
     registerPassportTools(registry, passportTools);
+  }
+  if (fileSearchTools && enabled["file-search"]) {
+    registerFileSearchTools(registry, fileSearchTools);
   }
 
   // Register synthesis tools (always enabled for orchestration)
@@ -215,11 +222,13 @@ function zodSchemaToJsonSchema(schema: z.ZodSchema<any>): any {
   } else if (schema instanceof z.ZodArray) {
     return {
       type: "array",
-      items: zodSchemaToJsonSchema(schema.element),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      items: zodSchemaToJsonSchema(schema.element as z.ZodType<any, any, any>),
       description: schema.description,
     };
   } else if (schema instanceof z.ZodOptional) {
-    return zodSchemaToJsonSchema(schema.unwrap());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return zodSchemaToJsonSchema(schema.unwrap() as z.ZodType<any, any, any>);
   } else if (schema instanceof z.ZodEnum) {
     return {
       type: "string",

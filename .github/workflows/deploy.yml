@@ -89,6 +89,10 @@ jobs:
               exit 1
             fi
 
+            # Build the db container
+            echo "Building db container..."
+            docker compose build --build-arg DB_USER="$DB_USER" --build-arg DB_PASS="$DB_PASS" --build-arg DB_PATH="$DB_PATH" db
+
             # Build with cache optimization and git commit for cache busting
             echo "Building Docker image with smart caching..."
             docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-assistant
@@ -98,7 +102,7 @@ jobs:
 
             echo "Starting new container..."
             docker compose down
-            docker compose up -d calendar-assistant
+            docker compose up -d --remove-orphans
 
             # Verify deployment
             echo "Verifying deployment..."

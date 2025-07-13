@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { CalendarService } from "@/services/calendar-service";
 import { createGoogleAuthWithFallback } from "@/lib/auth";
+import { CalendarService } from "@/services/calendar-service";
 import { CalendarTools } from "@/tools/calendar-tools";
 import { EmailTools } from "@/tools/email-tools";
-import { WebTools } from "@/tools/web-tools";
+import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
+import { WebTools } from "@/tools/web-tools";
 
 export async function GET() {
   try {
@@ -21,13 +22,15 @@ export async function GET() {
     const emailTools = new EmailTools();
     const webTools = new WebTools();
     const passportTools = new PassportTools();
+    const fileSearchTools = new FileSearchTools();
 
     // Only enabled tools will be registered
     const registry = createToolRegistry(
       calendarTools,
       emailTools,
       webTools,
-      passportTools
+      passportTools,
+      fileSearchTools
     );
     const enabledTools = registry.getAvailableTools();
     return NextResponse.json({ enabledTools });

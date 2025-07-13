@@ -3,28 +3,48 @@
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+model Document {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique @db.VarChar(128)
+  size       Int
+  extension  String   @db.VarChar(16)
+  fileType   String   @db.VarChar(32) // e.g. image, document, other
+  mimeType   String   @db.VarChar(64)
+  data       Bytes
+  rawOcrText String?  @db.Text // Text extracted via OCR
+  rawLlmText String?  @db.Text // Text extracted via LLM
+  category   String?  @db.VarChar(64)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  passport   Passport?
 }
 
 model Passport {
-  id                      Int     @id @default(autoincrement())
-  passport_number         String  @db.VarChar(32)
-  surname                 String  @db.VarChar(64)
-  given_names             String  @db.VarChar(64)
-  nationality             String  @db.VarChar(64)
+  id                      Int      @id @default(autoincrement())
+  passport_number         String   @db.VarChar(32)
+  surname                 String   @db.Citext
+  given_names             String   @db.Citext
+  nationality             String   @db.VarChar(64)
   date_of_birth           DateTime
-  sex                     String  @db.Char(1)
-  place_of_birth          String  @db.VarChar(128)
+  sex                     String   @db.Char(1)
+  place_of_birth          String   @db.VarChar(128)
   date_of_issue           DateTime
   date_of_expiry          DateTime
-  issuing_authority       String  @db.VarChar(128)
+  issuing_authority       String   @db.VarChar(128)
   holder_signature_present Boolean
-  residence               String? @db.VarChar(128)
+  residence               String?  @db.VarChar(128)
   height_cm               Int?
-  eye_color               String? @db.VarChar(32)
-  type                    String  @db.VarChar(64)
+  eye_color               String?  @db.VarChar(32)
+  type                    String   @db.VarChar(64)
+  documentId              Int?     @unique
+  document                Document? @relation(fields: [documentId], references: [id])
 }

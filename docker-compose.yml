@@ -1,5 +1,25 @@
 services:
+    db:
+        container_name: postgres-srv
+        image: postgres:16
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER:  ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASS}
+            POSTGRES_DB: calendar_assistant
+        networks:
+            - dockernet
+        volumes:
+            - type: bind
+              source: ${DB_PATH}
+              target: /var/lib/postgresql/data
+              bind:
+                propagation: rslave
+            - ./docker/db-init:/docker-entrypoint-initdb.d
     calendar-assistant:
+        depends_on:
+            - db
+        container_name: calendar-assistant
         build:
             context: .
             dockerfile: Dockerfile
@@ -9,7 +29,6 @@ services:
                 - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://calendar-assistant.revisbali.com}
                 - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
                 - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-unknown}
-        container_name: calendar-assistant
         restart: unless-stopped
         ports:
             - '3000:3000'
