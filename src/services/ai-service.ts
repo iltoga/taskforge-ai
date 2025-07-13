@@ -6,8 +6,8 @@ import {
   CalendarEvent,
   SimplifiedEvent,
 } from "@/types/calendar";
-import { ChatHistory } from "../types/chat";
-import { ProcessedFile } from "../types/files";
+import { ChatHistory } from "@/types/chat";
+import { ProcessedFile } from "@/types/files";
 
 import { loadAgenticPrompt, loadSystemPrompt } from "@/services/prompt-loader";
 import {
@@ -176,7 +176,7 @@ export class AIService {
   }> {
     try {
       // Dynamic import to avoid circular dependencies
-      const { ToolOrchestrator } = await import("./tool-orchestrator/core");
+      const { ToolOrchestrator } = await import("@/services/orchestrator/core");
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -248,7 +248,7 @@ export class AIService {
   }> {
     try {
       // Dynamic import to avoid circular dependencies
-      const { ToolOrchestrator } = await import("./tool-orchestrator/core");
+      const { ToolOrchestrator } = await import("@/services/orchestrator/core");
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -823,16 +823,22 @@ Please create an appropriate response based on the user's request.`;
       const imageFiles = processedFiles.filter((file) => file.isImage !== null);
 
       const docFiles = processedFiles.filter((file) => !file.isImage !== null);
+      // docs to be processed as images
+      const docsToProcessAsImages = docFiles.filter(
+        (file) => file.processAsImage
+      );
       console.log(
-        `🗃️ Processing message with ${imageFiles.length} image files and ${docFiles.length} document files:`,
-        { imageFiles, docFiles }
+        `🗃️ Processing message with ${imageFiles.length} image files, ${docFiles.length} document files, and ${docsToProcessAsImages.length} documents to be processed as images:`,
+        { imageFiles, docFiles, docsToProcessAsImages }
       );
 
       // Import FileSearchTool
-      const { FileSearchTool } = await import("@/services/file-search-tool");
+      const { FileSearchService } = await import(
+        "@/services/file-search-service"
+      );
 
       // Create and initialize the file search tool with provider config
-      const fileSearchTool = new FileSearchTool(model);
+      const fileSearchService = new FileSearchService(model);
 
       try {
         console.log("📋 AIService: About to initialize file search tool...");
@@ -886,7 +892,7 @@ Please create an appropriate response based on the user's request.`;
         // Since we only have file IDs, we cannot determine image vs document types here
         // All file IDs will be treated as documents for file_search
         // For proper image/document separation, use processMessageWithEmbeddedFiles instead
-        await fileSearchTool.initialize(
+        await fileSearchService.initialize(
           customInstructions,
           model,
           processedFiles
@@ -898,18 +904,17 @@ Please create an appropriate response based on the user's request.`;
         console.log(
           "🔍 AIService: File search tool initialized, starting search..."
         );
-        const searchResults = await fileSearchTool.searchFiles(message);
+        const searchResult = await fileSearchService.searchFiles(message);
         console.log("🔍 AIService: Search completed, processing results...");
 
         console.log("📊 Search results received:", {
-          resultsCount: searchResults?.length || 0,
-          hasResults: !!(searchResults && searchResults.length > 0),
+          hasResults: !!(searchResult && searchResult.content.length > 0),
           firstResultPreview:
-            searchResults?.[0]?.content?.substring(0, 200) || "No content",
+            searchResult?.content?.[0]?.substring(0, 200) || "No content",
         });
 
         // CRITICAL: Check if file search actually worked
-        if (!searchResults || searchResults.length === 0) {
+        if (!searchResult || searchResult.content.length === 0) {
           console.error(
             "❌ CRITICAL ERROR: File search returned no results - this indicates a failure in processing"
           );
@@ -918,7 +923,7 @@ Please create an appropriate response based on the user's request.`;
           );
         }
 
-        if (searchResults && searchResults.length > 0) {
+        if (searchResult && searchResult.content.length > 0) {
           const fileCount = processedFiles.length;
           const fileWord = fileCount === 1 ? "file" : "files";
 
@@ -927,20 +932,16 @@ Please create an appropriate response based on the user's request.`;
 
           response += "## 📄 Analysis Results\n\n";
 
-          searchResults.forEach((result, index) => {
-            response += `### ${
-              result.filename
-                ? `From ${result.filename}`
-                : `Result ${index + 1}`
-            }\n\n`;
-            response += `${result.content}\n\n`;
+          response += `### From ${searchResult.filename}\n`;
+          response += `${searchResult.content}\n`;
+          // add a separator for clarity
+          response += "---\n";
 
-            if (result.relevance && result.relevance < 1.0) {
-              response += `*Relevance: ${Math.round(
-                result.relevance * 100
-              )}%*\n\n`;
-            }
-          });
+          if (searchResult.relevance && searchResult.relevance < 1.0) {
+            response += `*Relevance: ${Math.round(
+              searchResult.relevance * 100
+            )}%*\n`;
+          }
 
           response += "---\n\n";
           response += "💡 **How to use this information:**\n";
@@ -974,7 +975,7 @@ Please create an appropriate response based on the user's request.`;
       } finally {
         // Clean up resources
         console.log("🧹 Cleaning up file search resources...");
-        fileSearchTool.cleanup();
+        fileSearchService.cleanup();
       }
     } catch (error) {
       console.error("File processing error:", error);

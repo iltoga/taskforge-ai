@@ -1,8 +1,8 @@
+import { ModelType } from "@/appconfig/models";
+import { type AIProviderConfig } from "@/lib/openai";
 import { ToolExecution } from "@/tools/tool-registry";
 import { ChatHistory } from "@/types/chat";
 import { ProcessedFile } from "@/types/files";
-import { ModelType } from "@/appconfig/models";
-import { type AIProviderConfig } from "@/lib/openai";
 
 /* ------------------------------------------------------------------ */
 /* CORE STEP + RESULT SHAPES                                          */
@@ -91,3 +91,27 @@ export interface SynthesisToolParams {
   stepId: number;
   processedFiles?: ProcessedFile[];
 }
+
+/* === INITIAL PLAN GENERATION ========================================= */
+export interface PlannedStep {
+  id: string;
+  goal: string;
+  tool: string;
+  parameters: Record<string, unknown>;
+}
+
+// Helper interface for raw plan calls
+export interface RawPlanCall {
+  name?: string;
+  tool?: string;
+  parameters?: Record<string, unknown>;
+  reasoning?: string;
+}
+
+// normalise objects so both `name` and `tool` are present for TS safety
+export type NormalizedPlanCall = {
+  name: string;
+  tool: string;
+  parameters: Record<string, unknown>;
+  reasoning?: string;
+};

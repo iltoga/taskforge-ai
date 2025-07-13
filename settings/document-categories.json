@@ -1,0 +1,32 @@
+{
+    "categories": [
+        "passport",
+        "id-card",
+        "driver-license",
+        "birth-certificate",
+        "marriage-certificate",
+        "residence-permit",
+        "social-security-card",
+        "tax-document",
+        "bank-statement",
+        "utility-bill",
+        "insurance-policy",
+        "medical-record",
+        "employment-contract",
+        "pay-slip",
+        "university-degree",
+        "rental-agreement",
+        "vehicle-registration",
+        "credit-report",
+        "visa",
+        "travel-ticket",
+        "invoice",
+        "warranty",
+        "membership-card",
+        "receipt",
+        "contract",
+        "legal-document",
+        "company-registration",
+        "uncategorized"
+    ]
+}

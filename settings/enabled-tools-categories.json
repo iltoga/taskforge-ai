@@ -1,0 +1,8 @@
+{
+  "calendar": true,
+  "passport": true,
+  "web": false,
+  "email": false,
+  "file-search": true,
+  "synthesis": true
+}

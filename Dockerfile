@@ -1,5 +1,14 @@
 FROM node:24-alpine AS base
 
+# Install system dependencies required for sharp and other native modules
+RUN apk add --no-cache \
+    libc6-compat \
+    vips-dev \
+    build-base \
+    python3 \
+    make \
+    g++
+
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
@@ -12,6 +21,9 @@ RUN npm install -g npm@11.4.2
 
 # Install ALL dependencies (including devDependencies) needed for build
 RUN npm ci
+
+# Rebuild sharp for the Linux platform (alpine)
+RUN npm rebuild sharp --platform=linux --arch=x64
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -80,7 +92,8 @@ ENV OPENAI_API_KEY=${OPENAI_API_KEY}
 
 
 # Install wget for health checks (as used in docker-compose.yml), ImageMagick and Ghostscript for PDF/image conversion
-RUN apk add --no-cache wget imagemagick ghostscript
+# Also install vips for sharp runtime support
+RUN apk add --no-cache wget imagemagick ghostscript vips
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -98,6 +111,9 @@ COPY prisma ./prisma
 # Install production dependencies
 RUN npm install -g npm@11.4.2
 RUN npm ci --only=production && npm cache clean --force
+
+# Rebuild sharp for the Linux platform in production stage
+RUN npm rebuild sharp --platform=linux --arch=x64
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
@@ -121,5 +137,6 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Ensure DB schema is up-to-date at container start (runtime)
-ENTRYPOINT ["sh", "-c", "npx prisma migrate deploy && exec npm start"]
+COPY .docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

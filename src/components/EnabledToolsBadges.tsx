@@ -8,7 +8,7 @@ interface EnabledToolsBadgesProps {
 const TOOL_META: Record<string, { icon: React.ReactNode; label: string }> = {
   calendar: { icon: <span>📅</span>, label: 'Calendar' },
   email: { icon: <span>✉️</span>, label: 'Email' },
-  file: { icon: <span>📁</span>, label: 'File Search' },
+  'file-search': { icon: <span>📁</span>, label: 'File Search' },
   web: { icon: <span>🌐</span>, label: 'Web' },
   passport: { icon: <span>🛂</span>, label: 'Passport Db' },
 };

@@ -184,7 +184,7 @@ if (availableCategories.includes("my-category")) {
 
 ### Step 6: Add to Settings Configuration
 
-Update `settings/enabled-tools.json`:
+Update `settings/enabled-tools-categories.json`:
 
 ```json
 {

@@ -1,25 +1,25 @@
-import { z } from 'zod';
-import { PassportFilterSchema, PassportIdSchema, PassportInputSchema } from './passport-tool-definitions';
-import { PassportTools } from './passport-tools';
-import { ToolRegistry } from './tool-registry';
+import { z } from "zod";
+import {
+  PassportFilterSchema,
+  PassportIdSchema,
+  PassportInputSchema,
+} from "./passport-tool-definitions";
+import { PassportTools } from "./passport-tools";
+import { ToolRegistry } from "./tool-registry";
 
-export function registerPassportTools(registry: ToolRegistry, passportTools: PassportTools) {
+export function registerPassportTools(
+  registry: ToolRegistry,
+  passportTools: PassportTools
+) {
+  const TOOL_CATEGORY = "passport";
+
   registry.registerTool(
     {
-      name: 'setupPassportSchema',
-      description: 'Initialize the passport database schema. Call this first before using other passport operations.',
-      parameters: z.object({}),
-      category: 'passport',
-    },
-    async () => passportTools.setupSchema()
-  );
-
-  registry.registerTool(
-    {
-      name: 'createPassport',
-      description: 'Create a new passport record in the database. Use this to add passport information.',
+      name: "createPassport",
+      description:
+        "Create a new passport record in the database. Use this to add passport information.",
       parameters: PassportInputSchema,
-      category: 'passport',
+      category: TOOL_CATEGORY,
     },
     async (params: Record<string, unknown>) => {
       const p = params as {
@@ -54,23 +54,27 @@ export function registerPassportTools(registry: ToolRegistry, passportTools: Pas
 
   registry.registerTool(
     {
-      name: 'getPassports',
-      description: 'Retrieve passport records from the database with optional filters. Use this to search for existing passports.',
+      name: "getPassports",
+      description:
+        "Retrieve passport records from the database with optional filters. Use this to search for existing passports.",
       parameters: PassportFilterSchema,
-      category: 'passport',
+      category: TOOL_CATEGORY,
     },
     async (params: Record<string, unknown>) => {
       const p = params as Record<string, unknown>;
 
       // Convert date strings to Date objects if provided
       const filters: Record<string, unknown> = { ...p };
-      if (filters.date_of_birth && typeof filters.date_of_birth === 'string') {
+      if (filters.date_of_birth && typeof filters.date_of_birth === "string") {
         filters.date_of_birth = new Date(filters.date_of_birth);
       }
-      if (filters.date_of_issue && typeof filters.date_of_issue === 'string') {
+      if (filters.date_of_issue && typeof filters.date_of_issue === "string") {
         filters.date_of_issue = new Date(filters.date_of_issue);
       }
-      if (filters.date_of_expiry && typeof filters.date_of_expiry === 'string') {
+      if (
+        filters.date_of_expiry &&
+        typeof filters.date_of_expiry === "string"
+      ) {
         filters.date_of_expiry = new Date(filters.date_of_expiry);
       }
 
@@ -80,25 +84,38 @@ export function registerPassportTools(registry: ToolRegistry, passportTools: Pas
 
   registry.registerTool(
     {
-      name: 'updatePassport',
-      description: 'Update an existing passport record by ID. Use this to modify passport information.',
+      name: "updatePassport",
+      description:
+        "Update an existing passport record by ID. Use this to modify passport information.",
       parameters: PassportIdSchema.extend(PassportFilterSchema.shape),
-      category: 'passport',
+      category: TOOL_CATEGORY,
     },
     async (params: Record<string, unknown>) => {
-      if (typeof params.id !== 'number') {
-        return { success: false, error: 'Missing or invalid id' };
+      if (typeof params.id !== "number") {
+        return { success: false, error: "Missing or invalid id" };
       }
-      const { id, ...updateData } = params as { id: number } & Record<string, unknown>;
+      const { id, ...updateData } = params as { id: number } & Record<
+        string,
+        unknown
+      >;
 
       // Convert date strings to Date objects if provided
-      if (updateData.date_of_birth && typeof updateData.date_of_birth === 'string') {
+      if (
+        updateData.date_of_birth &&
+        typeof updateData.date_of_birth === "string"
+      ) {
         updateData.date_of_birth = new Date(updateData.date_of_birth);
       }
-      if (updateData.date_of_issue && typeof updateData.date_of_issue === 'string') {
+      if (
+        updateData.date_of_issue &&
+        typeof updateData.date_of_issue === "string"
+      ) {
         updateData.date_of_issue = new Date(updateData.date_of_issue);
       }
-      if (updateData.date_of_expiry && typeof updateData.date_of_expiry === 'string') {
+      if (
+        updateData.date_of_expiry &&
+        typeof updateData.date_of_expiry === "string"
+      ) {
         updateData.date_of_expiry = new Date(updateData.date_of_expiry);
       }
 
@@ -108,14 +125,15 @@ export function registerPassportTools(registry: ToolRegistry, passportTools: Pas
 
   registry.registerTool(
     {
-      name: 'deletePassport',
-      description: 'Delete a passport record by ID. Use this to remove passport information.',
+      name: "deletePassport",
+      description:
+        "Delete a passport record by ID. Use this to remove passport information.",
       parameters: PassportIdSchema,
-      category: 'passport',
+      category: TOOL_CATEGORY,
     },
     async (params: Record<string, unknown>) => {
-      if (typeof params.id !== 'number') {
-        return { success: false, error: 'Missing or invalid id' };
+      if (typeof params.id !== "number") {
+        return { success: false, error: "Missing or invalid id" };
       }
       return passportTools.deletePassport(params.id);
     }
@@ -123,10 +141,11 @@ export function registerPassportTools(registry: ToolRegistry, passportTools: Pas
 
   registry.registerTool(
     {
-      name: 'listPassports',
-      description: 'List all passport records. Use this to retrieve all passport information without filters.',
+      name: "listPassports",
+      description:
+        "List all passport records. Use this to retrieve all passport information without filters.",
       parameters: z.object({}),
-      category: 'passport',
+      category: TOOL_CATEGORY,
     },
     async () => passportTools.listPassports()
   );

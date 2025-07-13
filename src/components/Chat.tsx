@@ -8,8 +8,9 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { ModelType, supportsFileSearch } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
-import { ModelSelector } from './ModelSelector';
+import { ProcessedFile } from '../types/files';
 import { EnabledToolsBadges } from './EnabledToolsBadges';
+import { ModelSelector } from './ModelSelector';
 
 interface ChatMessage {
   id: string;
@@ -24,14 +25,10 @@ interface ChatMessage {
   attachedFiles?: Array<{ id?: string; name: string; size: number; type: string }>;
 }
 
-interface UploadedFile {
+export interface UploadedFile extends ProcessedFile {
   id?: string;
-  name: string;
-  size: number;
-  type: string;
   fileId?: string;
   imageData?: string;
-  isImage?: boolean;
 }
 
 // Utility function to safely stringify unknown values
@@ -137,8 +134,8 @@ export function Chat() {
     }
   }, [useAgenticMode]);
 
-  // Function to clear chat messages and sessionStorage
-  const clearChat = () => {
+  // Function to clear chat messages, sessionStorage, and reset file search signature
+  const clearChat = async () => {
     setMessages([]);
     setUploadedFiles([]);
     if (typeof window !== 'undefined') {
@@ -146,6 +143,12 @@ export function Chat() {
         sessionStorage.removeItem('chat-messages');
       } catch (error) {
         console.warn('Failed to clear messages from sessionStorage:', error);
+      }
+      // Reset file search signature on the server
+      try {
+        await fetch('/api/chat/files/reset-signature', { method: 'POST' });
+      } catch (error) {
+        console.warn('Failed to reset file search signature:', error);
       }
     }
   };
@@ -326,12 +329,15 @@ export function Chat() {
           calendarId: selectedCalendarId,
           fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
           processedFiles: uploadedFiles.map(f => ({
-            fileName: f.name,
-            fileSize: f.size,
-            fileType: f.type,
+            name: f.name,
+            size: f.size,
+            type: f.type,
             fileId: f.fileId,
             imageData: f.imageData,
-            isImage: f.isImage
+            isImage: f.isImage,
+            convertedImages: f.convertedImages, // Include converted images array
+            totalImageSize: f.totalImageSize, // Include total image size
+            processAsImage: f.processAsImage // Include process as image flag
           })),
         },
       });
@@ -354,12 +360,15 @@ export function Chat() {
               calendarId: selectedCalendarId,
               fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
               processedFiles: uploadedFiles.map(f => ({
-                fileName: f.name,
-                fileSize: f.size,
-                fileType: f.type,
+                name: f.name,
+                size: f.size,
+                type: f.type,
                 fileId: f.fileId,
                 imageData: f.imageData,
-                isImage: f.isImage
+                isImage: f.isImage,
+                convertedImages: f.convertedImages, // Include converted images array
+                totalImageSize: f.totalImageSize, // Include total image size
+                processAsImage: f.processAsImage // Include process as image flag
               })),
             }),
           });
@@ -492,12 +501,15 @@ export function Chat() {
               calendarId: selectedCalendarId,
               fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
               processedFiles: uploadedFiles.map(f => ({
-                fileName: f.name,
-                fileSize: f.size,
-                fileType: f.type,
+                name: f.name,
+                size: f.size,
+                type: f.type,
                 fileId: f.fileId,
                 imageData: f.imageData,
-                isImage: f.isImage
+                isImage: f.isImage,
+                convertedImages: f.convertedImages, // Include converted images array
+                totalImageSize: f.totalImageSize, // Include total image size
+                processAsImage: f.processAsImage // Include process as image flag
               })),
             }),
           });
@@ -541,9 +553,9 @@ export function Chat() {
             calendarId: selectedCalendarId,
             fileIds: uploadedFiles.filter(f => f.id).map(f => f.id!),
             processedFiles: uploadedFiles.map(f => ({
-              fileName: f.name,
-              fileSize: f.size,
-              fileType: f.type,
+              name: f.name,
+              size: f.size,
+              type: f.type,
               fileId: f.fileId,
               imageData: f.imageData,
               isImage: f.isImage
@@ -599,6 +611,7 @@ export function Chat() {
 
   // File upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleFileUpload triggered');
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -638,24 +651,27 @@ export function Chat() {
 
         // Handle new API response structure with uploads array
         if (result.success && result.uploads && Array.isArray(result.uploads)) {
-          for (const upload of result.uploads) {
+          for (const upload of result.uploads as UploadedFile[]) {
             newFiles.push({
-              id: upload.fileId || upload.fileName, // Use fileId for documents, fileName for images
-              name: upload.fileName,
-              size: upload.fileSize,
-              type: upload.fileType,
+              id: upload.fileId || upload.name, // Use fileId for documents, name for images
+              name: upload.name,
+              size: upload.size,
+              type: upload.type,
               fileId: upload.fileId,
               imageData: upload.imageData,
-              isImage: upload.isImage
+              isImage: upload.isImage,
+              convertedImages: upload.convertedImages, // Preserve converted images array
+              totalImageSize: upload.totalImageSize, // Preserve total image size
+              processAsImage: upload.processAsImage // Preserve process as image flag
             });
           }
         } else {
           // Fallback to old response structure for compatibility
           newFiles.push({
             id: result.fileId,
-            name: result.fileName,
-            size: result.fileSize,
-            type: result.fileType,
+            name: result.name,
+            size: result.size,
+            type: result.type,
           });
         }
       }

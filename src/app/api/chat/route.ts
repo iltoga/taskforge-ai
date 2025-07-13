@@ -6,15 +6,16 @@ import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { CalendarTools } from "@/tools/calendar-tools";
 import { EmailTools } from "@/tools/email-tools";
+import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
 import { ExtendedSession } from "@/types/auth";
 import { CalendarEvent } from "@/types/calendar";
+import { ProcessedFile } from "@/types/files";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
-import { ProcessedFile } from "../../../types/files";
 
 export async function POST(request: Request) {
   try {
@@ -160,6 +161,7 @@ export async function POST(request: Request) {
         const calendarTools = new CalendarTools(calendarService, calendarId);
         const emailTools = new EmailTools();
         const passportTools = new PassportTools();
+        const fileSearchTools = new FileSearchTools();
         // Disabled web tools to force use of vector search for knowledge queries
         // const webTools = new WebTools();
         // const toolRegistry = createToolRegistry(calendarTools, emailTools, fileTools, webTools, passportTools);
@@ -167,7 +169,8 @@ export async function POST(request: Request) {
           calendarTools,
           emailTools,
           undefined,
-          passportTools
+          passportTools,
+          fileSearchTools
         );
 
         // Register knowledge tools (including vector search) for non-calendar queries

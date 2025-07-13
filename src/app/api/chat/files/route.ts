@@ -2,10 +2,10 @@ import { authOptions } from "@/lib/auth";
 import { AIProviderConfig } from "@/lib/openai";
 import { PdfConverter } from "@/services/pdf-converter";
 import { ApiResponse, ProcessedFile } from "@/types/files";
+import fs from "fs";
 import { lookup as mimeLookup } from "mime-types";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
 
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "4194304", 10); // 4 MB
 const FILE_UPLOAD_DIR = process.env.FILE_UPLOAD_DIR || "/app/tmp_data";
@@ -104,22 +104,32 @@ export async function POST(request: NextRequest) {
 
         console.log(`📄 Successfully converted ${pages.length} pages`);
 
-        // Convert each page to base64 for vision instead of uploading
+        // For multi-page PDFs, create a single ProcessedFile entry with all image file names and total size
+        const imageFileNames: string[] = [];
+        let totalImageSize = 0;
+
         for (const page of pages) {
           const pageFileName = `${file.name.replace(/\.pdf$/i, "")}_p${
             page.pageNumber
           }.png`;
-          // Try to save the page buffer as a binary file (with overwrite)
           const pageFilePath = `${FILE_UPLOAD_DIR}/${pageFileName}`;
           fs.writeFileSync(pageFilePath, page.buffer);
-
-          processed.push({
-            fileName: pageFileName,
-            fileSize: page.buffer.length,
-            fileType: "image/png",
-            isImage: true,
-          });
+          imageFileNames.push(pageFileName);
+          totalImageSize += page.buffer.length;
         }
+
+        // Optionally, save the original PDF as well
+        fs.writeFileSync(`${FILE_UPLOAD_DIR}/${file.name}`, buffer);
+
+        processed.push({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          isImage: false,
+          convertedImages: imageFileNames,
+          totalImageSize,
+          processAsImage: imageFileNames.length > 0,
+        });
 
         if (processed.length === 0) {
           throw new Error("No pages were successfully converted from PDF");
@@ -145,10 +155,11 @@ export async function POST(request: NextRequest) {
         const filePath = `${FILE_UPLOAD_DIR}/${file.name}`;
         fs.writeFileSync(filePath, buffer);
         processed.push({
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
+          name: file.name,
+          size: file.size,
+          type: file.type,
           isImage: true,
+          processAsImage: true,
         });
       } catch (err) {
         console.error("Image encoding error:", err);
@@ -172,10 +183,11 @@ export async function POST(request: NextRequest) {
         const filePath = `${FILE_UPLOAD_DIR}/${file.name}`;
         fs.writeFileSync(filePath, buffer);
         processed.push({
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
+          name: file.name,
+          size: file.size,
+          type: file.type,
           isImage: false,
+          processAsImage: false,
         });
       }
     }

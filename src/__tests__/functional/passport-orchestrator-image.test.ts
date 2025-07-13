@@ -1,12 +1,12 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
-import fs from 'fs';
-import path from 'path';
-import { ToolOrchestrator } from '../../services/tool-orchestrator';
-import { CalendarTools } from '../../tools/calendar-tools';
-import { PassportTools } from '../../tools/passport-tools';
-import { createToolRegistry, ToolRegistry } from '../../tools/tool-registry';
+import fs from "fs";
+import path from "path";
+import { ToolOrchestrator } from "../../services/orchestrator/core";
+import { CalendarTools } from "../../tools/calendar-tools";
+import { PassportTools } from "../../tools/passport-tools";
+import { createToolRegistry, ToolRegistry } from "../../tools/tool-registry";
 
 jest.setTimeout(120_000);
 
@@ -20,17 +20,17 @@ const calendarStub = {
 
 const prompt = `add passport to db`;
 
-describe('passport flow via orchestrator with image upload', () => {
+describe("passport flow via orchestrator with image upload", () => {
   let passportTools: PassportTools;
   let registry: ToolRegistry;
   let orchestrator: ToolOrchestrator;
   let createdId: number | undefined;
   let imageBase64: string;
-  const testImagePath = path.join(process.cwd(), 'tmp', 'passport.png');
+  const testImagePath = path.join(process.cwd(), "tmp", "passport.png");
 
   beforeAll(async () => {
     if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY environment variable is required');
+      throw new Error("OPENAI_API_KEY environment variable is required");
     }
 
     passportTools = new PassportTools();
@@ -38,11 +38,11 @@ describe('passport flow via orchestrator with image upload', () => {
       calendarStub,
       undefined,
       undefined,
-      undefined,
       passportTools,
+      undefined,
       { calendar: false, email: false, file: false, web: false, passport: true }
     );
-    await registry.executeTool('setupPassportSchema', {});
+    await registry.executeTool("setupPassportSchema", {});
     orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY as string);
 
     // Check if test file exists
@@ -52,8 +52,10 @@ describe('passport flow via orchestrator with image upload', () => {
 
     // Read and encode image as base64
     const imageBuffer = fs.readFileSync(testImagePath);
-    imageBase64 = imageBuffer.toString('base64');
-    console.log(`✅ Test image encoded to base64 (${imageBase64.length} chars)`);
+    imageBase64 = imageBuffer.toString("base64");
+    console.log(
+      `✅ Test image encoded to base64 (${imageBase64.length} chars)`
+    );
   }, 30000);
 
   afterAll(async () => {
@@ -75,22 +77,23 @@ describe('passport flow via orchestrator with image upload', () => {
     }
   });
 
-  it('creates and deletes a passport record from uploaded image', async () => {
+  it("creates and deletes a passport record from uploaded image", async () => {
     // Prepare processed files data (simulating what the chat route does)
-    const processedFiles = [{
-      fileName: 'passport.png',
-      fileContent: imageBase64,
-      fileSize: Buffer.from(imageBase64, 'base64').length
-    }];
+    const processedFiles = [
+      {
+        fileName: "passport.png",
+        fileContent: imageBase64,
+        fileSize: Buffer.from(imageBase64, "base64").length,
+      },
+    ];
 
     const orchestrationRes = await orchestrator.orchestrate(
       prompt,
-      [],                 // chat history
+      [], // chat history
       registry,
-      'gpt-4.1-mini',      // model
+      "gpt-4.1-mini", // model
       { maxSteps: 10, maxToolCalls: 5 },
-      [`processed:passport.png`], // fileIds with processed prefix
-      processedFiles      // processedFiles parameter
+      processedFiles // processedFiles parameter
     );
 
     expect(orchestrationRes.success).toBe(true);
@@ -102,20 +105,22 @@ describe('passport flow via orchestrator with image upload', () => {
 
     if ((allPassports as any[]).length > 0) {
       // Get the most recently created passport (assuming it's the last one)
-      const passport = (allPassports as any[])[(allPassports as any[]).length - 1];
+      const passport = (allPassports as any[])[
+        (allPassports as any[]).length - 1
+      ];
       createdId = passport.id;
 
       console.log(`📋 Created passport record:`, passport);
 
       // Verify the passport has required fields
-      expect(passport).toHaveProperty('passport_number');
-      expect(passport).toHaveProperty('surname');
-      expect(passport).toHaveProperty('given_names');
-      expect(passport).toHaveProperty('nationality');
+      expect(passport).toHaveProperty("passport_number");
+      expect(passport).toHaveProperty("surname");
+      expect(passport).toHaveProperty("given_names");
+      expect(passport).toHaveProperty("nationality");
 
       // Verify that nationality field is in English (not Italian)
       // This tests our translation requirement
-      expect(typeof passport.nationality).toBe('string');
+      expect(typeof passport.nationality).toBe("string");
       expect(passport.nationality.length).toBeGreaterThan(0);
 
       // Test deletion
@@ -124,14 +129,16 @@ describe('passport flow via orchestrator with image upload', () => {
 
       // Verify deletion by checking if the record still exists in the full list
       const { data: afterDeleteList } = await passportTools.listPassports();
-      const deletedPassportExists = (afterDeleteList as any[]).find((p: any) => p.id === createdId);
+      const deletedPassportExists = (afterDeleteList as any[]).find(
+        (p: any) => p.id === createdId
+      );
       expect(deletedPassportExists).toBeUndefined();
 
       // Clear createdId since we've successfully deleted it
       createdId = undefined;
     } else {
       // If no passport was created, the test should still pass but log a warning
-      console.warn('⚠️ No passport record was created by the orchestrator');
+      console.warn("⚠️ No passport record was created by the orchestrator");
     }
   });
 });
