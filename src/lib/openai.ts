@@ -385,7 +385,7 @@ export type CategorizeInput =
 /**
  * Categorize a document (plain text OR array of base-64 “data:image/...;base64,” URLs) using an LLM.
  * If `opts.model` is omitted, the function falls back to:
- *   1. process.env.OPENAI_DEFAULT_CATEGORIZATION_MODEL
+ *   1. process.env.DEFAULT_CATEGORIZATION_MODEL
  *   2. process.env.OPENAI_DEFAULT_MODEL
  *   3. "gpt-4.1-mini"
  */
@@ -394,7 +394,7 @@ export async function categorizeDocument(
   opts: { model?: ModelType } = {}
 ): Promise<string> {
   const model: ModelType = (opts.model ||
-    (process.env.OPENAI_DEFAULT_CATEGORIZATION_MODEL as ModelType) ||
+    (process.env.DEFAULT_CATEGORIZATION_MODEL as ModelType) ||
     (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
     "gpt-4.1-mini") as ModelType;
 
@@ -413,7 +413,7 @@ export async function categorizeDocument(
   if ("text" in input) {
     userPrompt = `${promptHeader}\n\nDocument:\n${input.text}`;
   } else {
-    userPrompt = `${promptHeader}\n\nThe document is provided as images below.`;
+    userPrompt = `${promptHeader}\n\nThe document is provided as image/s.`;
     imagesPayload = input.images.map((dataUrl) => {
       const mimeMatch = dataUrl.match(/^data:(.+?);base64,/);
       return {

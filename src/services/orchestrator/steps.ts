@@ -4,7 +4,6 @@ import { ToolExecution, ToolRegistry } from "@/tools/tool-registry";
 import { ChatHistory } from "@/types/chat";
 import { ProcessedFile } from "@/types/files";
 import * as prompts from "./prompts";
-import { buildPlannerPrompt } from "./prompts";
 import {
   NormalizedPlanCall,
   OrchestrationStep,
@@ -25,6 +24,89 @@ const TEMP_SENSITIVE_MODELS = new Set([
 
 function supportsTemperature(model: ModelType): boolean {
   return !TEMP_SENSITIVE_MODELS.has(model as never);
+}
+
+// Shared utility to reduce duplication between performAnalysis and generatePlan
+function createSharedPlanningContext(
+  toolRegistry: ToolRegistry,
+  vectorStoreIds: string[],
+  processedFiles: ProcessedFile[] = [],
+  toolExecutions?: ToolExecution[],
+  currentContext?: string
+) {
+  const categorizedTools = toolListWithParams(toolRegistry, vectorStoreIds);
+
+  // Create valid tool names set
+  const validToolNames = new Set(
+    toolRegistry.getAvailableTools().map((t) => t.name)
+  );
+  if (vectorStoreIds.length === 0) {
+    validToolNames.delete("vectorFileSearch");
+  }
+  validToolNames.delete("synthesizeFinalAnswer");
+  validToolNames.delete("initializeFileSearch"); // Exclude initializeFileSearch as it is not used in planning. it is used programmatically in orchestrate
+
+  // Generate file info (format differs between functions)
+  const fileInfoForAnalysis =
+    processedFiles.length > 0
+      ? `\n\n**FILE CONTEXT INFORMATION**:\n${processedFiles
+          .map((f) => {
+            let typeDesc = "";
+            if (f.isImage) {
+              typeDesc = "image file";
+            } else if (f.convertedImages && f.convertedImages.length > 0) {
+              const imagesPlural = f.convertedImages.length > 1;
+              typeDesc = `document file (document has been converted to image${
+                imagesPlural ? "s" : ""
+              } ${f.convertedImages.join(", ")})`;
+            } else {
+              typeDesc = "document file";
+            }
+            return `- ${f.name} (${f.size} bytes, ${typeDesc})`;
+          })
+          .join("\n")}`
+      : "";
+
+  const fileInfoForPlanning =
+    processedFiles.length > 0
+      ? "\n\n**UPLOADED FILES**:\n" +
+        processedFiles
+          .map((f, i) => {
+            let type = f.isImage ? "image" : "document";
+            if (f.processAsImage) {
+              type += " (document to be processed as image/s: ";
+              if (f.convertedImages && f.convertedImages.length > 0) {
+                type += f.convertedImages.join(", ");
+              } else {
+                type += "no images found";
+              }
+              type += ")";
+            }
+            return `  ${i + 1}. ${f.name} (${type})`;
+          })
+          .join("\n")
+      : "";
+
+  // Generate previous tool context
+  const previousToolContext =
+    toolExecutions && toolExecutions.length > 0
+      ? `\n\n**PREVIOUS TOOL EXECUTIONS:**\n${toolExecutions
+          .map((exec) => {
+            const summary = utils.createToolExecutionSummary(exec);
+            return `- ${summary}`;
+          })
+          .join("\n")}\n\n**CURRENT CONTEXT:**\n${
+          currentContext || "No additional context"
+        }`
+      : "";
+
+  return {
+    categorizedTools,
+    validToolNames,
+    fileInfoForAnalysis,
+    fileInfoForPlanning,
+    previousToolContext,
+  };
 }
 
 // async function imagesFromFiles(files: ProcessedFile[]) {
@@ -74,54 +156,18 @@ export async function generatePlan(
   currentContext?: string,
   toolExecutions?: ToolExecution[]
 ): Promise<PlannedStep[]> {
-  const categorizedTools = toolListWithParams(toolRegistry, ctx.vectorStoreIds);
-
-  // 2. Create a validToolNames set and prune vectorFileSearch if no vector stores
-  const validToolNames = new Set(
-    toolRegistry.getAvailableTools().map((t) => t.name)
+  const {
+    categorizedTools,
+    validToolNames,
+    fileInfoForPlanning: fileInfo,
+    previousToolContext,
+  } = createSharedPlanningContext(
+    toolRegistry,
+    ctx.vectorStoreIds,
+    processedFiles,
+    toolExecutions,
+    currentContext
   );
-  if (ctx.vectorStoreIds.length === 0) {
-    validToolNames.delete("vectorFileSearch");
-  }
-
-  // 3. Remove synthesizeFinalAnswer from planning - it should ONLY be called as the final step
-  // Other synthesis tools like synthesizeChat can be used during orchestration
-  // This ensures synthesizeFinalAnswer is only executed once at the end of orchestration
-  validToolNames.delete("synthesizeFinalAnswer");
-
-  // 3. Generate file list info string
-  const fileInfo =
-    processedFiles.length > 0
-      ? "\n\n**UPLOADED FILES**:\n" +
-        processedFiles
-          .map((f, i) => {
-            let type = f.isImage ? "image" : "document";
-            if (f.processAsImage) {
-              type += " (document to be processed as image/s: ";
-              if (f.convertedImages && f.convertedImages.length > 0) {
-                type += f.convertedImages.join(", ");
-              } else {
-                type += "no images found";
-              }
-              type += ")";
-            }
-            return `  ${i + 1}. ${f.name} (${type})`;
-          })
-          .join("\n")
-      : "";
-
-  // 4. Generate context from previous tool executions (if any)
-  const previousToolContext =
-    toolExecutions && toolExecutions.length > 0
-      ? `\n\n**PREVIOUS TOOL EXECUTIONS:**\n${toolExecutions
-          .map((exec) => {
-            const summary = utils.createToolExecutionSummary(exec);
-            return `- ${summary}`;
-          })
-          .join("\n")}\n\n**CURRENT CONTEXT:**\n${
-          currentContext || "No additional context"
-        }`
-      : "";
 
   // 5. Insert fileInfo and context into the prompt after Available tools:
   const prompt = `
@@ -156,11 +202,13 @@ Return **only** valid JSON like:
 ]
 `;
 
+  ctx.log(`🟦 [generatePlan] Prompt sent to LLM:\n${prompt}`);
   const llm = await generateTextWithProvider(prompt, ctx.getAIConfig(model), {
     model,
     max_tokens: 512,
     temperature: 0,
   });
+  ctx.log(`� [generatePlan] LLM response:\n${llm?.text}`);
 
   let plannedCalls: RawPlanCall[] =
     utils.parseToolDecisions(llm?.text ?? "") || [];
@@ -193,21 +241,21 @@ Return **only** valid JSON like:
     })
     .filter(Boolean) as NormalizedPlanCall[];
   // Ensure searchFiles is first when there are uploaded files
-  if (
-    processedFiles.length > 0 &&
-    !normalizedCalls.some((c) => c.tool === "searchFiles")
-  ) {
-    normalizedCalls.unshift({
-      name: "searchFiles",
-      tool: "searchFiles",
-      parameters: {
-        query: "extract all relevant data and information from uploaded files",
-      },
-      reasoning: "Need to extract data from uploaded files/images",
-    });
-  }
+  // if (
+  //   processedFiles.length > 0 &&
+  //   !normalizedCalls.some((c) => c.tool === "searchFiles")
+  // ) {
+  //   normalizedCalls.unshift({
+  //     name: "searchFiles",
+  //     tool: "searchFiles",
+  //     parameters: {
+  //       query: "extract all relevant data and information from uploaded files",
+  //     },
+  //     reasoning: "Need to extract data from uploaded files/images",
+  //   });
+  // }
 
-  return normalizedCalls.map((raw, idx) => {
+  const res = normalizedCalls.map((raw, idx) => {
     const toolName =
       raw.tool ||
       raw.name ||
@@ -223,6 +271,8 @@ Return **only** valid JSON like:
       parameters: raw.parameters ?? {},
     } as PlannedStep;
   });
+  ctx.log(`🗺️ Planned steps:\n${JSON.stringify(res, null, 2)}`);
+  return res;
 }
 
 /* === ANALYSIS ========================================================= */
@@ -235,37 +285,20 @@ export async function performAnalysis(
   stepId: number,
   processedFiles: ProcessedFile[] = []
 ): Promise<OrchestrationStep> {
-  const categorizedTools = toolListWithParams(toolRegistry, ctx.vectorStoreIds);
-  const fileInfo =
-    processedFiles.length > 0
-      ? `\n\n**FILE CONTEXT INFORMATION**:\n${processedFiles
-          .map((f) => {
-            let typeDesc = "";
-            if (f.isImage) {
-              typeDesc = "image file";
-            } else if (f.convertedImages && f.convertedImages.length > 0) {
-              const imagesPlural = f.convertedImages.length > 1;
-              typeDesc = `document file (document has been converted to image${
-                imagesPlural ? "s" : ""
-              } ${f.convertedImages.join(", ")})`;
-            } else {
-              typeDesc = "document file";
-            }
-            return `- ${f.name} (${f.size} bytes, ${typeDesc})`;
-          })
-          .join("\n")}`
-      : "";
-
-  const plannerPrompt = buildPlannerPrompt(
-    utils.formatChatHistory(chatHistory),
-    userMessage,
-    fileInfo,
-    categorizedTools,
-    prompts.generateAnalysisInstructions(toolRegistry), // analysisInstr
-    prompts.generateContextInstructions(toolRegistry), // ctxInstr
-    prompts.generateAnalysisExamples(toolRegistry) // examples
+  const { fileInfoForAnalysis } = createSharedPlanningContext(
+    toolRegistry,
+    ctx.vectorStoreIds,
+    processedFiles
   );
 
+  const plannerPrompt = prompts.buildCompactPlannerPrompt(
+    utils.formatChatHistory(chatHistory),
+    userMessage,
+    fileInfoForAnalysis,
+    toolRegistry
+  );
+
+  ctx.log(`🟦 [performAnalysis] Prompt sent to LLM:\n${plannerPrompt}`);
   const response = await generateTextWithProvider(
     plannerPrompt,
     ctx.getAIConfig(model),
@@ -278,8 +311,7 @@ export async function performAnalysis(
       ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
-
-  ctx.log(`📝 Orchestrator's plan:\n${response?.text}`);
+  ctx.log(`� [performAnalysis] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,
@@ -342,11 +374,12 @@ ${categorizedTools}
 
 ${prompts.generateDecisionRules(toolRegistry)}
 ${prompts.generatePriorityOrder(toolRegistry)}
-${prompts.generateToolExamples(toolRegistry, ctx.vectorStoreIds)}
+
 
 Respond with either CALL_TOOLS json array or SUFFICIENT_INFO message exactly as specified.
 `;
 
+  ctx.log(`🟦 [decideToolUsage] Prompt sent to LLM:\n${prompt}`);
   const response = await generateTextWithProvider(
     prompt,
     ctx.getAIConfig(model),
@@ -358,6 +391,7 @@ Respond with either CALL_TOOLS json array or SUFFICIENT_INFO message exactly as 
       ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
+  ctx.log(`🟩 [decideToolUsage] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,
@@ -422,6 +456,7 @@ Should we CONTINUE to fully complete the user's request or is it COMPLETE?
 Respond with \`CONTINUE:\` or \`COMPLETE:\` and your reasoning.
 `;
 
+  ctx.log(`🟦 [evaluateProgress] Prompt sent to LLM:\n${prompt}`);
   const response = await generateTextWithProvider(
     prompt,
     ctx.getAIConfig(model),
@@ -430,6 +465,7 @@ Respond with \`CONTINUE:\` or \`COMPLETE:\` and your reasoning.
       ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
+  ctx.log(`🟩 [evaluateProgress] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,
@@ -466,6 +502,7 @@ FORMAT_NEEDS_REFINEMENT: explanation...
 \`\`\`
 `;
 
+  ctx.log(`🟦 [validateResponseFormat] Prompt sent to LLM:\n${prompt}`);
   const response = await generateTextWithProvider(
     prompt,
     ctx.getAIConfig(model),
@@ -474,6 +511,7 @@ FORMAT_NEEDS_REFINEMENT: explanation...
       ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
+  ctx.log(`🟩 [validateResponseFormat] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,
@@ -519,6 +557,7 @@ ${utils.formatChatHistory(chatHistory)}
 Produce improved final answer.
 `;
 
+  ctx.log(`🟦 [refineSynthesis] Prompt sent to LLM:\n${prompt}`);
   const response = await generateTextWithProvider(
     prompt,
     ctx.getAIConfig(model),
@@ -527,6 +566,7 @@ Produce improved final answer.
       ...(supportsTemperature(model) && { temperature: 0.3 }),
     }
   );
+  ctx.log(`🟩 [refineSynthesis] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,
@@ -573,6 +613,7 @@ Write a clear, helpful answer.
 Use markdown; keep it concise but complete.
 `;
 
+  ctx.log(`🟦 [synthesizeFinalResponse] Prompt sent to LLM:\n${prompt}`);
   const response = await generateTextWithProvider(
     prompt,
     ctx.getAIConfig(model),
@@ -581,6 +622,7 @@ Use markdown; keep it concise but complete.
       ...(supportsTemperature(model) && { temperature: 0.3 }),
     }
   );
+  ctx.log(`🟩 [synthesizeFinalResponse] LLM response:\n${response?.text}`);
 
   return {
     id: `step_${stepId}`,

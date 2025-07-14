@@ -188,6 +188,45 @@ export function getToolParameterInfo(
 }
 
 /* ------------------------------------------------------------------ */
+/* COMPACT PARAMETER INFO (OPTIMIZED)                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ultra-compact parameter descriptions to reduce prompt size.
+ */
+export function getCompactToolParameterInfo(toolName: string): string {
+  switch (toolName) {
+    case "getEvents":
+    case "searchEvents":
+      return "{query?, timeRange?}";
+    case "createEvent":
+      return "{eventData: {summary, start, end, ...}}";
+    case "updateEvent":
+      return "{eventId, changes}";
+    case "deleteEvent":
+      return "{eventId}";
+    case "vectorFileSearch":
+      return "{query, vectorStoreIds[]}";
+    case "searchFiles":
+      return "{query}";
+    case "getDocumentByName":
+      return "{name}";
+    case "createPassport":
+    case "updatePassport":
+      return "{passport_number, surname, given_names, nationality, date_of_birth, ...}";
+    case "getPassports":
+      return "{id?, passport_number?, surname?, ...}";
+    case "deletePassport":
+      return "{id}";
+    case "synthesizeChat":
+    case "synthesizeFinalAnswer":
+      return "{userMessage, chatHistory, toolCalls, ...}";
+    default:
+      return "{...}";
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* CALL_TOOLS PARSER                                                  */
 /* ------------------------------------------------------------------ */
 export function parseToolDecisions(
