@@ -346,6 +346,19 @@ export const fileSearchToolDefinitions = {
   },
 };
 
+// File categorizer tool definition
+export const fileCategorizerToolDefinition = {
+  description:
+    "Categorize a file (text or image) using LLM document categorization. Returns a string category. Accepts a file name.",
+  parameters: z.object({
+    fileName: z
+      .string()
+      .describe(
+        "file name with extension (e.g., passport_francisco.pdf, image.jpg)"
+      ),
+  }),
+};
+
 // Type exports for TypeScript
 export type CalendarToolName = keyof typeof calendarToolDefinitions;
 export type EmailToolName = keyof typeof emailToolDefinitions;

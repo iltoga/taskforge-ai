@@ -1,8 +1,11 @@
 import { getFileSearchSignature } from "@/lib/file-search-session";
 import { ProcessedFile } from "@/types/files";
 import { z } from "zod";
-import { FileSearchTools } from "./file-search-tools";
-import { fileSearchToolDefinitions } from "./tool-definitions";
+import { categorizeFile, FileSearchTools } from "./file-search-tools";
+import {
+  fileCategorizerToolDefinition,
+  fileSearchToolDefinitions,
+} from "./tool-definitions";
 import { ToolRegistry } from "./tool-registry";
 
 export function registerFileSearchTools(
@@ -10,6 +13,28 @@ export function registerFileSearchTools(
   fileSearchTools: FileSearchTools
 ): void {
   const TOOL_CATEGORY = "file-search";
+
+  // Register fileCategorizer tool
+  registry.registerTool(
+    {
+      name: "fileCategorizer",
+      description: fileCategorizerToolDefinition.description,
+      parameters: fileCategorizerToolDefinition.parameters,
+      category: TOOL_CATEGORY,
+    },
+    async (parameters) => {
+      const { fileName } = parameters as { fileName: string };
+      try {
+        const category = await categorizeFile(fileName);
+        return { success: true, data: { category } };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+  );
 
   // Register searchFiles tool
   registry.registerTool(

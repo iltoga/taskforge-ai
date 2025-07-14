@@ -2,94 +2,12 @@ import { ToolRegistry } from "@/tools/tool-registry";
 import * as utils from "./utils";
 
 /* ------------------------------------------------------------------ */
-/* INTERNAL HELPERS                                                   */
-/* ------------------------------------------------------------------ */
-
-/** Pretty print all tools grouped by category with parameter hints. */
-function listToolsWithParams(
-  registry: ToolRegistry,
-  vectorStoreIds: string[]
-): string {
-  return registry
-    .getAvailableCategories()
-    .map((category) => {
-      const items = registry
-        .getToolsByCategory(category)
-        .map(
-          (t) =>
-            `  • ${t.name}: ${
-              t.description
-            }\n    Parameters: ${utils.getToolParameterInfo(
-              t.name,
-              vectorStoreIds
-            )}`
-        )
-        .join("\n");
-      return `**${category.toUpperCase()}**\n${items}`;
-    })
-    .join("\n\n");
-}
-
-/* ------------------------------------------------------------------ */
 /* PUBLIC API                                                         */
 /* ------------------------------------------------------------------ */
 
 /**
- * Numbered rules that guide the LLM when it decides which tools to call.
- */
-export function generateDecisionRules(registry: ToolRegistry): string {
-  const cat = registry.getAvailableCategories();
-  let n = 1;
-  const rules: string[] = [];
-
-  if (cat.includes("calendar")) {
-    rules.push(
-      `${n++}. **Calendar queries** → ALWAYS use \`searchEvents\` or \`getEvents\` before answering.`,
-      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`
-    );
-  }
-
-  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
-    rules.push(
-      `${n++}. **Docs / visa / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
-    );
-  }
-
-  if (cat.includes("passport")) {
-    rules.push(
-      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`
-    );
-  }
-
-  rules.push(
-    `${n++}. If unsure which tool yields the required info, choose the **cheapest** query tool first.`,
-    `${n++}. If no tool can help, reply with **SUFFICIENT_INFO** explaining why.`
-  );
-
-  return `**DECISION RULES**\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
-}
-
-/**
- * A one-shot ordered list telling the model which categories are more
- * important when several could apply.
- */
-export function generatePriorityOrder(registry: ToolRegistry): string {
-  const cat = registry.getAvailableCategories();
-  const parts: string[] = ["**CATEGORY PRIORITY**"];
-
-  if (cat.includes("file-search")) parts.push("1. File search tools");
-  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch"))
-    parts.push(`${parts.length}. 2. Knowledge (vectorFileSearch)`);
-  if (cat.includes("calendar")) parts.push("1. Calendar tools");
-  if (cat.includes("passport")) parts.push(`${parts.length}. Passport`);
-  if (cat.includes("email")) parts.push(`${parts.length}. Email`);
-  if (cat.includes("web")) parts.push(`${parts.length}. Web`);
-
-  return parts.join("\n") + "\n";
-}
-
-/**
  * Global “always remember” bullets inserted in the analysis prompt.
+ * @deprecated
  */
 export function generateAnalysisInstructions(registry: ToolRegistry): string {
   const out: string[] = [
@@ -157,6 +75,7 @@ export function generateAnalysisInstructions(registry: ToolRegistry): string {
 
 /**
  * Bigger blocks that instruct the LLM how to interpret ambiguous queries.
+ * @deprecated
  */
 export function generateContextInstructions(registry: ToolRegistry): string {
   const cat = registry.getAvailableCategories();
@@ -204,6 +123,8 @@ export function generateContextInstructions(registry: ToolRegistry): string {
 
 /**
  * Example analyses shown to the model so it can imitate the style.
+ *
+ * @deprecated
  */
 export function generateAnalysisExamples(registry: ToolRegistry): string {
   const ex: string[] = [];
@@ -297,6 +218,8 @@ USER: "Summarize the current conversation and tool outputs so far."
 
 /**
  * Concrete CALL_TOOLS snippets the LLM can copy-paste.
+ *
+ * @deprecated
  */
 export function generateToolExamples(
   registry: ToolRegistry,
@@ -357,17 +280,191 @@ export function generateToolExamples(
   return ["**EXAMPLE CALL_TOOLS BLOCKS**", ...rows].join("\n\n") + "\n";
 }
 
+/**
+ * A one-shot ordered list telling the model which categories are more
+ * important when several could apply.
+ */
+export function generatePriorityOrder(registry: ToolRegistry): string {
+  const cat = registry.getAvailableCategories();
+  const parts: string[] = ["**CATEGORY PRIORITY**"];
+
+  if (cat.includes("file-search")) parts.push("1. File search tools");
+  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch"))
+    parts.push(`${parts.length}. 2. Knowledge (vectorFileSearch)`);
+  if (cat.includes("calendar")) parts.push("1. Calendar tools");
+  if (cat.includes("passport")) parts.push(`${parts.length}. Passport`);
+  if (cat.includes("email")) parts.push(`${parts.length}. Email`);
+  if (cat.includes("web")) parts.push(`${parts.length}. Web`);
+
+  return parts.join("\n") + "\n";
+}
+
+/**
+ * Numbered rules that guide the LLM when it decides which tools to call.
+ */
+export function generateDecisionRules(registry: ToolRegistry): string {
+  const cat = registry.getAvailableCategories();
+  let n = 1;
+  const rules: string[] = [];
+
+  if (cat.includes("calendar")) {
+    rules.push(
+      `${n++}. **Calendar queries** → ALWAYS use \`searchEvents\` or \`getEvents\` before answering.`,
+      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`
+    );
+  }
+
+  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
+    rules.push(
+      `${n++}. **Documentation / visa / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
+    );
+  }
+
+  if (cat.includes("passport")) {
+    rules.push(
+      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`
+    );
+  }
+
+  if (cat.includes("email")) {
+    rules.push(
+      `${n++}. **Email operations** → use email tools (\`sendEmail\`, \`getEmails\`, etc.).`
+    );
+  }
+
+  if (cat.includes("file-search")) {
+    rules.push(
+      `${n++}. **File search** → use \`searchFiles\` with a descriptive \`query\` parameter. Do not use \`files\` parameter.`,
+      `${n++}. **Get document by name** → use \`getDocumentByName\` with the exact filename to retrieve the document from the database.`
+    );
+  }
+
+  rules.push(
+    `${n++}. If unsure which tool yields the required info, ask for clarification.`,
+    `${n++}. If no tool can help and you have sufficient info to answer user's question, reply with **SUFFICIENT_INFO** explaining why.`
+  );
+
+  return `**DECISION RULES**\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
+}
+
 /* ------------------------------------------------------------------ */
-/* UTILITY EXPORT: complete tool inventory text (optional helper)     */
+/* OPTIMIZED PROMPT FUNCTIONS (SHORTER & FASTER)                      */
 /* ------------------------------------------------------------------ */
 
-/** Convenience helper other files may use. */
-export function fullToolInventory(
-  registry: ToolRegistry,
-  vectorStoreIds: string[]
-): string {
-  return listToolsWithParams(registry, vectorStoreIds);
+/**
+ * Compact tool listing with only essential information.
+ */
+function listToolsCompact(registry: ToolRegistry): string {
+  return registry
+    .getAvailableCategories()
+    .map((category) => {
+      const items = registry
+        .getToolsByCategory(category)
+        .map(
+          (t) =>
+            `  • ${t.name}: ${
+              t.description
+            } ${utils.getCompactToolParameterInfo(t.name)}`
+        )
+        .join("\n");
+      return `**${category.toUpperCase()}**\n${items}`;
+    })
+    .join("\n\n");
 }
+
+/**
+ * Essential decision rules only.
+ */
+export function generateCompactRules(registry: ToolRegistry): string {
+  const cat = registry.getAvailableCategories();
+  const rules: string[] = [];
+
+  if (cat.includes("calendar"))
+    rules.push("- Calendar queries → use searchEvents/getEvents first");
+  if (cat.includes("file-search"))
+    rules.push("- File operations → use searchFiles with query parameter");
+  if (cat.includes("passport"))
+    rules.push("- Passport data → use passport tools, translate to English");
+  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
+    rules.push("- Knowledge queries → use vectorFileSearch");
+  }
+  rules.push("- If unsure → ask for clarification");
+
+  return rules.join("\n");
+}
+
+/**
+ * Essential examples only - maximum 3 per category.
+ */
+export function generateCompactExamples(registry: ToolRegistry): string {
+  const cat = registry.getAvailableCategories();
+  const examples: string[] = [];
+
+  if (cat.includes("file-search")) {
+    examples.push('searchFiles: {query: "extract passport details"}');
+  }
+  if (cat.includes("calendar")) {
+    examples.push('searchEvents: {query: "meetings", timeRange: {...}}');
+  }
+  if (cat.includes("passport")) {
+    examples.push('createPassport: {passport_number: "...", surname: "..."}');
+  }
+  if (cat.includes("email")) {
+    examples.push(
+      'sendEmail: {to: ["<user_email>"], subject: "...", body: "..."}'
+    );
+  }
+  if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
+    examples.push(
+      'vectorFileSearch: {query: "visa requirements", vectorStoreIds: [...] }'
+    );
+  }
+  if (cat.includes("web")) {
+    examples.push('searchWeb: {query: "latest AI news"}');
+  }
+
+  return examples.length > 0 ? `**EXAMPLES**: ${examples.join(" | ")}` : "";
+}
+
+/**
+ * Ultra-compact planner prompt - reduces size by ~80%.
+ */
+export const buildCompactPlannerPrompt = (
+  chatHistory: string,
+  userMessage: string,
+  fileInfo: string,
+  registry: ToolRegistry
+) => `
+ROLE: StrategistGPT - Tool Planning Agent
+
+RULES:
+1. Write SCRATCHPAD with reasoning
+2. Output PLAN_JSON array: [{"step_n": 1, "purpose": "...", "tool": "exact_name", "success": "..."}]
+3. Each step = one tool
+4. End with SELF_CHECK: "OK" or list issues
+
+CONTEXT:
+${chatHistory ? `HISTORY: ${chatHistory.slice(0, 500)}...` : ""}
+REQUEST: "${userMessage}" ${fileInfo}
+
+TOOLS:
+${listToolsCompact(registry)}
+
+RULES:
+${generateCompactRules(registry)}
+
+${generateCompactExamples(registry)}
+
+OUTPUT:
+### SCRATCHPAD
+• [reasoning bullets]
+
+### PLAN_JSON
+[the array]
+
+### SELF_CHECK
+[OK or issues]
+`;
 
 /**
  * Build the planner prompt for the orchestrator.
