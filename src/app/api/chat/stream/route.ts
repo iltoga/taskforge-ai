@@ -1,5 +1,5 @@
 import { ModelType } from "@/appconfig/models";
-import { authOptions, createGoogleAuth } from "@/lib/auth";
+import { createGoogleAuth } from "@/lib/auth-compat";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
 import { CalendarTools } from "@/tools/calendar-tools";
@@ -10,13 +10,13 @@ import { createToolRegistry } from "@/tools/tool-registry";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
 import { WebTools } from "@/tools/web-tools";
-import { ExtendedSession } from "@/types/auth";
+import { ExtendedSession } from "@/lib/auth-compat";
 import { ProcessedFile } from "@/types/files";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth-compat";
 
 export async function POST(request: Request) {
   try {
-    const session = (await getServerSession(authOptions)) as ExtendedSession;
+    const session = (await auth()) as ExtendedSession;
 
     if (!session?.accessToken) {
       return new Response(

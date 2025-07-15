@@ -1,16 +1,16 @@
 import { ModelType } from '@/appconfig/models';
-import { authOptions, createGoogleAuth } from '@/lib/auth';
+import { createGoogleAuth } from "@/lib/auth-compat";
 import { AIService } from '@/services/ai-service';
 import { CalendarService } from '@/services/calendar-service';
 import { ExtendedSession } from '@/types/auth';
-import { getServerSession } from 'next-auth';
+import { auth } from "@/lib/auth-compat";
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   console.log('🚀 Reports API called');
 
   try {
-    const session = await getServerSession(authOptions) as ExtendedSession;
+    const session = await auth() as ExtendedSession;
     console.log('🔐 Session check:', session ? 'Session exists' : 'No session');
 
     if (!session?.accessToken) {

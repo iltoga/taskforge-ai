@@ -1,7 +1,7 @@
-import { authOptions, getServiceAccountAuth, isServiceAccountAvailable } from '@/lib/auth';
+import { getServiceAccountAuth, isServiceAccountAvailable } from "@/lib/auth-compat";
 import { EnhancedCalendarService } from '@/services/enhanced-calendar-service';
 import { ExtendedSession } from '@/types/auth';
-import { getServerSession } from 'next-auth';
+import { auth } from "@/lib/auth-compat";
 import { NextResponse } from 'next/server';
 
 interface TestResult {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   try {
     console.log('🧪 Testing alternative authentication system...');
 
-    const session = await getServerSession(authOptions) as ExtendedSession;
+    const session = await auth() as ExtendedSession;
     const { searchParams } = new URL(request.url);
     const forceServiceAccount = searchParams.get('serviceAccount') === 'true';
 
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
         console.log('🔐 Testing user OAuth authentication...');
 
         // Import createGoogleAuth here to avoid circular imports
-        const { createGoogleAuth } = await import('@/lib/auth');
+        const { createGoogleAuth } = await import('@/lib/auth-compat');
         const userAuth = createGoogleAuth(session.accessToken, session.refreshToken);
 
         const userCalendarService = await EnhancedCalendarService.createWithFallback(userAuth, false);
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
 
       let primaryAuth = undefined;
       if (session?.accessToken && !forceServiceAccount) {
-        const { createGoogleAuth } = await import('@/lib/auth');
+        const { createGoogleAuth } = await import('@/lib/auth-compat');
         primaryAuth = createGoogleAuth(session.accessToken, session.refreshToken);
       }
 

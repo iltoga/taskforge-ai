@@ -158,10 +158,8 @@ export function getToolParameterInfo(
     /* File search */
     case "searchFiles":
       return "{ query: string (required) - natural language query to search uploaded files }";
-    case "getDocumentByName":
+    case "getDocumentByNameFromDb":
       return "{ name: string (required) - exact filename with extension }";
-    case "cleanupFiles":
-      return "{ deleteDiskFiles?: boolean }";
 
     /* Passport */
     case "createPassport":
@@ -172,7 +170,7 @@ export function getToolParameterInfo(
       return "{ id: number (required), passport_number?: string, surname?: string (translated in english), given_names?: string (translated in english), nationality?: string (translated in english), date_of_birth?: string (YYYY-MM-DD), sex?: string, place_of_birth?: string (translated in english), date_of_issue?: string, date_of_expiry?: string, issuing_authority?: string (translated in english), holder_signature_present?: boolean, type?: string, residence?: string (translated in english), height_cm?: number, eye_color?: string, documentId?: number (id of the uploaded file. add only if available) }";
     case "deletePassport":
       return "{ id: number (required) }";
-    case "getDocumentByName":
+    case "getDocumentByNameFromDb":
       return "{ name: string (required, complete file name) }";
 
     /* Synthesis */
@@ -209,7 +207,7 @@ export function getCompactToolParameterInfo(toolName: string): string {
       return "{query, vectorStoreIds[]}";
     case "searchFiles":
       return "{query}";
-    case "getDocumentByName":
+    case "getDocumentByNameFromDb":
       return "{name}";
     case "createPassport":
     case "updatePassport":

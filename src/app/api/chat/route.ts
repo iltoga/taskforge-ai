@@ -1,5 +1,5 @@
 import { ModelType } from "@/appconfig/models";
-import { authOptions, createGoogleAuth } from "@/lib/auth";
+import { auth, createGoogleAuth } from "@/lib/auth-compat";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
@@ -10,16 +10,15 @@ import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
+import { ExtendedSession } from "@/lib/auth-compat";
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
-import { ExtendedSession } from "@/types/auth";
 import { CalendarEvent } from "@/types/calendar";
 import { ProcessedFile } from "@/types/files";
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const session = (await getServerSession(authOptions)) as ExtendedSession;
+    const session = (await auth()) as ExtendedSession;
 
     // Check authentication mode
     const useServiceAccountMode = isServiceAccountMode();

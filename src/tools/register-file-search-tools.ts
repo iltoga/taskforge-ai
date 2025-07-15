@@ -50,11 +50,11 @@ export function registerFileSearchTools(
       };
 
       // Add a guard to ensure initialization has occurred
-      if (!getFileSearchSignature()) {
+      const currentSignature = await getFileSearchSignature();
+      if (!currentSignature) {
         return {
           success: false,
-          error:
-            "File search has not been initialized. Please call 'initializeFileSearch' first.",
+          error: "No files or images available for search",
         };
       }
 
@@ -80,8 +80,9 @@ export function registerFileSearchTools(
 
   registry.registerTool(
     {
-      name: "getDocumentByName",
-      description: fileSearchToolDefinitions.getDocumentByName.description,
+      name: "getDocumentByNameFromDb",
+      description:
+        fileSearchToolDefinitions.getDocumentByNameFromDb.description,
       parameters: z.object({
         name: z
           .string()
@@ -93,7 +94,7 @@ export function registerFileSearchTools(
       if (typeof params.name !== "string") {
         return { success: false, error: "Missing or invalid name" };
       }
-      return fileSearchTools.getDocumentByName(params.name);
+      return fileSearchTools.getDocumentByNameFromDb(params.name);
     }
   );
 
@@ -131,20 +132,4 @@ export function registerFileSearchTools(
   //     return fileSearchTools.createOrUpdateDocument(data);
   //   }
   // );
-
-  // Register cleanupFiles tool
-  registry.registerTool(
-    {
-      name: "cleanupFiles",
-      description: fileSearchToolDefinitions.cleanupFiles.description,
-      parameters: fileSearchToolDefinitions.cleanupFiles.parameters,
-      category: TOOL_CATEGORY,
-    },
-    async (parameters) => {
-      const { deleteDiskFiles } = parameters as { deleteDiskFiles?: boolean };
-      const result = await fileSearchTools.cleanupFiles({ deleteDiskFiles });
-
-      return result;
-    }
-  );
 }

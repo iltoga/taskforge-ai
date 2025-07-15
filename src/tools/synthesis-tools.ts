@@ -76,93 +76,87 @@ export class SynthesisTools {
         : "";
 
     const prompt = `
-## RESPONSE SYNTHESIS TASK
+  ## RESPONSE SYNTHESIS TASK
 
-${
-  enhancedContext
-    ? `**ENHANCED CONTEXT (RECOMMENDED):**\n${enhancedContext}\n\n`
-    : ""
-}
+  ${
+    enhancedContext
+      ? `**ENHANCED CONTEXT (RECOMMENDED):**\n${enhancedContext}\n\n`
+      : ""
+  }
 
-${chatHistory
-  .map(
-    (msg: { type: "user" | "assistant"; content: string }) =>
-      `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`
-  )
-  .join("\n")}
+  ${chatHistory
+    .map(
+      (msg: { type: "user" | "assistant"; content: string }) =>
+        `${msg.type === "user" ? "User" : "Assistant"}: ${msg.content}`
+    )
+    .join("\n")}
 
-**User's Original Request:** "${userMessage}"
-${previousStepsContext}
-${
-  validationFeedback
-    ? `\n**VALIDATION FEEDBACK TO ADDRESS:**\n${validationFeedback}\n`
-    : ""
-}
+  **User's Original Request:** "${userMessage}"
+  ${previousStepsContext}
+  ${
+    validationFeedback
+      ? `\n**VALIDATION FEEDBACK TO ADDRESS:**\n${validationFeedback}\n`
+      : ""
+  }
 
-${
-  conversationHistory && conversationHistory.length > 0
-    ? `\n**INTERNAL CONVERSATION CONTEXT:**\n${conversationHistory
-        .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
-        .join("\n")}\n`
-    : ""
-}
+  ${
+    conversationHistory && conversationHistory.length > 0
+      ? `\n**INTERNAL CONVERSATION CONTEXT:**\n${conversationHistory
+          .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
+          .join("\n")}\n`
+      : ""
+  }
 
-**Available Data from Tools:**
-${
-  enhancedContext
-    ? "(See Enhanced Context above for detailed tool results)"
-    : toolResults
-}
+  **Available Data from Tools:**
+  ${
+    enhancedContext
+      ? "(See Enhanced Context above for detailed tool results)"
+      : toolResults
+  }
 
-## SYNTHESIS REQUIREMENTS
+  ## SYNTHESIS REQUIREMENTS
 
-### 1. COMPREHENSIVE RESPONSE
-Create a helpful, conversational response that:
-${
-  validationFeedback
-    ? "- **ADDRESSES VALIDATION FEEDBACK**: Fix any formatting, tone, or content issues identified in the validation feedback above\n"
-    : ""
-}
+  ### 1. COMPREHENSIVE RESPONSE
+  Create a helpful, conversational response that:
+  ${
+    validationFeedback
+      ? "- **ADDRESSES VALIDATION FEEDBACK**: Fix any formatting, tone, or content issues identified in the validation feedback above\n"
+      : ""
+  }
+  - If, to answer the user's question, one or more tools' outputs must be shown to the user in the final answer, make sure to format that output properly as well (well-structured and user-friendly markdown).
 
-### 2. MARKDOWN FORMATTING REQUIREMENTS
+  ### 2. MARKDOWN FORMATTING REQUIREMENTS
 
-**CRITICAL**: Your response MUST be properly formatted using Markdown syntax:
+  **CRITICAL:**
+  - **In CASE any tool output must be shown to the user to answer their question, you MUST reformat and summarize that output into well-structured, user-friendly markdown too, as part of your answer.**
+  - **For any structured or extracted data (from any tool), always present it as a clear markdown table, list, or section.**
+  - **If a tool returns a raw string, bullet list, or unformatted data, you MUST reformat it for clarity and readability.**
+  - **ALL TABLES returnded by tools must be formatted as markdown tables.**
 
-**For Calendar Events and Data:**
+  **Example Structure:**
+  ## [Summary Title]
 
-**For Structured Information:**
+  ### [Section Title]
+  - Use bullet points, tables, or lists for structured data
+  - Always use clear section headings
 
-**Example Structure:**
-## Events Summary for [Company/Project] ([Date Range])
+  ## Summary
+  [Summarize the results and actions, based only on tool outputs]
 
-### [Event Title]
-**Date:** [Actual date from tool results]
-**Description:** [Actual description from calendar data]
-**Status:** [Actual status from tools]
+  ## Important Note
+  All information above comes from actual tool results. If no relevant data was found, clearly state this.
 
-## Summary
-[Based only on retrieved data from tools]
+  ### 3. RESPONSE STRUCTURE
 
-## Important Note
-All information above comes from actual calendar data retrieved by tools. If no relevant events were found, this will be clearly stated.
+  ## QUALITY STANDARDS
 
-### 3. RESPONSE STRUCTURE
+  ## CRITICAL RULE
+  **NEVER CLAIM ACTIONS WERE COMPLETED UNLESS TOOLS WERE ACTUALLY CALLED AND SUCCEEDED**
 
-## QUALITY STANDARDS
+  If the user requested an action (create, update, delete) but no tools were called, or tools returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information.
 
-## CRITICAL RULE FOR CALENDAR ASSISTANT
-**NEVER CLAIM ACTIONS WERE COMPLETED UNLESS TOOLS WERE ACTUALLY CALLED AND SUCCEEDED**
-
-If the user requested an action (create, update, delete) but no tools were called:
-
-If tools were not called or returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information. NEVER provide translation services - this is a calendar application.
-
-**Examples of FORBIDDEN responses when no tools were called:**
-
-**Examples of CORRECT responses when no tools were called:**
-
-Create your comprehensive, well-formatted markdown response below:
-`;
+  Create your comprehensive, well-formatted markdown response below:
+  `;
 
     // Defensive: Only pass a valid AIProviderConfig if present
     // Use type from openai.ts
@@ -295,12 +289,12 @@ ${toolResults}
 
 ---
 
-You are Calendar Assistant. Write a clear, conversational, markdown-formatted reply to the user, based strictly on the tool results and chat context above.
+You are an AI genius Assistant. Write a clear, conversational, markdown-formatted reply to the user, based strictly on the tool results and chat context above.
 
 - If tool results are empty or no relevant data was found, politely state this.
 - Do not fabricate or assume any information not present in the tool results.
 - Use a friendly, concise tone suitable for chat.
-- Use markdown for formatting, including lists, bold, and sections as appropriate.
+- Use markdown for formatting, including lists, bold, tables and sections as appropriate.
 - If the user requested an action but no tools were called, clearly state that no action was performed.
 - Never provide translation services or make up calendar data.
 

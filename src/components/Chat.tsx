@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import { ModelType, supportsFileSearch } from '../appconfig/models';
 import { useDevelopment } from '../contexts/DevelopmentContext';
 import { ProcessedFile } from '../types/files';
@@ -839,7 +840,10 @@ export function Chat() {
               ) : (
                 // Assistant messages as markdown with prose styling
                 <div className="prose prose-sm max-w-none prose-invert">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeRaw]}
+                    remarkPlugins={[remarkGfm]}
+                  >
                     {message.content}
                   </ReactMarkdown>
                 </div>

@@ -35,6 +35,7 @@ export class FileSearchTools {
 
       // Check if files have changed since last initialization
       if (currentSignature === (await getFileSearchSignature())) {
+        this.isInitialized = true; // Set the flag even for cached initialization
         return {
           success: true,
           data: {
@@ -67,6 +68,7 @@ export class FileSearchTools {
         },
       };
     } catch (error) {
+      this.isInitialized = false; // Ensure flag is false on failure
       return {
         success: false,
         error:
@@ -89,7 +91,7 @@ export class FileSearchTools {
     if (!this.isInitialized) {
       return {
         success: false,
-        error: "File search tool not initialized. Please upload files first.",
+        error: "No files or images available for search",
       };
     }
 
@@ -112,40 +114,13 @@ export class FileSearchTools {
     }
   }
 
-  /**
-   * Clean up uploaded files and resources
-   */
-  async cleanupFiles(
-    parameters: {
-      deleteDiskFiles?: boolean;
-    } = {}
-  ): Promise<ToolResult> {
-    const { deleteDiskFiles = false } = parameters;
-
-    try {
-      await this.fileSearchService.cleanup(deleteDiskFiles);
-      this.isInitialized = false;
-
-      return {
-        success: true,
-        data: {
-          message: "File search resources cleaned up successfully",
-          deletedDiskFiles: deleteDiskFiles,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Cleanup failed",
-      };
-    }
-  }
-
-  async getDocumentByName(
+  async getDocumentByNameFromDb(
     name: string
   ): Promise<{ success: boolean; data?: unknown; error?: string }> {
     try {
-      const document = await this.fileSearchService.getDocumentByName(name);
+      const document = await this.fileSearchService.getDocumentByNameFromDb(
+        name
+      );
       if (document) {
         return { success: true, data: document };
       } else {

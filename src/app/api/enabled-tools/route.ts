@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createGoogleAuthWithFallback } from "@/lib/auth";
+import { createGoogleAuthWithFallback } from "@/lib/auth-compat";
 import { CalendarService } from "@/services/calendar-service";
 import { CalendarTools } from "@/tools/calendar-tools";
 import { EmailTools } from "@/tools/email-tools";

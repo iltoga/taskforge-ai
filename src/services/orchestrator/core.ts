@@ -159,16 +159,23 @@ export class ToolOrchestrator {
               );
             } else {
               this.logProgress(
-                `⚠️ File search initialization failed: ${toolResult.error}`
+                `❌ File search initialization failed: ${toolResult.error}`
               );
+              console.error(
+                "File search initialization failed:",
+                toolResult.error
+              );
+              // Don't terminate here - continue with orchestration,
+              // but file search tools will properly handle the not-initialized state
             }
           } catch (error) {
             console.error("💥 initializeFileSearch error:", error);
             this.logProgress(
-              `⚠️ File search initialization error: ${
+              `❌ File search initialization error: ${
                 error instanceof Error ? error.message : error
               }`
             );
+            // Don't terminate here - continue with orchestration
           }
         } else {
           this.logProgress("⚠️ File search tools not available in registry");
@@ -317,6 +324,24 @@ export class ToolOrchestrator {
             call.parameters.vectorStoreIds = this.vectorStoreIds;
           }
 
+          // Check for repeated tool failures - if the same tool has failed 3 times in a row,
+          // terminate the workflow early to prevent infinite loops
+          const recentFailures = toolLog
+            .slice(-3)
+            .filter((exec) => exec.tool === call.name && !exec.result.success);
+
+          if (recentFailures.length >= 3) {
+            this.logProgress(
+              `🛑 Tool ${call.name} has failed 3 times consecutively. Terminating workflow to prevent infinite loops.`
+            );
+            console.error(
+              `Tool ${call.name} failed repeatedly:`,
+              recentFailures.map((f) => f.result.error)
+            );
+            needMore = false;
+            break;
+          }
+
           // Log what is being passed to the tool
           this.logProgress(
             `🔧 Executing ${call.name} with parameters: ${JSON.stringify(
@@ -352,6 +377,17 @@ export class ToolOrchestrator {
             content: `Executed ${call.name}`,
             toolExecution: exec,
           });
+
+          // Log tool failure details for debugging
+          if (!result.success) {
+            console.error(
+              `❌ Tool ${call.name} failed:`,
+              result.error,
+              "Parameters:",
+              call.parameters
+            );
+            this.logProgress(`❌ Tool ${call.name} failed: ${result.error}`);
+          }
 
           // Inject actual tool output into conversation if it should be included
           if (utils.shouldInjectToolResult(call.name, result, convo)) {
