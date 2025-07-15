@@ -15,7 +15,7 @@ services:
               target: /var/lib/postgresql/data
               bind:
                 propagation: rslave
-            - ./docker/db-init:/docker-entrypoint-initdb.d
+            - ./.docker/db-init:/docker-entrypoint-initdb.d
     taskforge-ai:
         depends_on:
             - db
