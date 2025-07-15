@@ -16,25 +16,24 @@ services:
               bind:
                 propagation: rslave
             - ./docker/db-init:/docker-entrypoint-initdb.d
-    calendar-assistant:
+    taskforge-ai:
         depends_on:
             - db
-        container_name: calendar-assistant
+        container_name: taskforge-ai
         build:
             context: .
             dockerfile: Dockerfile
             args:
                 - NODE_ENV=production
-                - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-https://calendar-assistant.revisbali.com}
-                - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-wss://calendar-assistant.revisbali.com}
-                - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG:-false}
-                - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-unknown}
+                - NEXT_PUBLIC_BACKEND_URL=${APP_URL}
+                - NEXT_PUBLIC_WS_URL=${WS_URL}
+                - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
+                - OPENAI_API_KEY=${OPENAI_API_KEY}
         restart: unless-stopped
         ports:
             - '3000:3000'
         environment:
             - NODE_ENV=production
-            - AUTH_SECRET=${AUTH_SECRET:-oqQSJAT9q1pn8cnFsrMgypU5OLe2qSFeaEd+vW0Cffs=}
             - NEXT_PWA_ENABLED=true
         env_file:
             - .env

@@ -1,4 +1,12 @@
-name: Deploy Calendar Assistant to VPS
+name: Deploy taskforge-ai to VPS using SSH and github Actions
+description: |
+  This workflow deploys the taskforge-ai application to a VPS using SSH and Docker.
+  It builds the Docker images, pulls the latest changes from the repository,
+  and restarts the application containers.
+  This workflow requires:
+     * the SSH_PRIVATE_KEY, VPS_HOST, and VPS_USERNAME secrets to be set in the repository settings and
+     * the .env file to be present in the repository root.
+     * a linux server with Docker and Docker Compose installed.
 
 on:
   push:
@@ -31,7 +39,7 @@ jobs:
             set -e  # Exit on any error
 
             # Check and setup repository
-            REPO_DIR="$HOME/.docker/calendar-assistant"
+            REPO_DIR="$HOME/.docker/taskforge-ai"
             echo "Starting deployment process..."
             echo "Repository directory: $REPO_DIR"
 
@@ -46,7 +54,7 @@ jobs:
 
             # Ensure remote URL is correct using the custom SSH configuration
             echo "Setting git remote URL..."
-            git remote set-url origin git@github.com-deploy-calendar-assistant:iltoga/calendar-assistant.git
+            git remote set-url origin git@github.com-deploy-taskforge-ai:iltoga/taskforge-ai.git
 
             # Ensure we're on the main branch and clean any local changes
             echo "Fetching latest changes..."
@@ -95,10 +103,10 @@ jobs:
 
             # Build with cache optimization and git commit for cache busting
             echo "Building Docker image with smart caching..."
-            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" calendar-assistant
+            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" taskforge-ai
 
             echo "Stopping existing container..."
-            docker compose down calendar-assistant || true
+            docker compose down taskforge-ai || true
 
             echo "Starting new container..."
             docker compose down
@@ -107,11 +115,11 @@ jobs:
             # Verify deployment
             echo "Verifying deployment..."
             sleep 10
-            if docker compose ps calendar-assistant | grep -q "Up"; then
+            if docker compose ps taskforge-ai | grep -q "Up"; then
               echo "✅ Container is running successfully"
             else
               echo "❌ Container failed to start"
-              docker compose logs calendar-assistant
+              docker compose logs taskforge-ai
               exit 1
             fi
 

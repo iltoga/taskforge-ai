@@ -121,6 +121,15 @@ export class FileSearchTools {
       const document = await this.fileSearchService.getDocumentByNameFromDb(
         name
       );
+      if (
+        document &&
+        typeof document === "object" &&
+        document !== null &&
+        "data" in document
+      ) {
+        // Remove 'data' property if present so we don't inject in the next prompt big objects
+        delete (document as Record<string, unknown>).data;
+      }
       if (document) {
         return { success: true, data: document };
       } else {

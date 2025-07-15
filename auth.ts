@@ -1,7 +1,5 @@
 import { isEmailAllowed, loadAllowedEmails } from "@/appconfig/email-filter";
 import { ServiceAccountAuth } from "@/lib/service-account-auth";
-import type { ChatHistory } from "@/types/chat";
-import type { ProcessedFile } from "@/types/files";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 import { OAuth2Client } from "google-auth-library";
@@ -24,9 +22,6 @@ declare module "next-auth" {
     accessToken?: string;
     refreshToken?: string;
     error?: string;
-    chatHistory?: ChatHistory;
-    processedFiles?: ProcessedFile[];
-    fileSearchSignature?: string;
   }
 
   interface User {
@@ -180,7 +175,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
 
-    async session({ session, user, token, trigger, newSession }) {
+    async session({ session, user, token }) {
       try {
         // Handle different session strategies
         if (process.env.BYPASS_GOOGLE_AUTH === "true") {
@@ -189,28 +184,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           session.refreshToken = token.refreshToken;
           session.error = token.error;
 
-          // For JWT mode, session data would be stored differently
-          // For now, we'll use basic session without extended data
           return session;
         } else {
           // Database mode (Google OAuth) - load from database
           if (user?.id) {
-            // Load session data from database
-            const dbSession = await prisma.session.findFirst({
-              where: { userId: user.id },
-              orderBy: { expires: "desc" },
-            });
-
-            if (dbSession) {
-              // Add structured data from database to session
-              session.chatHistory =
-                (dbSession.chatHistory as unknown as ChatHistory) || [];
-              session.processedFiles =
-                (dbSession.processedFiles as unknown as ProcessedFile[]) || [];
-              session.fileSearchSignature =
-                dbSession.fileSearchSignature || undefined;
-            }
-
             // For Google OAuth, we need to get tokens from account
             const account = await prisma.account.findFirst({
               where: { userId: user.id, provider: "google" },
@@ -253,36 +230,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   session.error = "RefreshAccessTokenError";
                 }
               }
-            }
-
-            // Handle session updates
-            if (trigger === "update" && newSession) {
-              await prisma.session.updateMany({
-                where: { userId: user.id },
-                data: {
-                  chatHistory: newSession.chatHistory
-                    ? JSON.parse(JSON.stringify(newSession.chatHistory))
-                    : session.chatHistory
-                    ? JSON.parse(JSON.stringify(session.chatHistory))
-                    : undefined,
-                  processedFiles: newSession.processedFiles
-                    ? JSON.parse(JSON.stringify(newSession.processedFiles))
-                    : session.processedFiles
-                    ? JSON.parse(JSON.stringify(session.processedFiles))
-                    : undefined,
-                  fileSearchSignature:
-                    newSession.fileSearchSignature ||
-                    session.fileSearchSignature,
-                },
-              });
-
-              // Update session object
-              if (newSession.chatHistory)
-                session.chatHistory = newSession.chatHistory;
-              if (newSession.processedFiles)
-                session.processedFiles = newSession.processedFiles;
-              if (newSession.fileSearchSignature)
-                session.fileSearchSignature = newSession.fileSearchSignature;
             }
           }
         }

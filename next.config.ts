@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   env: {
     NEXT_PUBLIC_APP_NAME: process.env.APP_NAME,
+    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
+    NEXT_PUBLIC_DEBUG: process.env.NEXT_PUBLIC_DEBUG,
   },
   images: {
     remotePatterns: [
@@ -19,8 +22,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp", "pdftopic"],
   // Explicitly allow cross-origin requests from dev/test origins
   allowedDevOrigins: [
-    "https://abcf-103-100-174-215.ngrok-free.app",
-    "https://www.calendar-assistant.revisbali.com",
+    process.env.ALLOWED_DEV_ORIGIN_1!,
+    process.env.ALLOWED_DEV_ORIGIN_2!,
+    process.env.ALLOWED_DEV_ORIGIN_3!,
   ],
 };
 
