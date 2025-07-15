@@ -38,6 +38,7 @@ export function registerPassportTools(
         height_cm?: number;
         eye_color?: string;
         type: string;
+        document_id?: string;
       };
 
       // Convert date strings to Date objects

@@ -398,7 +398,7 @@ export class FileSearchService {
    * Get single document by name (case-insensitive, partial match)
    * @param name - Name or partial name to search for
    */
-  async getDocumentByName(name: string): Promise<PrismaDocument | null> {
+  async getDocumentByNameFromDb(name: string): Promise<PrismaDocument | null> {
     try {
       return await this.prisma.document.findFirst({
         where: {

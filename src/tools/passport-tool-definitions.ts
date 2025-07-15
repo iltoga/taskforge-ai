@@ -82,10 +82,12 @@ export const PassportInputSchema = z.object({
     .describe(
       "Passport type (e.g., DIPLOMATISCH [DIPLOMATIC], translated in English)"
     ),
-  documentId: z
+  document_id: z
     .number()
     .optional()
-    .describe("ID of the uploaded file (Document). Add only if available."),
+    .describe(
+      "ID of the uploaded file (Document). Add only if available in other tool's output. Never fake it."
+    ),
 });
 
 export const PassportIdSchema = z.object({

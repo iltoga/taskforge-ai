@@ -3,17 +3,17 @@
  * This script can be used during development to test the token refresh flow
  */
 
-import { authOptions, createGoogleAuth } from '@/lib/auth';
+import { createGoogleAuth } from "@/lib/auth-compat";
 import { CalendarService } from '@/services/calendar-service';
 import { ExtendedSession } from '@/types/auth';
-import { getServerSession } from 'next-auth';
+import { auth } from "@/lib/auth-compat";
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   console.log('🔍 Testing OAuth token refresh functionality...');
 
   try {
-    const session = await getServerSession(authOptions) as ExtendedSession;
+    const session = await auth() as ExtendedSession;
 
     if (!session?.accessToken) {
       return NextResponse.json(

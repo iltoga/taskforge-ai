@@ -20,7 +20,7 @@ export function generateAnalysisInstructions(registry: ToolRegistry): string {
     out.push(
       "- Use searchFiles tools to search the content of uploaded files using natural language queries with a 'query' parameter (a descriptive string like 'passport details' or 'extract document information' or whatever is the users's intent with the files).",
       "- Use searchFiles tool with a descriptive query string like 'passport details' or 'extract document information'.",
-      "- Use getDocumentByName tool to retrieve a specific document from db by its exact filename."
+      "- Use getDocumentByNameFromDb tool to retrieve a specific document from db by its exact filename."
     );
   }
 
@@ -139,7 +139,7 @@ USER: "Search uploaded files for project guidelines."
 → Tool = searchFiles; params = {query:"project guidelines"}.`,
       `**Example – Get document by name**
 USER: "Retrieve the document named 'design.docx' from db."
-→ Tool = getDocumentByName; params = {name:"design.docx"}.`,
+→ Tool = getDocumentByNameFromDb; params = {name:"design.docx"}.`,
       `**Example – Extract passport data**
 USER: "I uploaded a passport PDF. Extract the details."
 → Tool = searchFiles; params = {query:"passport details including passport number, name, date of birth, nationality, expiry date"}.`
@@ -231,7 +231,7 @@ export function generateToolExamples(
     // Standalone example: searchFiles only
     rows.push(
       '```json\nCALL_TOOLS:\n[\n  {\n    "name": "searchFiles",\n    "parameters": { "query": "extract passport details including passport number name nationality date of birth expiry date" },\n    "reasoning": "Extract passport information from uploaded PDF document."\n  }\n]\n```',
-      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "getDocumentByName",\n    "parameters": { "name": "Passport_new_ext_05_apr_2032.pdf" },\n    "reasoning": "Retrieve specific passport document by filename."\n  }\n]\n```'
+      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "getDocumentByNameFromDb",\n    "parameters": { "name": "Passport_new_ext_05_apr_2032.pdf" },\n    "reasoning": "Retrieve specific passport document by filename."\n  }\n]\n```'
     );
   }
 
@@ -335,7 +335,7 @@ export function generateDecisionRules(registry: ToolRegistry): string {
   if (cat.includes("file-search")) {
     rules.push(
       `${n++}. **File search** → use \`searchFiles\` with a descriptive \`query\` parameter. Do not use \`files\` parameter.`,
-      `${n++}. **Get document by name** → use \`getDocumentByName\` with the exact filename to retrieve the document from the database.`
+      `${n++}. **Get document by name** → use \`getDocumentByNameFromDb\` with the exact filename to retrieve the document from the database.`
     );
   }
 

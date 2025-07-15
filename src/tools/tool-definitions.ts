@@ -327,21 +327,13 @@ export const fileSearchToolDefinitions = {
     }),
   },
 
-  getDocumentByName: {
+  getDocumentByNameFromDb: {
     description:
-      "Retrieve a specific document previously uploaded (passport, image or other) by its filename (complete with extension) from db",
+      "Retrieve a specific document previously uploaded (pdf, image or other) by its filename (complete with extension) from db. This can be used to retrieve the document's database id to use it in other tools.",
     parameters: z.object({
-      name: z.string().describe("Name of the document to retrieve"),
-    }),
-  },
-
-  cleanupFiles: {
-    description: "Clean up uploaded files and resources",
-    parameters: z.object({
-      deleteDiskFiles: z
-        .boolean()
-        .optional()
-        .describe("Whether to delete uploaded files from disk"),
+      name: z
+        .string()
+        .describe("Filename (with extension) of the document to retrieve"),
     }),
   },
 };

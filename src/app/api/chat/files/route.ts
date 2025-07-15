@@ -1,10 +1,10 @@
-import { authOptions } from "@/lib/auth";
+import { } from "@/lib/auth-compat";
 import { AIProviderConfig } from "@/lib/openai";
 import { PdfConverter } from "@/services/pdf-converter";
 import { ApiResponse, ProcessedFile } from "@/types/files";
 import fs from "fs";
 import { lookup as mimeLookup } from "mime-types";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth-compat";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "4194304", 10); // 4 MB
@@ -31,7 +31,7 @@ async function deleteOpenAIFile(
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session) {
       return NextResponse.json(
         { success: false, message: "Unauthorized", uploads: [] } as ApiResponse,
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session) {
       return NextResponse.json(
         {
