@@ -6,7 +6,7 @@ services:
         environment:
             POSTGRES_USER:  ${DB_USER}
             POSTGRES_PASSWORD: ${DB_PASS}
-            POSTGRES_DB: calendar_assistant
+            POSTGRES_DB: ${DB_NAME}
         networks:
             - dockernet
         volumes:
@@ -35,6 +35,8 @@ services:
         environment:
             - NODE_ENV=production
             - NEXT_PWA_ENABLED=true
+            - AUTH_TRUST_HOST=true
+
         env_file:
             - .env
         networks:
