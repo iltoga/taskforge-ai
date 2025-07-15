@@ -65,7 +65,7 @@ jobs:
 
             echo "Resetting to latest remote state..."
             git reset --hard origin/main
-            git clean -fd
+            git clean -fd || true
 
             echo "Pulling latest changes..."
             git pull origin main
