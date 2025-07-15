@@ -1,25 +1,17 @@
+import * as userChatDataService from "@/services/user-chat-data-service";
 import { ChatHistory } from "@/types/chat";
 import { ProcessedFile } from "@/types/files";
-import { ExtendedPrismaClient } from "@/types/prisma-extended";
-import { PrismaClient } from "@prisma/client";
 import { useSession } from "next-auth/react";
 import { auth } from "../../auth";
 
-// Create global Prisma instance to avoid multiple connections
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-
-// Type-safe Prisma client with session model
-// Note: TypeScript types may not be updated yet, but runtime works
-const typedPrisma = prisma as PrismaClient & ExtendedPrismaClient;
-
 /**
- * NextAuth.js v5 Database Session Management Service
+ * NextAuth.js v5 User-Based Session Management Service
  *
- * This service replaces the cookie-based file search session system with
- * database-backed sessions using NextAuth.js v5 and Prisma. It provides
- * storage and retrieval of structured data including:
+ * This service provides persistent chat data storage using user-based records
+ * instead of session-based storage. Data persists across login/logout cycles
+ * and is only cleared when the user explicitly clicks "Clear Chat".
+ *
+ * Provides storage and retrieval of structured data including:
  * - Chat history (array of ChatMessage)
  * - Processed files (array of ProcessedFile)
  * - File search signature (string for cache validation)
@@ -40,21 +32,7 @@ export async function updateSessionData(data: {
     throw new Error("No authenticated user found");
   }
 
-  // Update the most recent session for this user
-  await typedPrisma.session.updateMany({
-    where: { userId: session.user.id },
-    data: {
-      ...(data.chatHistory && {
-        chatHistory: JSON.parse(JSON.stringify(data.chatHistory)),
-      }),
-      ...(data.processedFiles && {
-        processedFiles: JSON.parse(JSON.stringify(data.processedFiles)),
-      }),
-      ...(data.fileSearchSignature !== undefined && {
-        fileSearchSignature: data.fileSearchSignature,
-      }),
-    },
-  });
+  await userChatDataService.updateUserChatData(session.user.id, data);
 }
 
 /**
@@ -72,21 +50,7 @@ export async function getSessionData(): Promise<{
     return null;
   }
 
-  const dbSession = await typedPrisma.session.findFirst({
-    where: { userId: session.user.id },
-    orderBy: { expires: "desc" },
-  });
-
-  if (!dbSession) {
-    return null;
-  }
-
-  return {
-    chatHistory: (dbSession.chatHistory as unknown as ChatHistory) || [],
-    processedFiles:
-      (dbSession.processedFiles as unknown as ProcessedFile[]) || [],
-    fileSearchSignature: dbSession.fileSearchSignature || null,
-  };
+  return await userChatDataService.getUserChatData(session.user.id);
 }
 
 /**
@@ -101,14 +65,19 @@ export function useSessionData() {
     processedFiles?: ProcessedFile[];
     fileSearchSignature?: string;
   }) => {
-    // Update session data using NextAuth.js v5's update mechanism
-    await update(data);
+    // Update user data through the session manager
+    await updateSessionData(data);
+
+    // Trigger session refresh to get updated data
+    await update();
   };
 
+  // Note: For client components, we need to fetch the data separately
+  // since it's no longer stored in the session object
   return {
-    chatHistory: session?.chatHistory || [],
-    processedFiles: session?.processedFiles || [],
-    fileSearchSignature: session?.fileSearchSignature || null,
+    chatHistory: [], // Will be loaded separately on client
+    processedFiles: [], // Will be loaded separately on client
+    fileSearchSignature: null, // Will be loaded separately on client
     updateData,
     isLoading: !session,
   };
@@ -124,7 +93,11 @@ export function useSessionData() {
  * Replaces setFileSearchSignature from cookie-based system
  */
 export async function setFileSearchSignature(signature: string): Promise<void> {
-  await updateSessionData({ fileSearchSignature: signature });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.setFileSearchSignature(session.user.id, signature);
 }
 
 /**
@@ -132,7 +105,11 @@ export async function setFileSearchSignature(signature: string): Promise<void> {
  * Replaces resetFileSearchSignature from cookie-based system
  */
 export async function resetFileSearchSignature(): Promise<void> {
-  await updateSessionData({ fileSearchSignature: "" });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.resetFileSearchSignature(session.user.id);
 }
 
 /**
@@ -140,8 +117,11 @@ export async function resetFileSearchSignature(): Promise<void> {
  * Replaces getFileSearchSignature from cookie-based system
  */
 export async function getFileSearchSignature(): Promise<string | null> {
-  const sessionData = await getSessionData();
-  return sessionData?.fileSearchSignature || null;
+  const session = await auth();
+  if (!session?.user?.id) {
+    return null;
+  }
+  return await userChatDataService.getFileSearchSignature(session.user.id);
 }
 
 /**
@@ -149,19 +129,9 @@ export async function getFileSearchSignature(): Promise<string | null> {
  * This is used to check if the file set has changed since the last initialization.
  * It combines file name and size for a robust signature and sorts the result
  * to ensure file order doesn't affect the outcome.
- * (Unchanged from cookie-based system)
+ * (Re-exported from user chat data service)
  */
-export const createFileSignature = (files: ProcessedFile[]): string => {
-  if (!files || files.length === 0) {
-    return "[]";
-  }
-  // Create a composite key for each file from its name and size.
-  // Sorting this array ensures that the order of files in the input array
-  // does not produce a different signature.
-  const fileSignatures = files.map((f) => `${f.name}:${f.size}`).sort();
-
-  return JSON.stringify(fileSignatures);
-};
+export const createFileSignature = userChatDataService.createFileSignature;
 
 /**
  * Chat history management functions
@@ -171,26 +141,33 @@ export const createFileSignature = (files: ProcessedFile[]): string => {
  * Server Action to add a message to chat history
  */
 export async function addChatMessage(message: ChatHistory[0]): Promise<void> {
-  const sessionData = await getSessionData();
-  const currentHistory = sessionData?.chatHistory || [];
-
-  await updateSessionData({
-    chatHistory: [...currentHistory, message],
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.addChatMessage(session.user.id, message);
 }
 
 /**
  * Server Action to update entire chat history
  */
 export async function setChatHistory(chatHistory: ChatHistory): Promise<void> {
-  await updateSessionData({ chatHistory });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.setChatHistory(session.user.id, chatHistory);
 }
 
 /**
  * Server Action to clear chat history
  */
 export async function clearChatHistory(): Promise<void> {
-  await updateSessionData({ chatHistory: [] });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.clearChatHistory(session.user.id);
 }
 
 /**
@@ -203,51 +180,54 @@ export async function clearChatHistory(): Promise<void> {
 export async function setProcessedFiles(
   processedFiles: ProcessedFile[]
 ): Promise<void> {
-  await updateSessionData({ processedFiles });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.setProcessedFiles(session.user.id, processedFiles);
 }
 
 /**
  * Server Action to add a processed file
  */
 export async function addProcessedFile(file: ProcessedFile): Promise<void> {
-  const sessionData = await getSessionData();
-  const currentFiles = sessionData?.processedFiles || [];
-
-  await updateSessionData({
-    processedFiles: [...currentFiles, file],
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.addProcessedFile(session.user.id, file);
 }
 
 /**
  * Server Action to remove a processed file by name
  */
 export async function removeProcessedFile(fileName: string): Promise<void> {
-  const sessionData = await getSessionData();
-  const currentFiles = sessionData?.processedFiles || [];
-
-  await updateSessionData({
-    processedFiles: currentFiles.filter((f) => f.name !== fileName),
-  });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.removeProcessedFile(session.user.id, fileName);
 }
 
 /**
  * Server Action to clear processed files
  */
 export async function clearProcessedFiles(): Promise<void> {
-  await updateSessionData({ processedFiles: [] });
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
+  }
+  await userChatDataService.clearProcessedFiles(session.user.id);
 }
 
 /**
- * Migration helper: Import data from cookie-based session (if any exists)
- * Call this once during the transition period
+ * Clear all user chat data (used by "Clear Chat" button)
+ * This replaces the old cookie-based session clearing
  */
-export async function migrateCookieSessionToDatabase(): Promise<void> {
-  try {
-    // This would be called during the migration period to move any existing
-    // cookie-based session data to the database. Since we're replacing the
-    // entire system, this is mainly for reference.
-    console.log("🔄 Cookie to database session migration completed");
-  } catch (error) {
-    console.error("❌ Error during session migration:", error);
+export async function clearAllChatData(): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error("No authenticated user found");
   }
+  await userChatDataService.clearUserChatData(session.user.id);
 }

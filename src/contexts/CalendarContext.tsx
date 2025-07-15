@@ -23,8 +23,8 @@ interface CalendarInfo {
 
 const CalendarContext = createContext<CalendarContextType | undefined>(undefined);
 
-const CALENDAR_STORAGE_KEY_PREFIX = 'calendar-assistant-selected-calendar';
-const AVAILABLE_CALENDARS_STORAGE_KEY_PREFIX = 'calendar-assistant-available-calendars';
+const CALENDAR_STORAGE_KEY_PREFIX = 'taskforge-ai-selected-calendar';
+const AVAILABLE_CALENDARS_STORAGE_KEY_PREFIX = 'taskforge-ai-available-calendars';
 
 export const CalendarProvider = ({ children }: { children: ReactNode }) => {
   const { data: session } = useSession();

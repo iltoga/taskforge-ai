@@ -145,11 +145,23 @@ export function Chat() {
       } catch (error) {
         console.warn('Failed to clear messages from sessionStorage:', error);
       }
-      // Reset file search signature on the server
+
+      // Clear persistent user chat data on the server
       try {
-        await fetch('/api/chat/files/reset-signature', { method: 'POST' });
+        const response = await fetch('/api/chat/clear', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          console.warn('Failed to clear persistent chat data:', await response.text());
+        } else {
+          console.log('✅ Persistent chat data cleared successfully');
+        }
       } catch (error) {
-        console.warn('Failed to reset file search signature:', error);
+        console.warn('Failed to clear persistent chat data:', error);
       }
     }
   };

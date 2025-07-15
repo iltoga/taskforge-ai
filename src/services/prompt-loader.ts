@@ -6,7 +6,7 @@ import { join } from "path";
 
 export function loadSystemPrompt(): string {
   try {
-    const promptPath = join(process.cwd(), "prompts", "calendar-assistant.md");
+    const promptPath = join(process.cwd(), "prompts", "taskforge-ai.md");
     const templateContent = readFileSync(promptPath, "utf-8");
     const template = compile(templateContent);
 
