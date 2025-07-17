@@ -64,8 +64,8 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
       },
       method: "POST",
       body: new URLSearchParams({
-        client_id: process.env.AUTH_GOOGLE_ID!,
-        client_secret: process.env.AUTH_GOOGLE_SECRET!,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
         grant_type: "refresh_token",
         refresh_token: token.refreshToken!,
       }),
@@ -127,8 +127,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         ]
       : [
           GoogleProvider({
-            clientId: process.env.AUTH_GOOGLE_ID!,
-            clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
             authorization: {
               params: {
                 scope:
@@ -310,8 +310,8 @@ export const createGoogleAuthWithFallback = async (
 ): Promise<OAuth2Client> => {
   if (accessToken) {
     const oauth2Client = new OAuth2Client(
-      process.env.AUTH_GOOGLE_ID,
-      process.env.AUTH_GOOGLE_SECRET
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
     );
     oauth2Client.setCredentials({
       access_token: accessToken,
@@ -338,8 +338,8 @@ export const createGoogleAuth = (
   refreshToken?: string
 ): OAuth2Client => {
   const oauth2Client = new OAuth2Client(
-    process.env.AUTH_GOOGLE_ID,
-    process.env.AUTH_GOOGLE_SECRET
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
   );
 
   oauth2Client.setCredentials({
