@@ -38,6 +38,10 @@ jobs:
           script: |
             set -e  # Exit on any error
 
+            echo "Cleaning up Docker system to recover space..."
+            docker system prune -af
+
+
             # Check and setup repository
             REPO_DIR="$HOME/.docker/taskforge-ai"
             echo "Starting deployment process..."
