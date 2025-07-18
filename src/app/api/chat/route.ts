@@ -21,11 +21,12 @@ export async function POST(request: Request) {
     const session = (await auth()) as ExtendedSession;
 
     // Check authentication mode
-    const useServiceAccountMode = isServiceAccountMode();
+    const useServiceAccountMode =
+      process.env.BYPASS_GOOGLE_AUTH === "true" || isServiceAccountMode();
 
     // In service account mode, we still need user authentication for the app
     // but calendar operations will use service account
-    if (!session && !useServiceAccountMode) {
+    if (!session && process.env.BYPASS_GOOGLE_AUTH !== "true") {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -76,7 +77,50 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log(`📅 Using calendar: ${calendarId}`);
+    console.log(`📅 Initial calendar: ${calendarId}`);
+
+    // Determine the actual calendar ID to use based on authentication mode
+    let actualCalendarId = calendarId;
+
+    if (useServiceAccountMode) {
+      if (process.env.BYPASS_GOOGLE_AUTH === "true") {
+        // In bypass mode, use the configured calendar (your calendar)
+        const { loadAllowedCalendars, decodeCalendarId } = await import(
+          "@/lib/calendar-config"
+        );
+        const allowedCalendars = loadAllowedCalendars();
+
+        if (allowedCalendars.length > 0) {
+          actualCalendarId = decodeCalendarId(allowedCalendars[0].cid);
+          console.log(
+            `📅 Bypass mode: Using configured calendar: ${actualCalendarId}`
+          );
+        } else {
+          console.warn("⚠️ No allowed calendars configured for bypass mode");
+          actualCalendarId = "primary"; // Fallback to service account's own calendar
+        }
+      } else if (calendarId === "primary") {
+        // In service account mode (non-bypass), use the configured calendar
+        const { loadAllowedCalendars, decodeCalendarId } = await import(
+          "@/lib/calendar-config"
+        );
+        const allowedCalendars = loadAllowedCalendars();
+
+        if (allowedCalendars.length > 0) {
+          actualCalendarId = decodeCalendarId(allowedCalendars[0].cid);
+          console.log(
+            `📅 Service account mode: Using configured calendar: ${actualCalendarId}`
+          );
+        } else {
+          console.warn(
+            "⚠️ No allowed calendars configured for service account mode"
+          );
+          actualCalendarId = "primary"; // Fallback to service account's own calendar
+        }
+      }
+    }
+
+    console.log(`📅 Final calendar ID: ${actualCalendarId}`);
 
     // Initialize calendar service based on authentication mode
     let calendarService: CalendarService;
@@ -88,9 +132,16 @@ export async function POST(request: Request) {
         true
       );
       calendarService = enhancedService as unknown as CalendarService;
-      console.log(
-        "🔧 Using service account authentication for calendar operations"
-      );
+
+      if (process.env.BYPASS_GOOGLE_AUTH === "true") {
+        console.log(
+          "🔧 Bypass mode: Using service account authentication for calendar operations"
+        );
+      } else {
+        console.log(
+          "🔧 Using service account authentication for calendar operations"
+        );
+      }
     } else {
       // OAuth Mode: Use user OAuth for calendar operations
       if (!session?.accessToken) {
@@ -157,7 +208,10 @@ export async function POST(request: Request) {
         });
         console.log("🤖 Message:", englishMessage);
 
-        const calendarTools = new CalendarTools(calendarService, calendarId);
+        const calendarTools = new CalendarTools(
+          calendarService,
+          actualCalendarId
+        );
         const emailTools = new EmailTools();
         const passportTools = new PassportTools();
         const fileSearchTools = new FileSearchTools();
@@ -210,7 +264,10 @@ export async function POST(request: Request) {
         console.log("🔧 Message:", englishMessage);
         console.log("🔧 Calendar ID:", calendarId);
 
-        const calendarTools = new CalendarTools(calendarService, calendarId);
+        const calendarTools = new CalendarTools(
+          calendarService,
+          actualCalendarId
+        );
 
         const result = await aiService.processMessageWithTools(
           englishMessage,

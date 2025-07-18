@@ -4,11 +4,9 @@ export type ModelType =
   | "gpt-4.1-nano"
   | "gpt-4o"
   | "o3"
-  | "o3-mini"
   | "o4-mini"
   | "o4-mini-high"
   | "google/gemini-2.0-flash-001"
-  | "nousresearch/hermes-2-pro-llama-3-8b"
   | "google/gemini-2.5-flash"
   | "google/gemini-2.5-flash-lite-preview-06-17"
   | "microsoft/phi-4-reasoning-plus:free"
@@ -17,7 +15,8 @@ export type ModelType =
   | "deepseek/deepseek-r1-0528:free"
   | "deepseek/deepseek-r1-0528-qwen3-8b"
   | "anthropic/claude-sonnet-4"
-  | "qwen/qwen3-30b-a3b:free";
+  | "x-ai/grok-4"
+  | "moonshotai/kimi-k2:free";
 
 export interface ModelInfo {
   id: ModelType;
@@ -37,8 +36,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "gpt-4.1",
     name: "GPT-4.1",
-    description:
-      "OpenAI's most advanced model with improved reasoning and multimodal capabilities",
+    description: "OpenAI's most advanced model",
     pricing: "$2-$8/1M tokens",
     contextWindow: "256K",
     provider: "openai",
@@ -49,7 +47,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "gpt-4.1-mini",
     name: "GPT-4.1 Mini",
-    description: "Fast & cost-effective for most tasks",
+    description: "Fast & cost-effective",
     pricing: "$0.40-$1.60/1M tokens",
     contextWindow: "128K",
     provider: "openai",
@@ -60,8 +58,8 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "gpt-4.1-nano",
     name: "GPT-4.1 Nano",
-    description: "Ultra-fast, ideal for simple tasks",
-    pricing: "$0.100-$0.400/1M tokens",
+    description: "Ultra-fast, simple tasks",
+    pricing: "$0.10-$0.40/1M tokens",
     contextWindow: "128K",
     provider: "openai",
     badge: "Nano",
@@ -71,7 +69,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "gpt-4o",
     name: "GPT-4o",
-    description: "Multimodal, great for complex tasks",
+    description: "Multimodal, complex tasks",
     pricing: "$5/1M tokens",
     contextWindow: "128K",
     provider: "openai",
@@ -79,20 +77,9 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: true,
   },
   {
-    id: "o3-mini",
-    name: "o3-mini",
-    description: "Latest reasoning model, cost-effective",
-    pricing: "$1/1M tokens",
-    contextWindow: "128K",
-    provider: "openai",
-    badge: "Reasoning",
-    supportsAssistantAPI: true,
-    supportsFileSearch: true,
-  },
-  {
     id: "o3",
     name: "o3",
-    description: "Advanced reasoning capabilities",
+    description: "Advanced reasoning",
     pricing: "$2-$8/1M tokens",
     contextWindow: "128K",
     provider: "openai",
@@ -103,7 +90,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "o4-mini",
     name: "o4-mini",
-    description: "Fast, general-purpose model with very low cost",
+    description: "Fast, low cost",
     pricing: "$1.1-$4.4/1M tokens",
     contextWindow: "128K",
     provider: "openai",
@@ -114,7 +101,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "o4-mini-high",
     name: "o4-mini High",
-    description: "Better at coding and visual input",
+    description: "Better coding & visual input",
     pricing: "$0.25/1M tokens",
     contextWindow: "128K",
     provider: "openai",
@@ -125,7 +112,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "google/gemini-2.0-flash-001",
     name: "Gemini 2.0 Flash",
-    description: "Google Gemini 2.0 Flash via OpenRouter",
+    description: "Google Gemini 2.0 Flash",
     pricing: "$0.10/1M tokens",
     contextWindow: "1M",
     provider: "openrouter",
@@ -134,20 +121,9 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: false,
   },
   {
-    id: "nousresearch/hermes-2-pro-llama-3-8b",
-    name: "Hermes 2 Pro Llama 3 8B",
-    description: "Enhanced Llama 3 8B with function calling",
-    pricing: "$0.025/1M tokens",
-    contextWindow: "131K",
-    provider: "openrouter",
-    badge: "OpenRouter",
-    supportsAssistantAPI: false,
-    supportsFileSearch: false,
-  },
-  {
     id: "google/gemini-2.5-flash",
     name: "Gemini 2.5 Flash",
-    description: "State-of-the-art reasoning and coding",
+    description: "Reasoning & coding",
     pricing: "$0.15/1M tokens",
     contextWindow: "1M",
     provider: "openrouter",
@@ -158,7 +134,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "google/gemini-2.5-flash-lite-preview-06-17",
     name: "Gemini 2.5 Flash Lite",
-    description: "Lightweight version of Gemini 2.5 Flash",
+    description: "Lightweight Gemini 2.5 Flash",
     pricing: "$0.075/1M tokens",
     contextWindow: "1M",
     provider: "openrouter",
@@ -169,7 +145,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "microsoft/phi-4-reasoning-plus:free",
     name: "Phi-4 Reasoning Plus (Free)",
-    description: "Microsoft enhanced reasoning model",
+    description: "Microsoft reasoning model",
     pricing: "FREE",
     contextWindow: "33K",
     provider: "openrouter",
@@ -180,7 +156,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "meta-llama/llama-4-maverick:free",
     name: "Llama 4 Maverick (Free)",
-    description: "Multimodal MoE model with 128 experts",
+    description: "Multimodal MoE, 128 experts",
     pricing: "FREE",
     contextWindow: "128K",
     provider: "openrouter",
@@ -191,8 +167,8 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "google/gemini-2.5-pro-preview",
     name: "Gemini 2.5 Pro Preview",
-    description: "Premium reasoning and coding model",
-    pricing: "$1.25/1M input, $10/1M output",
+    description: "Premium reasoning & coding",
+    pricing: "$1.25/1M in, $10/1M out",
     contextWindow: "1M",
     provider: "openrouter",
     badge: "Premium",
@@ -202,7 +178,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "deepseek/deepseek-r1-0528:free",
     name: "DeepSeek R1 (Free)",
-    description: "Open reasoning model with thinking tokens",
+    description: "Open reasoning model",
     pricing: "FREE",
     contextWindow: "164K",
     provider: "openrouter",
@@ -212,9 +188,8 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   },
   {
     id: "deepseek/deepseek-r1-0528-qwen3-8b",
-    name: "DeepSeek R1 0528 Qwen3 8B",
-    description:
-      "Distilled variant of DeepSeek R1-0528, transferring chain-of-thought into an 8B-parameter form. Excels at math, programming, and logic, rivaling much larger models.",
+    name: "DeepSeek R1 Qwen3 8B",
+    description: "Distilled, excels at math/coding/logic",
     pricing: "$0.01-$0.02/1M tokens",
     contextWindow: "32K",
     provider: "openrouter",
@@ -225,7 +200,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   {
     id: "anthropic/claude-sonnet-4",
     name: "Claude Sonnet 4",
-    description: "Latest Anthropic model via OpenRouter",
+    description: "Latest Anthropic model",
     pricing: "Variable",
     contextWindow: "200K",
     provider: "openrouter",
@@ -234,11 +209,22 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: false,
   },
   {
-    id: "qwen/qwen3-30b-a3b:free",
-    name: "Qwen3 30B A3B (Free)",
-    description: "Latest Qwen MoE model with thinking mode",
+    id: "x-ai/grok-4",
+    name: "Grok 4",
+    description: "xAI's latest reasoning model",
+    pricing: "$3-$15/1M tokens",
+    contextWindow: "256K",
+    provider: "openrouter",
+    badge: "OpenRouter",
+    supportsAssistantAPI: false,
+    supportsFileSearch: false,
+  },
+  {
+    id: "moonshotai/kimi-k2:free",
+    name: "Kimi K2 (Free)",
+    description: "Moonshot AI's latest reasoning model",
     pricing: "FREE",
-    contextWindow: "41K",
+    contextWindow: "128K",
     provider: "openrouter",
     badge: "Free",
     supportsAssistantAPI: false,
