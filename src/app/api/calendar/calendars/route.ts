@@ -1,3 +1,41 @@
+/**
+ * @openapi
+ * /api/calendar/calendars:
+ *   get:
+ *     summary: "Get available calendars"
+ *     description: |
+ *       Retrieves a list of available calendars. In OAuth mode, fetches from user's Google account. In service account mode, returns predefined allowed calendars.
+ *     responses:
+ *       200:
+ *         description: "Calendars retrieved successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 calendars:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       summary:
+ *                         type: string
+ *                       primary:
+ *                         type: boolean
+ *                       accessRole:
+ *                         type: string
+ *                 mode:
+ *                   type: string
+ *                   enum: [oauth, service-account]
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: "Authentication required"
+ *       500:
+ *         description: "Failed to fetch calendars"
+ */
 import { auth } from "@/lib/auth-compat";
 import {
   getServiceAccountCalendars,

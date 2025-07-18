@@ -1,10 +1,65 @@
-import { } from "@/lib/auth-compat";
+/**
+ * @openapi
+ * /api/chat/files:
+ *   post:
+ *     summary: "Upload and process files for chat"
+ *     description: |
+ *       Uploads and processes files (PDF, images, documents) for use in chat conversations. Files are converted to appropriate formats and uploaded to OpenAI for processing.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: "File to upload (max 4MB)"
+ *             required:
+ *               - file
+ *     responses:
+ *       200:
+ *         description: "Files processed successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 uploads:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: "File validation error"
+ *       401:
+ *         description: "Authentication required"
+ *       413:
+ *         description: "File too large"
+ *       500:
+ *         description: "File processing failed"
+ *   delete:
+ *     summary: "Delete processed files"
+ *     description: |
+ *       Deletes all processed files for the authenticated user from both local storage and OpenAI.
+ *     responses:
+ *       200:
+ *         description: "Files deleted successfully"
+ *       401:
+ *         description: "Authentication required"
+ *       500:
+ *         description: "Failed to delete files"
+ */
+import { auth } from "@/lib/auth-compat";
 import { AIProviderConfig } from "@/lib/openai";
 import { PdfConverter } from "@/services/pdf-converter";
 import { ApiResponse, ProcessedFile } from "@/types/files";
 import fs from "fs";
 import { lookup as mimeLookup } from "mime-types";
-import { auth } from "@/lib/auth-compat";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "4194304", 10); // 4 MB

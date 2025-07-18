@@ -1,3 +1,66 @@
+/**
+ * @openapi
+ * /api/chat:
+ *   post:
+ *     summary: "Chat endpoint for AI assistant with tool and calendar integration"
+ *     description: |
+ *       Accepts a user message and optional parameters to interact with the AI assistant, calendar, and tools. Supports agentic orchestration, file processing, and legacy JSON-based flows.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: "The user message or query."
+ *               messages:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                       enum: [user, assistant]
+ *                     content:
+ *                       type: string
+ *                     timestamp:
+ *                       type: number
+ *               model:
+ *                 type: string
+ *                 description: "The AI model to use (default: gpt-4.1-mini)"
+ *               useTools:
+ *                 type: boolean
+ *                 description: "Whether to use tool-based orchestration (default: false)"
+ *               developmentMode:
+ *                 type: boolean
+ *                 description: "Enable agentic orchestrator (default: false)"
+ *               calendarId:
+ *                 type: string
+ *                 description: "Calendar ID to use (default: primary)"
+ *               processedFiles:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *             required:
+ *               - message
+ *     responses:
+ *       200:
+ *         description: "Successful response with AI or tool output"
+ *       400:
+ *         description: "Bad request (missing message or invalid input)"
+ *       401:
+ *         description: "Authentication required or expired"
+ *       403:
+ *         description: "Insufficient permissions"
+ *       429:
+ *         description: "Rate limit exceeded"
+ *       500:
+ *         description: "Internal server error"
+ */
 import { ModelType } from "@/appconfig/models";
 import { auth, createGoogleAuth } from "@/lib/auth-compat";
 import { isServiceAccountMode } from "@/lib/calendar-config";

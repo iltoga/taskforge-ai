@@ -1,3 +1,33 @@
+/**
+ * @openapi
+ * /api/chat/clear:
+ *   post:
+ *     summary: "Clear user chat data"
+ *     description: |
+ *       Clears all persistent chat data for the authenticated user, including chat history, processed files metadata, and file search cache.
+ *     responses:
+ *       200:
+ *         description: "Chat data cleared successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: "Authentication required"
+ *       500:
+ *         description: "Failed to clear chat data"
+ *   get:
+ *     summary: "Method not allowed"
+ *     description: "GET method is not supported for this endpoint"
+ *     responses:
+ *       405:
+ *         description: "Method not allowed"
+ */
 import { auth } from "@/lib/auth-compat";
 import { clearUserChatData } from "@/services/user-chat-data-service";
 import { NextResponse } from "next/server";

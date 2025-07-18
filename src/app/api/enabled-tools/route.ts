@@ -1,3 +1,32 @@
+/**
+ * @openapi
+ * /api/enabled-tools:
+ *   get:
+ *     summary: "Get enabled tools"
+ *     description: |
+ *       Retrieves a list of all enabled tools in the system, including calendar, email, web, passport, and file search tools.
+ *     responses:
+ *       200:
+ *         description: "Enabled tools retrieved successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 enabledTools:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       category:
+ *                         type: string
+ *       500:
+ *         description: "Failed to load enabled tools"
+ */
 import { NextResponse } from "next/server";
 
 import { createGoogleAuthWithFallback } from "@/lib/auth-compat";
