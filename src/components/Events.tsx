@@ -570,7 +570,7 @@ export function Events() {
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-secondary btn-sm gap-2">
               <Camera className="w-4 h-4" />
-              AI From Image
+              Image to Calendar
             </div>
             <ul tabIndex={0} className="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-64">
               <li>

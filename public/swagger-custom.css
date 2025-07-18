@@ -1,0 +1,7 @@
+.swagger-ui, .swagger-ui .opblock, .swagger-ui .opblock-body, .swagger-ui .responses-table, .swagger-ui .response-col_status {
+  background: #fff !important;
+  color: #222 !important;
+}
+.swagger-ui .response-col_status {
+  color: #222 !important;
+}

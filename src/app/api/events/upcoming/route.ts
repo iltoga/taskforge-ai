@@ -1,3 +1,37 @@
+/**
+ * @openapi
+ * /api/events/upcoming:
+ *   get:
+ *     summary: "Get upcoming calendar events"
+ *     description: |
+ *       Retrieves upcoming events for the next 7 days from the specified calendar. Supports both OAuth and service account authentication modes.
+ *     parameters:
+ *       - in: query
+ *         name: calendarId
+ *         schema:
+ *           type: string
+ *         description: "Calendar ID to fetch events from (default: primary)"
+ *     responses:
+ *       200:
+ *         description: "Upcoming events retrieved successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 events:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 count:
+ *                   type: number
+ *       401:
+ *         description: "Authentication required or expired"
+ *       500:
+ *         description: "Failed to fetch upcoming events"
+ */
 import { auth, createGoogleAuth } from "@/lib/auth-compat";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { CalendarService } from "@/services/calendar-service";

@@ -1,3 +1,52 @@
+/**
+ * @openapi
+ * /api/test/session-manager:
+ *   get:
+ *     summary: "Get session data"
+ *     description: |
+ *       Retrieves current session data for testing and debugging purposes.
+ *     responses:
+ *       200:
+ *         description: "Session data retrieved successfully"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                 message:
+ *                   type: string
+ *       500:
+ *         description: "Failed to retrieve session data"
+ *   post:
+ *     summary: "Update session data"
+ *     description: |
+ *       Updates session data with specified actions: updateSession, setFileSignature, addMessage, or setFiles.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               action:
+ *                 type: string
+ *                 enum: [updateSession, setFileSignature, addMessage, setFiles]
+ *               data:
+ *                 type: object
+ *                 description: "Action-specific data"
+ *             required:
+ *               - action
+ *               - data
+ *     responses:
+ *       200:
+ *         description: "Session data updated successfully"
+ *       500:
+ *         description: "Failed to update session data"
+ */
 import {
   addChatMessage,
   getSessionData,

@@ -1,3 +1,56 @@
+/**
+ * @openapi
+ * /api/chat/stream:
+ *   post:
+ *     summary: "Stream chat responses"
+ *     description: |
+ *       Provides streaming chat responses with AI assistant and tool integration. Supports agentic orchestration and real-time conversation flows.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: "User message"
+ *               messages:
+ *                 type: array
+ *                 description: "Chat history"
+ *                 items:
+ *                   type: object
+ *               useTools:
+ *                 type: boolean
+ *                 description: "Enable tool usage (default: false)"
+ *               orchestratorModel:
+ *                 type: string
+ *                 description: "AI model for orchestration (default: gpt-4.1-mini)"
+ *               developmentMode:
+ *                 type: boolean
+ *                 description: "Enable development features (default: false)"
+ *               calendarId:
+ *                 type: string
+ *                 description: "Calendar ID (default: primary)"
+ *               processedFiles:
+ *                 type: array
+ *                 description: "Previously processed files"
+ *                 items:
+ *                   type: object
+ *             required:
+ *               - message
+ *     responses:
+ *       200:
+ *         description: "Streaming response"
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *       401:
+ *         description: "Authentication required or expired"
+ *       500:
+ *         description: "Internal server error"
+ */
 import { ModelType } from "@/appconfig/models";
 import { createGoogleAuth } from "@/lib/auth-compat";
 import { AIService } from "@/services/ai-service";
@@ -8,11 +61,10 @@ import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
+import { auth, ExtendedSession } from "@/lib/auth-compat";
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
 import { WebTools } from "@/tools/web-tools";
-import { ExtendedSession } from "@/lib/auth-compat";
 import { ProcessedFile } from "@/types/files";
-import { auth } from "@/lib/auth-compat";
 
 export async function POST(request: Request) {
   try {
