@@ -170,8 +170,17 @@ export async function generatePlan(
   );
 
   // 5. Insert fileInfo and context into the prompt after Available tools:
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   const prompt = `
 You are a PLANNING AGENT.
+
+CURRENT_DATE: ${currentDate}
 
 User goal: "${userMessage}"
 ${previousToolContext}
@@ -186,6 +195,12 @@ IMPORTANT: For file search operations:
 - Use "searchFiles" with a "query" parameter (natural language query)
 - Never use "files" parameter
 - Example: {"tool": "searchFiles", "parameters": {"query": "extract passport details"}}
+
+IMPORTANT: For calendar operations:
+- When user says "today", use the current date: ${currentDate}
+- When user says "tomorrow", use the next day after current date
+- Always include proper time zones (e.g., "+02:00" or "UTC") in dateTime fields
+- Example: {"tool": "createEvent", "parameters": {"eventData": {"summary": "Meeting", "start": {"dateTime": "2025-07-17T14:00:00+02:00"}, "end": {"dateTime": "2025-07-17T15:00:00+02:00"}}}}
 
 Return **only** valid JSON like:
 [

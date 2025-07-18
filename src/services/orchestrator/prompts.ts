@@ -434,8 +434,18 @@ export const buildCompactPlannerPrompt = (
   userMessage: string,
   fileInfo: string,
   registry: ToolRegistry
-) => `
+) => {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return `
 ROLE: StrategistGPT - Tool Planning Agent
+
+CURRENT_DATE: ${currentDate}
 
 RULES:
 1. Write SCRATCHPAD with reasoning
@@ -452,6 +462,9 @@ ${listToolsCompact(registry)}
 
 RULES:
 ${generateCompactRules(registry)}
+- When user says "today", use current date: ${currentDate}
+- When user says "tomorrow", use the next day after current date
+- Always include time zones in calendar dateTime fields (e.g., "+02:00" or "UTC")
 
 ${generateCompactExamples(registry)}
 
@@ -465,6 +478,7 @@ OUTPUT:
 ### SELF_CHECK
 [OK or issues]
 `;
+};
 
 /**
  * Build the planner prompt for the orchestrator.

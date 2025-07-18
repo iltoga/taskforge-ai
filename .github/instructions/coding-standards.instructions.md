@@ -63,12 +63,19 @@ src/
 
 ## 6. Testing
 
-- **Requirement:** All new features, bug fixes, and tools **must** be accompanied by tests in `src/__tests__/`.
+- **Requirement:** All important features, bug fixes, and tools **must** be accompanied by tests in `src/__tests__/`.
 - **Mocks:** Use `jest.mock()` to mock dependencies, especially external API calls and services.
 - **Commands:**
   - `npm test`: Run all unit, integration, and component tests.
   - `npm run test:watch`: Run tests in watch mode.
   - `npm run test:coverage`: Generate a coverage report.
+  - `npx jest`: Run all Jest tests directly.
+  - `npx jest --watch`: Run Jest tests in watch mode.
+  - `npx jest --coverage`: Generate a Jest coverage report.
+
+### 6.1 Testing apis and live endpoints
+
+- When needing to test APIs live (or asked to do so), run the app in development mode with `npm run dev` and use curl to hit the endpoints directly, then evaluate the responses and fix any issues at your best convenience.
 
 ## 7. Commits & Version Control
 
