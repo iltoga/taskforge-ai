@@ -68,10 +68,30 @@ export function SettingsPage() {
   }, [setAvailableCalendars, setIsLoading, isInitialized]);
 
   useEffect(() => {
-    if (isInitialized) {
+    // Only fetch calendars if we don't have any AND we're initialized
+    // The CalendarContext will automatically fetch them on initialization if needed
+    if (isInitialized && availableCalendars.length === 0 && !isLoading) {
+      console.log('SettingsPage: No calendars available, fetching...');
       fetchCalendars();
     }
-  }, [fetchCalendars, isInitialized]);
+
+    // Fetch auth mode separately if we don't have it but we have calendars
+    // (this happens when CalendarContext fetches calendars but doesn't get auth mode)
+    if (isInitialized && !authMode && availableCalendars.length > 0) {
+      const fetchAuthMode = async () => {
+        try {
+          const response = await fetch('/api/calendar/calendars');
+          if (response.ok) {
+            const data = await response.json();
+            setAuthMode(data.mode || '');
+          }
+        } catch (error) {
+          console.error('Error fetching auth mode:', error);
+        }
+      };
+      fetchAuthMode();
+    }
+  }, [fetchCalendars, isInitialized, availableCalendars.length, isLoading, authMode]);
 
   const handleCalendarChange = (calendarId: string) => {
     setSaveStatus('saving');

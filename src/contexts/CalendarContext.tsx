@@ -109,17 +109,67 @@ export const CalendarProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [session, getStorageKey, getAvailableCalendarsStorageKey, isInitialized]);
 
-  // Auto-select primary calendar when calendars are loaded if no valid selection exists
+  // Fetch available calendars when the context is initialized
+  useEffect(() => {
+    if (isInitialized && session?.user && availableCalendars.length === 0 && !isLoading) {
+      console.log('CalendarContext initialized, fetching available calendars...');
+      setIsLoading(true);
+
+      const fetchCalendars = async () => {
+        try {
+          const response = await fetch('/api/calendar/calendars');
+          if (!response.ok) {
+            throw new Error('Failed to fetch calendars');
+          }
+          const data = await response.json();
+          const calendars = data.calendars || [];
+          setAvailableCalendars(calendars);
+          console.log(`CalendarContext: Loaded ${calendars.length} calendars`);
+
+          // Only auto-select a default if we don't have a valid selection
+          if (calendars.length > 0) {
+            const currentSelection = calendars.find((cal: CalendarInfo) => cal.id === selectedCalendarId);
+
+            if (!currentSelection) {
+              // Only change selection if current one is invalid
+              if (selectedCalendarId === 'primary' || !selectedCalendarId) {
+                // For 'primary' or empty selection, find the actual primary calendar or first available
+                const primaryCalendar = calendars.find((cal: CalendarInfo) => cal.primary);
+                const defaultCalendar = primaryCalendar || calendars[0];
+                console.log(`No valid selection, auto-selecting default calendar:`, defaultCalendar.summary);
+                setSelectedCalendarId(defaultCalendar.id);
+              } else {
+                // User had a specific selection that's no longer valid
+                console.log(`User's previous selection "${selectedCalendarId}" is no longer available, keeping 'primary' as fallback`);
+                setSelectedCalendarId('primary');
+              }
+            } else {
+              console.log(`Current calendar selection is valid: ${currentSelection.summary}`);
+            }
+          }
+        } catch (error) {
+          console.error('CalendarContext: Error fetching calendars:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchCalendars();
+    }
+  }, [isInitialized, session?.user, availableCalendars.length, isLoading, selectedCalendarId, setSelectedCalendarId]);
+
+  // Validate selection when calendars are updated (e.g., from settings page)
   useEffect(() => {
     if (availableCalendars.length > 0 && isInitialized && selectedCalendarId) {
       const currentSelection = availableCalendars.find(cal => cal.id === selectedCalendarId);
-      if (!currentSelection) {
-        // Current selection is invalid, find the primary calendar or fallback to first available
+
+      if (!currentSelection && selectedCalendarId !== 'primary') {
+        // Current selection is invalid and it's not 'primary', find a fallback
         const primaryCalendar = availableCalendars.find(cal => cal.primary);
         const fallbackCalendar = primaryCalendar || availableCalendars[0];
         console.log(`Invalid calendar selection "${selectedCalendarId}", switching to:`, fallbackCalendar.summary);
         setSelectedCalendarId(fallbackCalendar.id);
-      } else {
+      } else if (currentSelection) {
         console.log(`Current calendar selection is valid: ${currentSelection.summary}`);
       }
     }

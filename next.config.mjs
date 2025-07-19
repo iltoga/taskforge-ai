@@ -32,6 +32,33 @@ const nextConfig = {
     process.env.ALLOWED_DEV_ORIGIN_2,
     process.env.ALLOWED_DEV_ORIGIN_3,
   ],
+
+  // Add headers configuration for development
+  async headers() {
+    return [
+      {
+        source: '/api/auth/:path*',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Credentials',
+            value: 'true',
+          },
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: process.env.NODE_ENV === 'development' ? '*' : process.env.NEXTAUTH_URL || '',
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET,POST,PUT,DELETE,OPTIONS',
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);
