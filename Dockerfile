@@ -118,7 +118,7 @@ RUN npm rebuild sharp --platform=linux --arch=x64
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/prompts ./prompts
 COPY --from=builder /app/settings ./settings
