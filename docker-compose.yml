@@ -4,7 +4,7 @@ services:
         image: postgres:16
         restart: unless-stopped
         environment:
-            POSTGRES_USER:  ${DB_USER}
+            POSTGRES_USER: ${DB_USER}
             POSTGRES_PASSWORD: ${DB_PASS}
             POSTGRES_DB: ${DB_NAME}
         networks:
@@ -16,19 +16,37 @@ services:
               bind:
                 propagation: rslave
             - ./.docker/db-init:/docker-entrypoint-initdb.d
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+            start_period: 30s
+
     taskforge-ai:
         depends_on:
-            - db
+            db:
+                condition: service_healthy
         container_name: taskforge-ai
         build:
             context: .
             dockerfile: Dockerfile
+            target: runner
             args:
                 - NODE_ENV=production
-                - NEXT_PUBLIC_BACKEND_URL=${APP_URL}
-                - NEXT_PUBLIC_WS_URL=${WS_URL}
+                - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+                - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
                 - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
                 - OPENAI_API_KEY=${OPENAI_API_KEY}
+                - GIT_COMMIT_SHA=${GIT_COMMIT_SHA:-latest}
+            # Enable BuildKit features for caching
+            extra_hosts:
+                - "host.docker.internal:host-gateway"
+            cache_from:
+                - taskforge-ai:latest
+                - taskforge-ai:base
+                - taskforge-ai:deps
+                - taskforge-ai:builder
         restart: unless-stopped
         ports:
             - '3000:3000'
@@ -36,7 +54,6 @@ services:
             - NODE_ENV=production
             - NEXT_PWA_ENABLED=true
             - AUTH_TRUST_HOST=true
-
         env_file:
             - .env
         networks:
@@ -55,13 +72,15 @@ services:
             timeout: 10s
             retries: 3
             start_period: 40s
-        # Add resource limits
+        # Optimized resource limits
         deploy:
             resources:
                 limits:
-                    memory: 3G
+                    memory: 2G
+                    cpus: '1.0'
                 reservations:
-                    memory: 1G
+                    memory: 512M
+                    cpus: '0.5'
 
 networks:
     dockernet:

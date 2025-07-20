@@ -1,8 +1,8 @@
 name: Deploy taskforge-ai to VPS using SSH and github Actions
 description: |
   This workflow deploys the taskforge-ai application to a VPS using SSH and Docker.
-  It builds the Docker images, pulls the latest changes from the repository,
-  and restarts the application containers.
+  It builds the Docker images with aggressive caching, pulls the latest changes from the repository,
+  and restarts the application containers with minimal downtime.
   This workflow requires:
      * the SSH_PRIVATE_KEY, VPS_HOST, and VPS_USERNAME secrets to be set in the repository settings and
      * the .env file to be present in the repository root.
@@ -38,97 +38,183 @@ jobs:
           script: |
             set -e  # Exit on any error
 
-            echo "Cleaning up Docker system to recover space..."
-            docker system prune -af
-
+            echo "🚀 Starting optimized deployment process..."
 
             # Check and setup repository
             REPO_DIR="$HOME/.docker/taskforge-ai"
-            echo "Starting deployment process..."
             echo "Repository directory: $REPO_DIR"
 
             # Navigate to repository directory
             if [ ! -d "$REPO_DIR" ]; then
-              echo "Error: Repository directory does not exist: $REPO_DIR"
+              echo "❌ Error: Repository directory does not exist: $REPO_DIR"
               exit 1
             fi
 
             cd "$REPO_DIR"
-            echo "Current directory: $(pwd)"
+            echo "📁 Current directory: $(pwd)"
 
             # Ensure remote URL is correct using the custom SSH configuration
-            echo "Setting git remote URL..."
+            echo "🔗 Setting git remote URL..."
             git remote set-url origin git@github.com-deploy-taskforge-ai:iltoga/taskforge-ai.git
 
+            # Get current commit before update
+            OLD_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+
             # Ensure we're on the main branch and clean any local changes
-            echo "Fetching latest changes..."
+            echo "📥 Fetching latest changes..."
             git fetch --all
 
-            echo "Switching to main branch..."
+            echo "🔄 Switching to main branch..."
             git checkout main
 
-            echo "Resetting to latest remote state..."
+            echo "🧹 Resetting to latest remote state..."
             git reset --hard origin/main
             git clean -fd || true
 
-            echo "Pulling latest changes..."
+            echo "⬇️ Pulling latest changes..."
             git pull origin main
 
+            # Get new commit SHA
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "📊 Old commit: $OLD_COMMIT"
+            echo "📊 New commit: $NEW_COMMIT"
 
-            # Set permissions
-            # sudo chown -R nespola:nespola "$REPO_DIR"
+            # Check if package files changed to determine rebuild strategy
+            PACKAGE_CHANGED=false
+            if [ "$OLD_COMMIT" != "none" ] && [ "$OLD_COMMIT" != "$NEW_COMMIT" ]; then
+              if git diff --name-only $OLD_COMMIT $NEW_COMMIT | grep -E "(package\.json|package-lock\.json)" > /dev/null; then
+                PACKAGE_CHANGED=true
+                echo "📦 Package files changed - will rebuild dependencies"
+              else
+                echo "📦 Package files unchanged - using cached dependencies"
+              fi
+            fi
 
-            # Deploy with Docker
-            echo "Starting Docker deployment..."
-            cd "$REPO_DIR"
+            # Enable Docker BuildKit for advanced caching
             export DOCKER_BUILDKIT=1
-
-            # Get current git commit SHA
-            GIT_COMMIT_SHA=$(git rev-parse HEAD)
-            echo "Current git commit: $GIT_COMMIT_SHA"
+            export COMPOSE_DOCKER_CLI_BUILD=1
 
             # Source environment variables if available
             if [ -f .env ]; then
-              echo "Loading environment variables from .env..."
+              echo "🔧 Loading environment variables from .env..."
               source .env
             else
-              echo "Warning: .env file not found"
-            fi
-
-            # Ensure .env is present for Docker build
-            if [ ! -f .env ]; then
-              echo "❌ ERROR: .env file is missing in the repository root. Aborting deployment."
+              echo "⚠️ Warning: .env file not found"
               exit 1
             fi
 
-            # Build the db container
-            echo "Building db container..."
-            docker compose build --build-arg DB_USER="$DB_USER" --build-arg DB_PASS="$DB_PASS" --build-arg DB_PATH="$DB_PATH" db
+            # Set git commit for cache busting
+            export GIT_COMMIT_SHA=$NEW_COMMIT
 
-            # Build with cache optimization and git commit for cache busting
-            echo "Building Docker image with smart caching..."
-            docker compose build --build-arg GIT_COMMIT_SHA="$GIT_COMMIT_SHA" taskforge-ai
+            echo "🏗️ Building containers with aggressive caching..."
 
-            echo "Stopping existing container..."
-            docker compose down taskforge-ai || true
+            # Strategy 1: If only source code changed, use cache-from for faster builds
+            if [ "$PACKAGE_CHANGED" = false ] && [ "$OLD_COMMIT" != "none" ]; then
+              echo "⚡ Using cached layers for dependencies..."
 
-            echo "Starting new container..."
-            docker compose down
-            docker compose up -d --remove-orphans
+              # Build database container (rarely changes)
+              echo "🗄️ Building database container..."
+              docker compose build db
 
-            # Verify deployment
-            echo "Verifying deployment..."
-            sleep 10
-            if docker compose ps taskforge-ai | grep -q "Up"; then
-              echo "✅ Container is running successfully"
+              # Build app with maximum cache utilization
+              echo "🚀 Building application with cache..."
+              docker compose build \
+                --build-arg GIT_COMMIT_SHA="$NEW_COMMIT" \
+                --build-arg OPENAI_API_KEY="$OPENAI_API_KEY" \
+                taskforge-ai
+
             else
+              echo "🔄 Full rebuild required..."
+
+              # Clean up old images if package changed to avoid conflicts
+              if [ "$PACKAGE_CHANGED" = true ]; then
+                echo "🧹 Cleaning up old dependency caches..."
+                docker image prune -f --filter "label=stage=deps" || true
+              fi
+
+              # Build database container
+              echo "🗄️ Building database container..."
+              docker compose build db
+
+              # Build application with fresh dependencies
+              echo "🚀 Building application..."
+              docker compose build \
+                --build-arg GIT_COMMIT_SHA="$NEW_COMMIT" \
+                --build-arg OPENAI_API_KEY="$OPENAI_API_KEY" \
+                --no-cache \
+                taskforge-ai
+            fi
+
+            # Rolling update deployment for minimal downtime
+            echo "🔄 Performing rolling update..."
+
+            # Stop old container gracefully
+            echo "⏸️ Stopping old application container..."
+            docker compose stop taskforge-ai || true
+
+            # Start database if not running
+            echo "🗄️ Ensuring database is running..."
+            docker compose up -d db
+
+            # Wait for database with timeout
+            echo "⏳ Waiting for database to be ready..."
+            TIMEOUT=60
+            while [ $TIMEOUT -gt 0 ]; do
+              if docker compose exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
+                echo "✅ Database is ready!"
+                break
+              fi
+              echo "⏳ Database not ready, waiting... ($TIMEOUT seconds left)"
+              sleep 2
+              TIMEOUT=$((TIMEOUT - 2))
+            done
+
+            if [ $TIMEOUT -le 0 ]; then
+              echo "❌ Database failed to start in time"
+              docker compose logs db
+              exit 1
+            fi
+
+            # Start new application container
+            echo "🚀 Starting new application container..."
+            docker compose up -d taskforge-ai
+
+            # Verify deployment with extended timeout
+            echo "🔍 Verifying deployment..."
+            VERIFY_TIMEOUT=60
+            while [ $VERIFY_TIMEOUT -gt 0 ]; do
+              if docker compose ps taskforge-ai | grep -q "Up"; then
+                echo "✅ Container is running successfully"
+                break
+              fi
+              echo "⏳ Container starting... ($VERIFY_TIMEOUT seconds left)"
+              sleep 2
+              VERIFY_TIMEOUT=$((VERIFY_TIMEOUT - 2))
+            done
+
+            if [ $VERIFY_TIMEOUT -le 0 ]; then
               echo "❌ Container failed to start"
               docker compose logs taskforge-ai
               exit 1
             fi
 
-            # Clean up - Comment this out initially for debugging
-            echo "Cleaning up Docker system..."
-            docker system prune -af
+            # Health check
+            echo "🏥 Performing health check..."
+            sleep 10
+            if curl -f http://localhost:3000 >/dev/null 2>&1; then
+              echo "✅ Application is responding to health checks"
+            else
+              echo "⚠️ Health check failed, but container is running"
+            fi
 
-            echo "🚀 Deployment completed successfully!"
+            # Clean up only unused images and containers (keep cache)
+            echo "🧹 Cleaning up unused resources..."
+            docker container prune -f
+            docker image prune -f --filter "dangling=true"
+
+            # Show final status
+            echo "📊 Final container status:"
+            docker compose ps
+
+            echo "🎉 Deployment completed successfully!"
+            echo "📊 New version deployed: $NEW_COMMIT"

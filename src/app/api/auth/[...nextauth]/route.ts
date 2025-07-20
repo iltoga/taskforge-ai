@@ -42,6 +42,10 @@
  *       401:
  *         description: "Authentication failed"
  */
+
+// Force Node.js runtime to prevent duplicate callbacks with Prisma adapter
+export const runtime = "nodejs";
+
 import { handlers } from "../../../../../auth";
 
 export const GET = handlers.GET;

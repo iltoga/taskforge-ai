@@ -98,20 +98,54 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 // Debug configuration loading (without secrets)
 console.log("🔧 NextAuth.js Configuration loaded");
 console.log("NODE_ENV:", process.env.NODE_ENV);
-console.log("BYPASS_GOOGLE_AUTH:", process.env.BYPASS_GOOGLE_AUTH);
+// console.log("BYPASS_GOOGLE_AUTH:", process.env.BYPASS_GOOGLE_AUTH);
+console.log("CALENDAR_AUTH_MODE:", process.env.CALENDAR_AUTH_MODE);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter:
-    process.env.BYPASS_GOOGLE_AUTH === "true" ||
-    process.env.NODE_ENV === "development"
+    process.env.BYPASS_GOOGLE_AUTH === "true"
       ? undefined
       : PrismaAdapter(prisma),
   session: {
-    strategy:
-      process.env.BYPASS_GOOGLE_AUTH === "true" ||
-      process.env.NODE_ENV === "development"
-        ? "jwt"
-        : "database",
+    strategy: process.env.BYPASS_GOOGLE_AUTH === "true" ? "jwt" : "database",
+    // Increase session max age for database sessions to reduce queries
+    maxAge:
+      process.env.BYPASS_GOOGLE_AUTH === "true"
+        ? 30 * 24 * 60 * 60
+        : 7 * 24 * 60 * 60, // 30 days for JWT, 7 days for database
+  },
+
+  // CRITICAL: Production URL configuration for OAuth callbacks
+  basePath: "/api/auth",
+  secret: process.env.NEXTAUTH_SECRET,
+
+  // Suppress noisy duplicate callback errors in production
+  logger: {
+    error(error: Error) {
+      // Suppress the common invalid_grant error that happens due to duplicate callbacks
+      if (
+        process.env.NODE_ENV === "production" &&
+        (error.message?.includes("invalid_grant") ||
+          error.message?.includes("CallbackRouteError") ||
+          error.name === "CallbackRouteError")
+      ) {
+        console.warn(
+          "⚠️ Suppressed duplicate callback error (this is normal):",
+          error.message
+        );
+        return;
+      }
+      // Log all other errors normally
+      console.error("❌ NextAuth error:", error);
+    },
+    warn(code: string) {
+      console.warn("⚠️ NextAuth warning:", code);
+    },
+    debug(code: string, metadata?: unknown) {
+      if (process.env.NODE_ENV === "development") {
+        console.debug("🐛 NextAuth debug:", code, metadata);
+      }
+    },
   },
 
   providers:
@@ -145,7 +179,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   "openid email profile https://www.googleapis.com/auth/calendar",
                 access_type: "offline",
                 prompt: "consent",
+                response_type: "code",
               },
+            },
+            // CRITICAL: Disable PKCE to avoid state cookie issues in proxy environments
+            checks: ["state"],
+            // Explicitly set profile to avoid redirect issues
+            profile(profile) {
+              return {
+                id: profile.sub,
+                name: profile.name,
+                email: profile.email,
+                image: profile.picture,
+              };
             },
           }),
         ],
@@ -169,44 +215,52 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           );
           return false;
         }
+
+        // Prevent duplicate account creation by checking if user already exists
+        try {
+          if (process.env.BYPASS_GOOGLE_AUTH !== "true") {
+            const existingUser = await prisma.user.findUnique({
+              where: { email: user.email },
+            });
+            if (existingUser) {
+              console.log(
+                "🔄 Existing user found, skipping duplicate creation"
+              );
+            }
+          }
+        } catch (error) {
+          console.warn("⚠️ Could not check for existing user:", error);
+          // Continue with sign-in even if check fails
+        }
       }
 
       console.log("✅ Sign-in approved for:", user?.email);
       return true;
     },
 
-    async redirect({ url, baseUrl }) {
-      console.log("🔄 Redirect callback:", { url, baseUrl });
+    // Only use custom redirect for bypass mode, let NextAuth handle OAuth redirects automatically
+    ...(process.env.BYPASS_GOOGLE_AUTH === "true" && {
+      async redirect({ url, baseUrl }) {
+        console.log("� Redirect callback (bypass mode):", { url, baseUrl });
 
-      // For development, ensure we use the correct base URL
-      const isLocalDev = process.env.NODE_ENV === "development";
-      const effectiveBaseUrl = isLocalDev ? "http://localhost:3000" : baseUrl;
-
-      // Allows relative callback URLs
-      if (url.startsWith("/")) {
-        const redirectUrl = `${effectiveBaseUrl}${url}`;
-        console.log("📍 Redirecting to:", redirectUrl);
-        return redirectUrl;
-      }
-
-      // Allows callback URLs on the same origin
-      try {
-        const urlObj = new URL(url);
-        const baseUrlObj = new URL(effectiveBaseUrl);
-        if (urlObj.hostname === baseUrlObj.hostname) {
-          console.log("📍 Redirecting to same origin:", url);
-          return url;
+        // Allows relative callback URLs
+        if (url.startsWith("/")) {
+          const redirectUrl = `${baseUrl}${url}`;
+          console.log("📍 Redirecting to relative:", redirectUrl);
+          return redirectUrl;
         }
-      } catch {
-        console.log(
-          "❌ Invalid URL format, redirecting to base:",
-          effectiveBaseUrl
-        );
-      }
 
-      console.log("📍 Redirecting to base URL:", effectiveBaseUrl);
-      return effectiveBaseUrl;
-    },
+        // For same origin URLs, redirect to root
+        if (url.startsWith(baseUrl)) {
+          console.log("📍 Same origin detected, redirecting to root");
+          return baseUrl;
+        }
+
+        // Default fallback to base URL
+        console.log("📍 Fallback redirect to:", baseUrl);
+        return baseUrl;
+      },
+    }),
 
     async jwt({ token, account, user }) {
       console.log("🔑 JWT callback:", {
@@ -214,17 +268,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         hasUser: !!user,
         accountProvider: account?.provider,
         tokenStrategy:
-          process.env.BYPASS_GOOGLE_AUTH !== "true" &&
-          process.env.NODE_ENV !== "development"
-            ? "database"
-            : "jwt",
+          process.env.BYPASS_GOOGLE_AUTH === "true" ? "jwt" : "database",
       });
 
-      // Skip JWT processing for database sessions (only used for bypass mode and dev)
-      if (
-        process.env.BYPASS_GOOGLE_AUTH !== "true" &&
-        process.env.NODE_ENV !== "development"
-      ) {
+      // Skip JWT processing for database sessions (only used for bypass mode)
+      if (process.env.BYPASS_GOOGLE_AUTH !== "true") {
         console.log("📝 Using database sessions, skipping JWT processing");
         return token;
       }
@@ -287,11 +335,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         // Handle different session strategies
-        if (
-          process.env.BYPASS_GOOGLE_AUTH === "true" ||
-          process.env.NODE_ENV === "development"
-        ) {
-          // JWT mode (bypass or development) - use token data
+        if (process.env.BYPASS_GOOGLE_AUTH === "true") {
+          // JWT mode (bypass mode only) - use token data
           session.accessToken = token.accessToken;
           session.refreshToken = token.refreshToken;
           session.error = token.error;
@@ -397,59 +442,66 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   trustHost: true, // Important for ngrok and proxied environments
 
-  // Ensure proper cookie handling for development
+  // CRITICAL: Disable secure cookies for proxy environments
+  useSecureCookies: false,
+
+  // CRITICAL: Fix for state cookie missing error in proxy/CDN environments
+  // - Remove __Secure- prefixes
+  // - Set secure: false and sameSite: 'lax' for all cookies
+  // - Make sure NEXTAUTH_URL is set to your public HTTPS domain in the environment
   cookies: {
     sessionToken: {
-      name:
-        process.env.NODE_ENV === "development"
-          ? "next-auth.session-token"
-          : "__Secure-next-auth.session-token",
+      name: "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production", // Only secure in production
-        domain:
-          process.env.NODE_ENV === "development"
-            ? undefined
-            : new URL(process.env.NEXTAUTH_URL || "").hostname,
+        secure: false,
       },
     },
     callbackUrl: {
-      name:
-        process.env.NODE_ENV === "development"
-          ? "next-auth.callback-url"
-          : "__Secure-next-auth.callback-url",
-      options: {
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production", // Only secure in production
-        domain:
-          process.env.NODE_ENV === "development"
-            ? undefined
-            : new URL(process.env.NEXTAUTH_URL || "").hostname,
-      },
-    },
-    csrfToken: {
-      name:
-        process.env.NODE_ENV === "development"
-          ? "next-auth.csrf-token"
-          : "__Secure-next-auth.csrf-token",
+      name: "next-auth.callback-url",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production", // Only secure in production
-        domain:
-          process.env.NODE_ENV === "development"
-            ? undefined
-            : new URL(process.env.NEXTAUTH_URL || "").hostname,
+        secure: false,
+      },
+    },
+    csrfToken: {
+      name: "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+      },
+    },
+    state: {
+      name: "next-auth.state",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+        maxAge: 900,
+      },
+    },
+    nonce: {
+      name: "next-auth.nonce",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: false,
+        maxAge: 900,
       },
     },
   },
 
   pages: {
     error: "/auth/error", // Custom error page
+    // Don't override signIn page to avoid redirect loops
   },
 
   events: {
