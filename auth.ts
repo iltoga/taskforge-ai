@@ -179,19 +179,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   "openid email profile https://www.googleapis.com/auth/calendar",
                 access_type: "offline",
                 prompt: "consent",
-                response_type: "code",
               },
-            },
-            // CRITICAL: Disable PKCE to avoid state cookie issues in proxy environments
-            checks: ["state"],
-            // Explicitly set profile to avoid redirect issues
-            profile(profile) {
-              return {
-                id: profile.sub,
-                name: profile.name,
-                email: profile.email,
-                image: profile.picture,
-              };
             },
           }),
         ],
@@ -442,62 +430,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   trustHost: true, // Important for ngrok and proxied environments
 
-  // CRITICAL: Disable secure cookies for proxy environments
-  useSecureCookies: false,
-
-  // CRITICAL: Fix for state cookie missing error in proxy/CDN environments
-  // - Remove __Secure- prefixes
-  // - Set secure: false and sameSite: 'lax' for all cookies
-  // - Make sure NEXTAUTH_URL is set to your public HTTPS domain in the environment
-  cookies: {
-    sessionToken: {
-      name: "next-auth.session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-      },
-    },
-    callbackUrl: {
-      name: "next-auth.callback-url",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-      },
-    },
-    csrfToken: {
-      name: "next-auth.csrf-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-      },
-    },
-    state: {
-      name: "next-auth.state",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-        maxAge: 900,
-      },
-    },
-    nonce: {
-      name: "next-auth.nonce",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: false,
-        maxAge: 900,
-      },
-    },
-  },
+  // Use environment-appropriate cookie settings
+  useSecureCookies: process.env.NODE_ENV === "production",
 
   pages: {
     error: "/auth/error", // Custom error page
