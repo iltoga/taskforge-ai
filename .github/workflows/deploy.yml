@@ -50,9 +50,15 @@ jobs:
             echo "🔄  Switching to main branch …"
             git checkout main
 
+            echo "🐳  Ensuring no Docker containers are interfering..."
+            docker compose down --remove-orphans || echo "⚠️  No containers to stop"
+
             echo "🧹  Resetting local state …"
             git reset --hard origin/main
-            git clean -fd
+
+            # Safely clean only untracked files that won't interfere with operations
+            echo "🧹  Cleaning safe untracked files..."
+            git clean -f || echo "⚠️  Some files couldn't be cleaned, continuing..."
 
             echo "⬇️  Pulling latest commits …"
             git pull origin main
