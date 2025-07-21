@@ -4,4 +4,5 @@ export interface ExtendedSession extends Session {
   accessToken?: string;
   refreshToken?: string;
   accessTokenExpires?: number;
+  error?: string;
 }

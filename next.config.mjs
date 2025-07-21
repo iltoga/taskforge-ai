@@ -57,8 +57,8 @@ const nextConfig = {
 
 // Disable Serwist in development to avoid Turbopack conflicts
 // Only enable in production builds
-export default process.env.NODE_ENV === 'development' 
-  ? nextConfig 
+export default process.env.NODE_ENV === 'development'
+  ? nextConfig
   : withSerwistInit({
       swSrc: "src/app/sw.ts",
       swDest: "public/sw.js",
