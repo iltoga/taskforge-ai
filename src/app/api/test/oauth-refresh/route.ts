@@ -32,10 +32,10 @@
  * This script can be used during development to test the token refresh flow
  */
 
-import { auth, createGoogleAuth } from "../../../../auth";
 import { CalendarService } from "@/services/calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
+import { auth, createGoogleAuth } from "../../../../../auth";
 
 export async function GET() {
   console.log("🔍 Testing OAuth token refresh functionality...");

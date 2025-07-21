@@ -28,9 +28,9 @@
  *       405:
  *         description: "Method not allowed"
  */
-import { auth } from "../../../../auth";
 import { clearUserChatData } from "@/services/user-chat-data-service";
 import { NextResponse } from "next/server";
+import { auth } from "../../../../../auth";
 
 /**
  * Clear Chat API Route

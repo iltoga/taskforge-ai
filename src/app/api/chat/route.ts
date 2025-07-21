@@ -62,7 +62,6 @@
  *         description: "Internal server error"
  */
 import { ModelType } from "@/appconfig/models";
-import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
@@ -72,12 +71,14 @@ import { EmailTools } from "@/tools/email-tools";
 import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
+import { auth, createGoogleAuth } from "../../../../auth";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
-import { ExtendedSession } from "../../../../auth";
+
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
 import { CalendarEvent } from "@/types/calendar";
 import { ProcessedFile } from "@/types/files";
 import { NextResponse } from "next/server";
+import { ExtendedSession } from "../../../types/auth";
 
 export async function POST(request: Request) {
   try {

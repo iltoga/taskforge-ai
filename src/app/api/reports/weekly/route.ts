@@ -45,13 +45,13 @@
  *         description: "Failed to generate report"
  */
 import { ModelType } from "@/appconfig/models";
-import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
+import { auth, createGoogleAuth } from "../../../../../auth";
 
 export async function POST(request: Request) {
   console.log("🚀 Weekly report API called");

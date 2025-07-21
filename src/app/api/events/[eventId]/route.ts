@@ -72,10 +72,10 @@
  *       500:
  *         description: "Failed to update event"
  */
-import { auth, createGoogleAuth } from "../../../../auth";
 import { CalendarService } from "@/services/calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
+import { auth, createGoogleAuth } from "../../../../../auth";
 
 export async function DELETE(
   request: Request,

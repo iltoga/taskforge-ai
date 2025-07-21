@@ -32,12 +32,12 @@
  *       500:
  *         description: "Failed to fetch upcoming events"
  */
-import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
+import { auth, createGoogleAuth } from "../../../../../auth";
 
 export async function GET(request: Request) {
   try {

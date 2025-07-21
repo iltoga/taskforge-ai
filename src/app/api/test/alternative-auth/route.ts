@@ -37,14 +37,14 @@
  *       500:
  *         description: "Authentication test failed"
  */
+import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
+import { ExtendedSession } from "@/types/auth";
+import { NextResponse } from "next/server";
 import {
   auth,
   getServiceAccountAuth,
   isServiceAccountAvailable,
-} from "../../../../auth";
-import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
-import { ExtendedSession } from "@/types/auth";
-import { NextResponse } from "next/server";
+} from "../../../../../auth";
 
 interface TestResult {
   success: boolean;
@@ -136,7 +136,7 @@ export async function GET(request: Request) {
         console.log("🔐 Testing user OAuth authentication...");
 
         // Import createGoogleAuth here to avoid circular imports
-        const { createGoogleAuth } = await import("../../../../auth");
+        const { createGoogleAuth } = await import("../../../../../auth");
         const userAuth = createGoogleAuth(
           session.accessToken,
           session.refreshToken
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
 
       let primaryAuth = undefined;
       if (session?.accessToken && !forceServiceAccount) {
-        const { createGoogleAuth } = await import("../../../../auth");
+        const { createGoogleAuth } = await import("../../../../../auth");
         primaryAuth = createGoogleAuth(
           session.accessToken,
           session.refreshToken

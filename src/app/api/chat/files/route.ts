@@ -54,13 +54,13 @@
  *       500:
  *         description: "Failed to delete files"
  */
-import { auth } from "../../../../auth";
 import { AIProviderConfig } from "@/lib/openai";
 import { PdfConverter } from "@/services/pdf-converter";
 import { ApiResponse, ProcessedFile } from "@/types/files";
 import fs from "fs";
 import { lookup as mimeLookup } from "mime-types";
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "../../../../../auth";
 
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "4194304", 10); // 4 MB
 const FILE_UPLOAD_DIR = process.env.FILE_UPLOAD_DIR || "/app/tmp_data";
