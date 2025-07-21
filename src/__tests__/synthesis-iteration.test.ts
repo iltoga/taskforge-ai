@@ -53,7 +53,7 @@ describe("Enhanced Orchestrator - Synthesis Iteration", () => {
       items: [
         {
           id: "1",
-          summary: "Nespola Daily Report",
+          summary: "TechcorpDaily Report",
           description: "Backend work on API endpoints",
           start: { date: "2025-03-15" },
           end: { date: "2025-03-16" },
@@ -61,7 +61,7 @@ describe("Enhanced Orchestrator - Synthesis Iteration", () => {
         },
         {
           id: "2",
-          summary: "Nespola Client Meeting",
+          summary: "TechcorpClient Meeting",
           description: "Project review with client",
           start: { dateTime: "2025-04-10T14:00:00+08:00" },
           end: { dateTime: "2025-04-10T15:00:00+08:00" },
@@ -77,7 +77,7 @@ describe("Enhanced Orchestrator - Synthesis Iteration", () => {
       // Analysis phase
       .mockResolvedValueOnce({
         text: `## 1. REQUEST DECOMPOSITION
-User wants a high-level overview/summary of how the Nespola project is going, not a detailed event listing.
+User wants a high-level overview/summary of how the Techcorpproject is going, not a detailed event listing.
 This is a HOLISTIC SUMMARY request based on keywords "how is" and "going".
 
 ## 5. COMPLEXITY ASSESSMENT
@@ -97,7 +97,7 @@ CALL_TOOLS:
         "end": "2025-06-30T23:59:59+08:00"
       }
     },
-    "reasoning": "Search for Nespola events to understand project status and activities"
+    "reasoning": "Search for techoneevents to understand project status and activities"
   }
 ]
 \`\`\``,
@@ -105,30 +105,30 @@ CALL_TOOLS:
       // Progress evaluation
       .mockResolvedValueOnce({
         text: `\`\`\`
-COMPLETE: Found 2 Nespola events that provide sufficient information to assess project status and provide holistic overview.
+COMPLETE: Found 2 Techcorpevents that provide sufficient information to assess project status and provide holistic overview.
 \`\`\``,
       })
       // Initial synthesis (too detailed - just lists events)
       .mockResolvedValueOnce({
-        text: `## Events Summary for Nespola (March - June 2025)
+        text: `## Events Summary for techone(March - June 2025)
 
-### Nespola Daily Report
+### TechcorpDaily Report
 **Date:** March 15, 2025
 **Description:** Backend work on API endpoints
 **Status:** Confirmed
 
-### Nespola Client Meeting
+### TechcorpClient Meeting
 **Date:** April 10, 2025 at 2:00 PM - 3:00 PM
 **Description:** Project review with client
 **Status:** Confirmed
 
 ## Total Events
-Found 2 events for Nespola during this period.`,
+Found 2 events for techoneduring this period.`,
       })
       // Format validation (detects mismatch)
       .mockResolvedValueOnce({
         text: `\`\`\`
-FORMAT_NEEDS_REFINEMENT: The user asked "how is the nespola project going" which is a HOLISTIC SUMMARY request, but the response provided a DETAILED BREAKDOWN of individual events instead of a synthesized project overview.
+FORMAT_NEEDS_REFINEMENT: The user asked "how is the techcorpproject going" which is a HOLISTIC SUMMARY request, but the response provided a DETAILED BREAKDOWN of individual events instead of a synthesized project overview.
 
 REQUIRED_CHANGES:
 - Transform from event listing to integrated project narrative
@@ -141,9 +141,9 @@ EXPECTED_FORMAT: An integrated narrative about project status, progress, and key
       })
       // Refined synthesis (proper holistic summary)
       .mockResolvedValueOnce({
-        text: `## Nespola Project Status Overview
+        text: `## TechcorpProject Status Overview
 
-Based on my review of your calendar data from March to June 2025, here's how the Nespola project is progressing:
+Based on my review of your calendar data from March to June 2025, here's how the Techcorpproject is progressing:
 
 **Current Status:**
 The project appears to be in active development with regular activities. Over this 4-month period, I can see consistent engagement with both internal development work and client collaboration.
@@ -154,7 +154,7 @@ The project appears to be in active development with regular activities. Over th
 - **Consistent Activity**: The project maintains steady momentum with both development work and stakeholder meetings
 
 **Overall Assessment:**
-The Nespola project shows healthy progress with a good balance of technical development and client communication. The timeline suggests organized project management with regular development cycles and client touchpoints.
+The Techcorpproject shows healthy progress with a good balance of technical development and client communication. The timeline suggests organized project management with regular development cycles and client touchpoints.
 
 **Looking Ahead:**
 The established pattern of development work followed by client reviews suggests a well-structured project approach that should continue to deliver steady progress.`,
@@ -168,7 +168,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
 
     // Execute orchestration
     const result = await orchestrator.orchestrate(
-      "how is the nespola project going between march and june 2025?",
+      "how is the techcorpproject going between march and june 2025?",
       [], // empty chat history
       registry,
       "gpt-4.1-mini",
@@ -222,7 +222,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       items: [
         {
           id: "1",
-          summary: "Nespola Meeting",
+          summary: "TechcorpMeeting",
           start: { dateTime: "2025-03-15T14:00:00+08:00" },
           end: { dateTime: "2025-03-15T15:00:00+08:00" },
           status: "confirmed" as const,
@@ -250,9 +250,9 @@ CALL_TOOLS:
       })
       // Initial synthesis (detailed breakdown - appropriate for this request)
       .mockResolvedValueOnce({
-        text: `## Nespola Events
+        text: `## TechcorpEvents
 
-### Nespola Meeting
+### TechcorpMeeting
 **Date:** March 15, 2025 at 2:00 PM - 3:00 PM
 **Status:** Confirmed
 
@@ -266,7 +266,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       });
 
     const result = await orchestrator.orchestrate(
-      "list all nespola events",
+      "list all techcorpevents",
       [], // empty chat history
       registry,
       "gpt-4.1-mini",
@@ -282,7 +282,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
     expect(synthesisSteps).toHaveLength(1);
 
     // Should contain proper event breakdown format
-    expect(result.finalAnswer).toContain("### Nespola Meeting");
+    expect(result.finalAnswer).toContain("### TechcorpMeeting");
     expect(result.finalAnswer).toContain("**Date:**");
 
     console.log(

@@ -455,7 +455,7 @@ Return ONLY the JSON object, no other text.`;
         let toolResult;
 
         if (messageLower.includes("nespola")) {
-          // Search for nespola events
+          // Search for techoneevents
           const timeRange = this.extractTimeRange(message);
           toolResult = await calendarTools.searchEvents("nespola", timeRange);
           toolCalls.push({ tool: "searchEvents", result: toolResult });
@@ -463,7 +463,7 @@ Return ONLY the JSON object, no other text.`;
           if (toolResult.success && Array.isArray(toolResult.data)) {
             const events = toolResult.data as SimplifiedEvent[];
             if (events.length > 0) {
-              // Use AI to generate a proper summary of Nespola events
+              // Use AI to generate a proper summary of Techcorpevents
               response = await this.generateEventSummary(
                 events,
                 message,
@@ -471,10 +471,10 @@ Return ONLY the JSON object, no other text.`;
               );
             } else {
               response =
-                "I didn't find any events related to Nespola in the specified time period.";
+                "I didn't find any events related to Techcorpin the specified time period.";
             }
           } else {
-            response = `I tried to search for Nespola events but encountered an issue: ${
+            response = `I tried to search for techoneevents but encountered an issue: ${
               toolResult.message || "Unknown error"
             }`;
           }

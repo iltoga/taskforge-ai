@@ -1,8 +1,8 @@
-import { z } from 'zod';
-import { CalendarService } from '../services/calendar-service';
-import { ToolOrchestrator } from '../services/tool-orchestrator';
-import { CalendarTools } from '../tools/calendar-tools';
-import { ToolRegistry, createToolRegistry } from '../tools/tool-registry';
+import { z } from "zod";
+import { CalendarService } from "../services/calendar-service";
+import { ToolOrchestrator } from "../services/tool-orchestrator";
+import { CalendarTools } from "../tools/calendar-tools";
+import { ToolRegistry, createToolRegistry } from "../tools/tool-registry";
 
 // Mock CalendarService
 const mockCalendarService = {
@@ -14,17 +14,17 @@ const mockCalendarService = {
 
 // Mock OpenAI API
 const mockGenerateText = jest.fn();
-jest.mock('ai', () => ({
+jest.mock("ai", () => ({
   generateText: (params: unknown) => mockGenerateText(params),
 }));
 
-jest.mock('@ai-sdk/openai', () => ({
+jest.mock("@ai-sdk/openai", () => ({
   createOpenAI: jest.fn(() => ({
-    languageModel: jest.fn(() => 'mock-model'),
+    languageModel: jest.fn(() => "mock-model"),
   })),
 }));
 
-describe('Enhanced Tool Orchestrator', () => {
+describe("Enhanced Tool Orchestrator", () => {
   let orchestrator: ToolOrchestrator;
   let registry: ToolRegistry;
   let calendarTools: CalendarTools;
@@ -35,24 +35,32 @@ describe('Enhanced Tool Orchestrator', () => {
     // Setup
     calendarTools = new CalendarTools(mockCalendarService);
     registry = createToolRegistry(calendarTools);
-    orchestrator = new ToolOrchestrator('test-api-key');
+    orchestrator = new ToolOrchestrator("test-api-key");
 
     // Mock calendar service to return test events
     mockCalendarService.getEvents.mockResolvedValue({
       items: [
-        { id: '1', summary: 'Test Meeting', start: { dateTime: '2024-06-15T14:00:00Z' } },
-        { id: '2', summary: 'Nespola Review', start: { dateTime: '2024-06-16T15:00:00Z' } }
-      ]
+        {
+          id: "1",
+          summary: "Test Meeting",
+          start: { dateTime: "2024-06-15T14:00:00Z" },
+        },
+        {
+          id: "2",
+          summary: "TechcorpReview",
+          start: { dateTime: "2024-06-16T15:00:00Z" },
+        },
+      ],
     });
 
     mockCalendarService.createEvent.mockResolvedValue({
-      id: 'new-event-123',
-      summary: 'New Meeting',
-      start: { dateTime: '2024-06-16T14:00:00Z' }
+      id: "new-event-123",
+      summary: "New Meeting",
+      start: { dateTime: "2024-06-16T14:00:00Z" },
     });
   });
 
-  it('should perform comprehensive analysis with enhanced prompting', async () => {
+  it("should perform comprehensive analysis with enhanced prompting", async () => {
     mockGenerateText
       .mockResolvedValueOnce({
         text: `## 1. REQUEST DECOMPOSITION
@@ -77,7 +85,7 @@ Contingency plans: Retry with different parameters
 Expected deliverable: Formatted list of events
 
 ## 5. COMPLEXITY ASSESSMENT
-Simple (single tool call)`
+Simple (single tool call)`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`json
@@ -89,12 +97,12 @@ CALL_TOOLS:
     "reasoning": "Need to retrieve calendar events to answer user's request"
   }
 ]
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 COMPLETE: We have successfully retrieved the calendar events. The results show 2 events which provides sufficient information to answer the user's request comprehensively.
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `# Your Calendar Events
@@ -105,40 +113,40 @@ I found 2 events in your calendar:
 **Time:** June 15, 2024 at 2:00 PM
 **ID:** 1
 
-## 📅 Nespola Review
+## 📅 TechcorpReview
 **Time:** June 16, 2024 at 3:00 PM
 **ID:** 2
 
-Both events are properly scheduled and ready for your reference.`
+Both events are properly scheduled and ready for your reference.`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
-\`\`\``
+\`\`\``,
       });
 
     const result = await orchestrator.orchestrate(
-      'Show me my calendar events',
+      "Show me my calendar events",
       [], // empty chat history
       registry,
-      'gpt-4.1-mini',
+      "gpt-4.1-mini",
       { developmentMode: true }
     );
 
     expect(result.success).toBe(true);
     expect(result.steps.length).toBeGreaterThanOrEqual(4); // Allow for extra steps
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.finalAnswer).toContain('2 events');
+    expect(result.finalAnswer).toContain("2 events");
 
     // Verify enhanced analysis step
-    const analysisStep = result.steps.find(step => step.type === 'analysis');
+    const analysisStep = result.steps.find((step) => step.type === "analysis");
     expect(analysisStep).toBeDefined();
-    expect(analysisStep!.content).toContain('REQUEST DECOMPOSITION');
-    expect(analysisStep!.content).toContain('TOOL STRATEGY');
-    expect(analysisStep!.content).toContain('COMPLEXITY ASSESSMENT');
+    expect(analysisStep!.content).toContain("REQUEST DECOMPOSITION");
+    expect(analysisStep!.content).toContain("TOOL STRATEGY");
+    expect(analysisStep!.content).toContain("COMPLEXITY ASSESSMENT");
   });
 
-  it('should handle multi-step reasoning with iterative tool calls', async () => {
+  it("should handle multi-step reasoning with iterative tool calls", async () => {
     mockGenerateText
       .mockResolvedValueOnce({
         text: `## 1. REQUEST DECOMPOSITION
@@ -152,7 +160,7 @@ Specific tools: createEvent, then getEvents
 Optimal sequence: Create first, then list to verify
 
 ## 3. APPROACH PLAN
-Two-step process with verification`
+Two-step process with verification`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`json
@@ -170,12 +178,12 @@ CALL_TOOLS:
     "reasoning": "First step: create the requested event"
   }
 ]
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 CONTINUE: Event was created successfully but we should verify it appears in the calendar to provide complete confirmation to the user.
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`json
@@ -187,12 +195,12 @@ CALL_TOOLS:
     "reasoning": "Verify the created event appears in the calendar"
   }
 ]
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 COMPLETE: We have successfully created the event and verified it appears in the calendar. This provides complete confirmation of the action.
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `✅ **Event Created Successfully!**
@@ -203,19 +211,19 @@ I've created your new meeting and verified it's in your calendar:
 **Time:** June 20, 2024 at 2:00 PM - 3:00 PM
 **Status:** ✅ Confirmed in calendar
 
-The event has been successfully added and is ready for you.`
+The event has been successfully added and is ready for you.`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
-\`\`\``
+\`\`\``,
       });
 
     // Add createEvent tool to registry with proper schema
     registry.registerTool(
       {
-        name: 'createEvent',
-        description: 'Create a new calendar event',
+        name: "createEvent",
+        description: "Create a new calendar event",
         parameters: z.object({
           eventData: z.object({
             summary: z.string(),
@@ -227,14 +235,14 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
               dateTime: z.string().optional(),
               date: z.string().optional(),
             }),
-          })
+          }),
         }),
-        category: 'calendar'
+        category: "calendar",
       },
       async () => ({
         success: true,
-        data: { id: 'new-event-123', summary: 'New Meeting' },
-        message: 'Event created successfully'
+        data: { id: "new-event-123", summary: "New Meeting" },
+        message: "Event created successfully",
       })
     );
 
@@ -242,17 +250,17 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       'Create a meeting called "New Meeting" for tomorrow at 2pm and verify it was created',
       [], // empty chat history
       registry,
-      'gpt-4.1-mini',
+      "gpt-4.1-mini",
       { developmentMode: true }
     );
 
     expect(result.success).toBe(true);
     expect(result.toolCalls).toHaveLength(2); // create + verify
     expect(result.steps.length).toBeGreaterThanOrEqual(6); // Allow for extra steps
-    expect(result.finalAnswer).toContain('Event Created Successfully');
+    expect(result.finalAnswer).toContain("Event Created Successfully");
   });
 
-  it('should handle tool failures gracefully with detailed error information', async () => {
+  it("should handle tool failures gracefully with detailed error information", async () => {
     mockGenerateText
       .mockResolvedValueOnce({
         text: `## 1. REQUEST DECOMPOSITION
@@ -262,7 +270,7 @@ Potential sub-tasks: Query calendar API
 
 ## 2. TOOL STRATEGY
 Calendar tools required
-Specific tools: getEvents`
+Specific tools: getEvents`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`json
@@ -274,12 +282,12 @@ CALL_TOOLS:
     "reasoning": "Retrieve calendar events as requested"
   }
 ]
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 COMPLETE: Although the tool call failed, we have enough information to provide a helpful error message to the user explaining what went wrong.
-\`\`\``
+\`\`\``,
       })
       .mockResolvedValueOnce({
         text: `❌ **Unable to Retrieve Calendar Events**
@@ -292,50 +300,52 @@ I encountered an issue while trying to access your calendar:
 - **Message:** Please try again in a few minutes
 
 **Suggested Solution:**
-Please wait a few minutes and try your request again. Calendar API limits help ensure reliable service for all users.`
+Please wait a few minutes and try your request again. Calendar API limits help ensure reliable service for all users.`,
       })
       .mockResolvedValueOnce({
         text: `\`\`\`
 FORMAT_ACCEPTABLE: The response properly addresses the user's request with appropriate format and content structure.
-\`\`\``
+\`\`\``,
       });
 
     // Override the getEvents tool to fail
     registry.registerTool(
       {
-        name: 'getEvents',
-        description: 'Get calendar events (will fail)',
+        name: "getEvents",
+        description: "Get calendar events (will fail)",
         parameters: z.object({
-          timeRange: z.object({
-            start: z.string().optional(),
-            end: z.string().optional(),
-          }).optional()
+          timeRange: z
+            .object({
+              start: z.string().optional(),
+              end: z.string().optional(),
+            })
+            .optional(),
         }),
-        category: 'calendar'
+        category: "calendar",
       },
       async () => ({
         success: false,
-        error: 'API rate limit exceeded',
-        message: 'Please try again in a few minutes'
+        error: "API rate limit exceeded",
+        message: "Please try again in a few minutes",
       })
     );
 
     const result = await orchestrator.orchestrate(
-      'Show me my events',
+      "Show me my events",
       [], // empty chat history
       registry,
-      'gpt-4.1-mini',
+      "gpt-4.1-mini",
       { developmentMode: true, maxToolCalls: 1 } // Limit to 1 tool call for this test
     );
 
     expect(result.success).toBe(true);
     expect(result.toolCalls).toHaveLength(1);
     expect(result.toolCalls[0].result.success).toBe(false);
-    expect(result.finalAnswer).toContain('Unable to Retrieve Calendar Events');
-    expect(result.finalAnswer).toContain('API rate limit exceeded');
+    expect(result.finalAnswer).toContain("Unable to Retrieve Calendar Events");
+    expect(result.finalAnswer).toContain("API rate limit exceeded");
   });
 
-  it('should parse tool decisions from various formats', async () => {
+  it("should parse tool decisions from various formats", async () => {
     const testCases = [
       // JSON with code blocks
       `\`\`\`json
@@ -348,41 +358,43 @@ CALL_TOOLS:
 [{"name": "test", "parameters": {}}]`,
 
       // Just JSON array
-      `[{"name": "test", "parameters": {}}]`
+      `[{"name": "test", "parameters": {}}]`,
     ];
 
     for (const testCase of testCases) {
       const decisions = (orchestrator as any).parseToolDecisions(testCase);
       expect(decisions).toHaveLength(1);
-      expect(decisions[0].name).toBe('test');
+      expect(decisions[0].name).toBe("test");
     }
   });
 
-  it('should correctly evaluate when more information is needed', async () => {
+  it("should correctly evaluate when more information is needed", async () => {
     const testCases = [
-      { content: 'CONTINUE: Need more data', expected: true },
-      { content: 'COMPLETE: Have sufficient info', expected: false },
-      { content: 'We need more information to proceed', expected: true },
-      { content: 'We have enough information to answer', expected: false },
-      { content: 'The current data is sufficient', expected: false }
+      { content: "CONTINUE: Need more data", expected: true },
+      { content: "COMPLETE: Have sufficient info", expected: false },
+      { content: "We need more information to proceed", expected: true },
+      { content: "We have enough information to answer", expected: false },
+      { content: "The current data is sufficient", expected: false },
     ];
 
     for (const testCase of testCases) {
-      const result = (orchestrator as any).needsMoreInformation(testCase.content);
+      const result = (orchestrator as any).needsMoreInformation(
+        testCase.content
+      );
       expect(result).toBe(testCase.expected);
     }
   });
 
-  it('should include tool categories in analysis phase', async () => {
+  it("should include tool categories in analysis phase", async () => {
     mockGenerateText.mockResolvedValueOnce({
-      text: 'Analysis with tool categories'
+      text: "Analysis with tool categories",
     });
 
     await orchestrator.orchestrate(
-      'Test message',
+      "Test message",
       [], // empty chat history
       registry,
-      'gpt-4.1-mini',
+      "gpt-4.1-mini",
       { maxSteps: 1 }
     );
 
@@ -390,9 +402,9 @@ CALL_TOOLS:
       expect.objectContaining({
         messages: expect.arrayContaining([
           expect.objectContaining({
-            content: expect.stringContaining('**CALENDAR**:')
-          })
-        ])
+            content: expect.stringContaining("**CALENDAR**:"),
+          }),
+        ]),
       })
     );
   });

@@ -64,7 +64,7 @@ Added `src/__tests__/calendar-tools.test.ts` with tests covering:
 ```json
 {
   "id": "123",
-  "summary": "Nespola Meeting",
+  "summary": "TechcorpMeeting",
   "description": "Project discussion",
   "start": { "dateTime": "2025-06-18T14:00:00+08:00" },
   "end": { "dateTime": "2025-06-18T15:00:00+08:00" },
@@ -87,7 +87,7 @@ Added `src/__tests__/calendar-tools.test.ts` with tests covering:
 ```json
 {
   "id": "123",
-  "title": "Nespola Meeting",
+  "title": "TechcorpMeeting",
   "description": "Project discussion",
   "startDate": "2025-06-18T14:00:00+08:00",
   "endDate": "2025-06-18T15:00:00+08:00",

@@ -47,11 +47,11 @@ For each user request, think step by step:
 
 ## REASONING EXAMPLES
 
-**User:** "Show me all my Nespola meetings from March to June 2025"
+**User:** "Show me all my Techcorpmeetings from March to June 2025"
 
 **AI Reasoning:**
 
-1. User wants to find specific events (Nespola meetings) in a time range
+1. User wants to find specific events (Techcorpmeetings) in a time range
 2. I should use `searchEvents` with query "Nespola" and timeRange March-June 2025
 3. After getting results, I'll analyze and present them
 4. If results seem incomplete, I might try `getEvents` with broader search
@@ -110,7 +110,7 @@ Structure your responses to show your reasoning process:
   ✅ Tool getEvents completed successfully
   Parameters: {"timeRange": {"start": "2025-03-01", "end": "2025-06-30"}}
   Result: Found 3 events
-  Message: Found 3 Nespola meetings
+  Message: Found 3 Techcorpmeetings
   ```
 
 ## IMPORTANT BEHAVIORAL RULES

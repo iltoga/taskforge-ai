@@ -72,7 +72,7 @@ We have successfully refactored Calendar Assistant to implement a true agentic, 
 2. **Test Agentic Queries**
 
    ```
-   "Show me my Nespola events from March to June 2025"
+   "Show me my Techcorpevents from March to June 2025"
    "Find all meetings related to project management this month"
 
    "What conflicts do I have next week and suggest solutions"
@@ -87,7 +87,7 @@ We have successfully refactored Calendar Assistant to implement a true agentic, 
 
 #### Expected Behavior
 
-**User Input**: "Show me all Nespola events from March to June 2025"
+**User Input**: "Show me all Techcorpevents from March to June 2025"
 
 **Agentic Process**:
 

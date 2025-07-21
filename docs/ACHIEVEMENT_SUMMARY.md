@@ -86,7 +86,7 @@ We successfully transformed Calendar Assistant from a simple calendar assistant 
 **Result**: Formatted list of tomorrow's events
 
 ### Complex Request
-**User**: "Find all Nespola meetings this quarter and create a summary"
+**User**: "Find all Techcorpmeetings this quarter and create a summary"
 **AI Process**:
 1. Analysis (multi-step planning)
 2. Execute getEvents with date range and filters

@@ -33,7 +33,7 @@ This isn't just another calendar app. It's a **sophisticated agentic AI system**
 ### 📅 **Smart Calendar Management**
 
 - **Natural Language Interface**: "Schedule meeting with John tomorrow at 2 PM"
-- **Complex Queries**: "Show me all Nespola events from March to June 2025"
+- **Complex Queries**: "Show me all Techcorpevents from March to June 2025"
 - **Conflict Resolution**: Intelligent scheduling with conflict detection
 - **Weekly Analytics**: AI-powered work reports and summaries
 
@@ -178,7 +178,7 @@ OPENROUTER_API_KEY="your-openrouter-api-key"
 
 ```typescript
 // Complex multi-step queries
-"Find all meetings with Nespola between March and June 2025,
+"Find all meetings with Techcorpbetween March and June 2025,
 then create a summary report"
 
 "Schedule a meeting with the engineering team next Tuesday at 2 PM,

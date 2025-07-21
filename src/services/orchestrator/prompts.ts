@@ -148,7 +148,7 @@ USER: "I uploaded a passport PDF. Extract the details."
   if (registry.getAvailableCategories().includes("calendar")) {
     ex.push(
       `**Example – Calendar search**
-USER: "Show all Nespola meetings from March to June"
+USER: "Show all Techcorpmeetings from March to June"
 → Decompose as: objective = list meetings; tool = searchEvents; params = {query:"nespola", timeRange:{start:"2025-03-01T00:00:00Z", end:"2025-06-30T23:59:59Z"}}.`
     );
   }
