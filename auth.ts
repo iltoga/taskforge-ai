@@ -119,6 +119,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/api/auth",
   secret: process.env.NEXTAUTH_SECRET,
 
+  // Additional configuration to prevent "Configuration" errors
+  trustHost: true,
+
   // Suppress noisy duplicate callback errors in production
   logger: {
     error(error: Error) {
@@ -336,19 +339,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
           return session;
         } else {
-          // Database mode (Google OAuth) - load from database
+          // Database mode (Google OAuth) - load from database with timeout
           if (user?.id) {
             console.log("📝 Loading Google OAuth session for user:", user.id);
 
             try {
-              // Test database connection
-              await prisma.$connect();
+              // Add timeout to database operations to prevent hanging
+              const DATABASE_TIMEOUT = 3000; // 3 seconds
+
+              // Test database connection with timeout
+              await Promise.race([
+                prisma.$connect(),
+                new Promise((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error("Database connection timeout")),
+                    DATABASE_TIMEOUT
+                  )
+                ),
+              ]);
               console.log("✅ Database connected");
 
-              // For Google OAuth, we need to get tokens from account
-              const account = await prisma.account.findFirst({
-                where: { userId: user.id, provider: "google" },
-              });
+              // For Google OAuth, we need to get tokens from account with timeout
+              const account = await Promise.race([
+                prisma.account.findFirst({
+                  where: { userId: user.id, provider: "google" },
+                }),
+                new Promise<null>((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error("Database query timeout")),
+                    DATABASE_TIMEOUT
+                  )
+                ),
+              ]);
 
               if (account) {
                 console.log("📝 Found Google account:", {
@@ -372,17 +394,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     } as JWT);
 
                     if (!refreshed.error) {
-                      // Update tokens in database
-                      await prisma.account.update({
-                        where: { id: account.id },
-                        data: {
-                          access_token: refreshed.accessToken,
-                          expires_at: Math.floor(
-                            refreshed.accessTokenExpires! / 1000
-                          ),
-                          refresh_token: refreshed.refreshToken,
-                        },
-                      });
+                      // Update tokens in database with timeout
+                      await Promise.race([
+                        prisma.account.update({
+                          where: { id: account.id },
+                          data: {
+                            access_token: refreshed.accessToken,
+                            expires_at: Math.floor(
+                              refreshed.accessTokenExpires! / 1000
+                            ),
+                            refresh_token: refreshed.refreshToken,
+                          },
+                        }),
+                        new Promise((_, reject) =>
+                          setTimeout(
+                            () => reject(new Error("Database update timeout")),
+                            DATABASE_TIMEOUT
+                          )
+                        ),
+                      ]);
 
                       session.accessToken = refreshed.accessToken;
                       session.refreshToken = refreshed.refreshToken;
@@ -404,8 +434,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               }
             } catch (dbError) {
               console.error("❌ Database error in session callback:", dbError);
-              // Return session without database tokens if DB fails
+              // Don't throw error - return session without database tokens if DB fails
+              console.log(
+                "🔄 Continuing with basic session due to database error"
+              );
               return session;
+            } finally {
+              // Always disconnect to prevent connection leaks
+              try {
+                await prisma.$disconnect();
+              } catch (disconnectError) {
+                console.warn(
+                  "⚠️ Error disconnecting from database:",
+                  disconnectError
+                );
+              }
             }
           }
         }
@@ -417,7 +460,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return session;
       } catch (error) {
         console.error("❌ Session callback error:", error);
-        // Return a minimal session to prevent crashes
+        // Return a basic session to prevent authentication failures
+        console.log("🔄 Returning minimal session due to error");
         return {
           ...session,
           error: "SessionCallbackError",
@@ -427,8 +471,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   debug: process.env.NODE_ENV === "development",
-
-  trustHost: true, // Important for ngrok and proxied environments
 
   // Use environment-appropriate cookie settings
   useSecureCookies: process.env.NODE_ENV === "production",
