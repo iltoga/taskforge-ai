@@ -1,7 +1,7 @@
-import { Session } from 'next-auth';
+import { Session } from "next-auth";
 
 export interface ExtendedSession extends Session {
   accessToken?: string;
   refreshToken?: string;
-  error?: string;
+  accessTokenExpires?: number;
 }

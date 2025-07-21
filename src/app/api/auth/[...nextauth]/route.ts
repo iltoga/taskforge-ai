@@ -43,10 +43,9 @@
  *         description: "Authentication failed"
  */
 
-// Force Node.js runtime to prevent duplicate callbacks with Prisma adapter
+// Use Node.js runtime for NextAuth
 export const runtime = "nodejs";
 
 import { handlers } from "../../../../../auth";
 
-export const GET = handlers.GET;
-export const POST = handlers.POST;
+export const { GET, POST } = handlers;

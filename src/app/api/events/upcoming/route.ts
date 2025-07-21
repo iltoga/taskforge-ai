@@ -32,7 +32,7 @@
  *       500:
  *         description: "Failed to fetch upcoming events"
  */
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";

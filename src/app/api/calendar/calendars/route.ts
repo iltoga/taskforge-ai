@@ -36,7 +36,7 @@
  *       500:
  *         description: "Failed to fetch calendars"
  */
-import { auth } from "@/lib/auth-compat";
+
 import {
   getServiceAccountCalendars,
   isServiceAccountMode,
@@ -44,7 +44,7 @@ import {
 import { ExtendedSession } from "@/types/auth";
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
-import { createGoogleAuth } from "../../../../../auth";
+import { auth, createGoogleAuth } from "../../../../../auth";
 
 export async function GET() {
   try {

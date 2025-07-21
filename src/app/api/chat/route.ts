@@ -62,7 +62,7 @@
  *         description: "Internal server error"
  */
 import { ModelType } from "@/appconfig/models";
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
@@ -73,7 +73,7 @@ import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
-import { ExtendedSession } from "@/lib/auth-compat";
+import { ExtendedSession } from "../../../../auth";
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
 import { CalendarEvent } from "@/types/calendar";
 import { ProcessedFile } from "@/types/files";

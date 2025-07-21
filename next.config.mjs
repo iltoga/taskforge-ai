@@ -1,11 +1,5 @@
 import withSerwistInit from "@serwist/next";
 
-const withSerwist = withSerwistInit({
-  swSrc: "src/app/sw.ts",
-  swDest: "public/sw.js",
-  disable: process.env.NODE_ENV !== "production",
-});
-
 const nextConfig = {
   /* config options here */
   env: {
@@ -61,4 +55,12 @@ const nextConfig = {
   },
 };
 
-export default withSerwist(nextConfig);
+// Disable Serwist in development to avoid Turbopack conflicts
+// Only enable in production builds
+export default process.env.NODE_ENV === 'development' 
+  ? nextConfig 
+  : withSerwistInit({
+      swSrc: "src/app/sw.ts",
+      swDest: "public/sw.js",
+      disable: false,
+    })(nextConfig);

@@ -1,9 +1,6 @@
-import {
-  getServiceAccountAuth,
-  isServiceAccountAvailable,
-} from "@/lib/auth-compat";
 import { OAuth2Client } from "google-auth-library";
 import { calendar_v3, google } from "googleapis";
+import { getServiceAccountAuth, isServiceAccountAvailable } from "../../auth";
 import { serverDevLogger } from "../lib/dev-logger";
 import { CalendarEvent, EventList } from "../types/calendar";
 import { CalendarService } from "./calendar-service";

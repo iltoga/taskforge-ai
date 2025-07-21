@@ -28,7 +28,7 @@
  *       405:
  *         description: "Method not allowed"
  */
-import { auth } from "@/lib/auth-compat";
+import { auth } from "../../../../auth";
 import { clearUserChatData } from "@/services/user-chat-data-service";
 import { NextResponse } from "next/server";
 

@@ -32,7 +32,7 @@
  * This script can be used during development to test the token refresh flow
  */
 
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { CalendarService } from "@/services/calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";

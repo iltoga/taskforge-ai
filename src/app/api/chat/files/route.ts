@@ -54,7 +54,7 @@
  *       500:
  *         description: "Failed to delete files"
  */
-import { auth } from "@/lib/auth-compat";
+import { auth } from "../../../../auth";
 import { AIProviderConfig } from "@/lib/openai";
 import { PdfConverter } from "@/services/pdf-converter";
 import { ApiResponse, ProcessedFile } from "@/types/files";

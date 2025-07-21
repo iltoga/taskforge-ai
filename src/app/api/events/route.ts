@@ -58,7 +58,7 @@
  *       500:
  *         description: "Failed to create event"
  */
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { CalendarService } from "@/services/calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";

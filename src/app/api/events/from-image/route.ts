@@ -49,7 +49,7 @@
  *       500:
  *         description: "Failed to process image for calendar events"
  */
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
 import { ExtendedSession } from "@/types/auth";

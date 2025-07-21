@@ -49,7 +49,7 @@
  *         description: "Failed to generate report"
  */
 import { ModelType } from "@/appconfig/models";
-import { auth, createGoogleAuth } from "@/lib/auth-compat";
+import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
