@@ -1,10 +1,10 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
-import { ToolOrchestrator } from '../../services/tool-orchestrator';
-import { CalendarTools } from '../../tools/calendar-tools';
-import { PassportTools } from '../../tools/passport-tools';
-import { createToolRegistry, ToolRegistry } from '../../tools/tool-registry';
+import { ToolOrchestrator } from "../../services/tool-orchestrator";
+import { CalendarTools } from "../../tools/calendar-tools";
+import { PassportTools } from "../../tools/passport-tools";
+import { createToolRegistry, ToolRegistry } from "../../tools/tool-registry";
 
 jest.setTimeout(120_000);
 
@@ -65,7 +65,7 @@ Ask me to create calendar events based on the information
 
 upload a passport document for me to create a passport record.`;
 
-describe('passport flow via orchestrator', () => {
+describe("passport flow via orchestrator", () => {
   let passportTools: PassportTools;
   let registry: ToolRegistry;
   let orchestrator: ToolOrchestrator;
@@ -81,7 +81,7 @@ describe('passport flow via orchestrator', () => {
       passportTools,
       { calendar: false, email: false, file: false, web: false, passport: true }
     );
-    await registry.executeTool('setupPassportSchema', {});
+    await registry.executeTool("setupPassportSchema", {});
     orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY as string);
   });
 
@@ -91,18 +91,20 @@ describe('passport flow via orchestrator', () => {
     await passportTools.prisma.$disconnect();
   });
 
-  it('creates and deletes a passport record', async () => {
+  it("creates and deletes a passport record", async () => {
     const orchestrationRes = await orchestrator.orchestrate(
       prompt,
-      [],                 // chat history
+      [], // chat history
       registry,
-      'gpt-4.1-mini',      // model
+      "gpt-5-mini", // model
       { maxSteps: 10, maxToolCalls: 5 },
-      []                  // fileIds
+      [] // fileIds
     );
     expect(orchestrationRes.success).toBe(true);
 
-    const { data: createdPassports } = await passportTools.getPassports({ passport_number: 'YB7658734' });
+    const { data: createdPassports } = await passportTools.getPassports({
+      passport_number: "YB7658734",
+    });
     expect(Array.isArray(createdPassports)).toBe(true);
     expect((createdPassports as any[]).length).toBeGreaterThan(0);
 
@@ -110,19 +112,19 @@ describe('passport flow via orchestrator', () => {
     createdId = passport.id;
 
     expect(passport).toMatchObject({
-      passport_number: 'YB7658734',
-      surname: 'ROSSI',
-      given_names: 'MARIO',
-      nationality: 'ITALIANA',
-      place_of_birth: 'MILANO (MI)',
+      passport_number: "YB7658734",
+      surname: "ROSSI",
+      given_names: "MARIO",
+      nationality: "ITALIANA",
+      place_of_birth: "MILANO (MI)",
     });
 
     const deleteRes = await passportTools.deletePassport(createdId as number);
     expect(deleteRes.success).toBe(true);
 
-    const { data: afterDelete } = await passportTools.getPassports({ passport_number: 'YB7658734' });
+    const { data: afterDelete } = await passportTools.getPassports({
+      passport_number: "YB7658734",
+    });
     expect((afterDelete as any[]).length).toBe(0);
-
-
   });
 });

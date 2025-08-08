@@ -91,7 +91,7 @@ describe("passport flow via orchestrator with image upload", () => {
       prompt,
       [], // chat history
       registry,
-      "gpt-4.1-mini", // model
+      "gpt-5-mini", // model
       { maxSteps: 10, maxToolCalls: 5 },
       processedFiles // processedFiles parameter
     );

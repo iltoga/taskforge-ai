@@ -1,4 +1,4 @@
-import { ModelType } from "@/appconfig/models";
+import { ModelType, supportsTemperature } from "@/appconfig/models";
 import { generateTextWithProvider } from "@/lib/openai";
 import { ToolExecution, ToolRegistry } from "@/tools/tool-registry";
 import { ChatHistory } from "@/types/chat";
@@ -15,16 +15,7 @@ import * as utils from "./utils";
 
 /* internal ---------------------------------------------------------------- */
 
-const TEMP_SENSITIVE_MODELS = new Set([
-  "o4-mini",
-  "o4-mini-high",
-  "o3",
-  "o3-mini",
-]);
-
-function supportsTemperature(model: ModelType): boolean {
-  return !TEMP_SENSITIVE_MODELS.has(model as never);
-}
+// supportsTemperature is imported from appconfig/models
 
 // Shared utility to reduce duplication between performAnalysis and generatePlan
 function createSharedPlanningContext(
@@ -221,7 +212,7 @@ Return **only** valid JSON like:
   const llm = await generateTextWithProvider(prompt, ctx.getAIConfig(model), {
     model,
     max_tokens: 512,
-    temperature: 0,
+    ...(supportsTemperature(model) && { temperature: 0 }),
   });
   ctx.log(`� [generatePlan] LLM response:\n${llm?.text}`);
 

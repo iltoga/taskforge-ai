@@ -90,7 +90,7 @@ This isn't just another calendar app. It's a **sophisticated agentic AI system**
 const result = await orchestrator.orchestrate(
   userMessage,
   registry,
-  'gpt-4.1-mini',
+  'gpt-5-mini',
   { developmentMode: true }
 );
 ```

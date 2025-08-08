@@ -77,7 +77,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: mockToolCalls,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 5,
         aiConfig: mockAIConfig,
       });
@@ -90,7 +90,7 @@ describe("SynthesisTools", () => {
         expect.stringContaining("RESPONSE SYNTHESIS TASK"),
         mockAIConfig,
         expect.objectContaining({
-          model: "gpt-4.1-mini",
+          model: "gpt-5-mini",
           temperature: 0.3,
         })
       );
@@ -107,7 +107,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: [],
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 3,
         aiConfig: mockAIConfig,
       });
@@ -146,7 +146,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: actionToolCalls,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 4,
         aiConfig: mockAIConfig,
       });
@@ -185,7 +185,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: failedToolCalls,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 2,
         aiConfig: mockAIConfig,
       });
@@ -239,7 +239,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: mockToolCalls,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 1,
         // aiConfig is optional, not provided
       });
@@ -263,7 +263,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: mockToolCalls,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 1,
         aiConfig: mockAIConfig,
       });
@@ -303,7 +303,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: mockToolCalls,
         previousSteps: multipleSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 3,
         aiConfig: mockAIConfig,
       });
@@ -350,7 +350,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: toolCallsWithObjectData,
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 1,
         aiConfig: mockAIConfig,
       });
@@ -377,7 +377,7 @@ describe("SynthesisTools", () => {
         chatHistory: mockChatHistory,
         toolCalls: [], // No action tools called
         previousSteps: mockPreviousSteps,
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         stepId: 1,
         aiConfig: mockAIConfig,
       });

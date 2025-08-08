@@ -9,9 +9,11 @@
 import { NextRequest } from "next/server";
 import { POST } from "../app/api/chat/route";
 
-// Mock next-auth
-jest.mock("next-auth", () => ({
-  getServerSession: jest.fn(),
+// Mock local auth module used by the route
+jest.mock("@/lib/auth", () => ({
+  __esModule: true,
+  auth: jest.fn(),
+  createGoogleAuth: jest.fn(),
 }));
 
 // Mock the auth module
@@ -26,14 +28,11 @@ jest.mock("@/services/calendar-service");
 // Mock AI service
 jest.mock("@/services/ai-service");
 
-import { createGoogleAuth } from "@/lib/auth";
+import { auth, createGoogleAuth } from "@/lib/auth";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
-import { getServerSession } from "next-auth";
 
-const mockGetServerSession = getServerSession as jest.MockedFunction<
-  typeof getServerSession
->;
+const mockAuth = auth as jest.MockedFunction<typeof auth>;
 const mockCreateGoogleAuth = createGoogleAuth as jest.MockedFunction<
   typeof createGoogleAuth
 >;
@@ -47,7 +46,7 @@ describe("Agentic Mode Routing Fix", () => {
     jest.clearAllMocks();
 
     // Mock authenticated session
-    mockGetServerSession.mockResolvedValue({
+    (mockAuth as unknown as jest.Mock).mockResolvedValue({
       accessToken: "mock_access_token",
       user: { email: "test@example.com" },
     } as any);
@@ -84,9 +83,9 @@ describe("Agentic Mode Routing Fix", () => {
       method: "POST",
       body: JSON.stringify({
         message: "summarize all events for techonebetween march and june 2025",
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         useTools: true,
-        orchestratorModel: "gpt-4.1-mini",
+        orchestratorModel: "gpt-5-mini",
         developmentMode: true, // This should trigger agentic mode
       }),
     });
@@ -100,7 +99,7 @@ describe("Agentic Mode Routing Fix", () => {
       "test message", // translated message
       [], // chat history (empty for this test)
       expect.anything(), // tool registry
-      "gpt-4.1-mini", // orchestrator model
+      "gpt-5-mini", // orchestrator model
       true, // development mode
       [] // fileIds (empty for this test)
     );
@@ -138,9 +137,9 @@ describe("Agentic Mode Routing Fix", () => {
       method: "POST",
       body: JSON.stringify({
         message: "summarize all events for techonebetween march and june 2025",
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
         useTools: true,
-        orchestratorModel: "gpt-4.1-mini",
+        orchestratorModel: "gpt-5-mini",
         developmentMode: false, // This should use simple tool mode
       }),
     });

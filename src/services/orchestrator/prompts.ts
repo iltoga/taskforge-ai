@@ -205,11 +205,11 @@ USER: "Summarize the article at https://news.site/article"
     ex.push(
       `**Example – Synthesis summary**
 USER: "Summarize the current conversation and tool outputs so far."
-→ Tool = synthesizeChat; params = {userMessage:"Summarize the current conversation and tool outputs so far.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-4.1"}.`
+→ Tool = synthesizeChat; params = {userMessage:"Summarize the current conversation and tool outputs so far.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-5"}.`
       // Note: This example is commented out because it is used automatically by the orchestrator as final step
       //       `**Example – Final synthesis**
       // USER: "Provide the final answer to the original user request based on all gathered data."
-      // → Tool = synthesizeFinalAnswer; params = {userMessage:"Provide the final answer to the original user request based on all gathered data.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-4.1"}.`
+      // → Tool = synthesizeFinalAnswer; params = {userMessage:"Provide the final answer to the original user request based on all gathered data.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-5"}.`
     );
   }
 
@@ -254,7 +254,7 @@ export function generateToolExamples(
   /* Synthesis tools */
   if (registry.getAvailableCategories().includes("synthesis")) {
     rows.push(
-      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "synthesizeChat",\n    "parameters": {\n      "userMessage": "Summarize the current conversation.",\n      "chatHistory": [...],\n      "toolCalls": [...],\n      "previousSteps": [...],\n      "model": "gpt-4.1"\n    },\n    "reasoning": "Provide a concise context summary for the next steps."\n  }\n]\n```'
+      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "synthesizeChat",\n    "parameters": {\n      "userMessage": "Summarize the current conversation.",\n      "chatHistory": [...],\n      "toolCalls": [...],\n      "previousSteps": [...],\n      "model": "gpt-5"\n    },\n    "reasoning": "Provide a concise context summary for the next steps."\n  }\n]\n```'
     );
   }
 

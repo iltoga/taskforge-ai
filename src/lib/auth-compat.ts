@@ -7,7 +7,13 @@
 
 import { OAuth2Client } from "google-auth-library";
 import type { Session } from "next-auth";
-import { auth as nextAuthV5 } from "../../auth";
+import {
+  getServiceAccountAuth as _getSAAuth,
+  initializeServiceAccountAuth as _initSAAuth,
+  isServiceAccountAvailable as _isSAAvailable,
+  resetServiceAccountAuth as _resetSAAuth,
+  auth as nextAuthV5,
+} from "../../auth";
 
 // Re-export types from the old auth system
 export type { ExtendedSession } from "@/types/auth";
@@ -63,12 +69,16 @@ export const createGoogleAuthWithFallback = async (
  * Placeholder service account functions
  */
 export async function getServiceAccountAuth() {
-  console.warn("Service account auth not available in simplified auth");
-  return null;
+  return _getSAAuth();
 }
-
 export function isServiceAccountAvailable(): boolean {
-  return false;
+  return _isSAAvailable();
+}
+export function initializeServiceAccountAuth() {
+  return _initSAAuth();
+}
+export function resetServiceAccountAuth() {
+  return _resetSAAuth();
 }
 
 /**

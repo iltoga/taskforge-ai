@@ -1,4 +1,8 @@
-import { MODEL_CONFIGS, ModelType } from "@/appconfig/models";
+import {
+  MODEL_CONFIGS,
+  ModelType,
+  supportsTemperature as modelSupportsTemperature,
+} from "@/appconfig/models";
 import { openai as legacyOpenai } from "@/services/_openai-client";
 import fs from "fs/promises";
 import path from "path";
@@ -160,106 +164,165 @@ export async function generateTextWithProvider(
   config: AIProviderConfig,
   options: GenerateTextOptions = {}
 ): Promise<GenerateTextResult> {
-  const {
-    images,
-    fileIds,
-    tools,
-    model: modelName,
-    enableFileSearch = true,
-    ...rest
-  } = options;
+  const { images, fileIds, tools, model: modelName, enableFileSearch = true, ...rest } = options;
   let model: ModelType = modelName as ModelType;
 
-  // Build messages array for text, images, and files
+  // Build messages array for text and images
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const messages: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const content: any[] = [];
-
   if (input) {
     content.push({ type: "text", text: input });
   }
-
   if (images && images.length) {
     for (const img of images) {
-      // Vercel AI SDK expects images as { type: 'image', image: 'data:image/png;base64,...' }
-      // If imageData is already a data URL, use it directly
       content.push({ type: "image", image: img.imageData });
     }
   }
-
-  // File handling
+  // File handling: if we need file search with non-OpenAI, force OpenAI
   if (fileIds && fileIds.length) {
     if (config.provider !== "openai") {
-      // force openai default model
-      model = (process.env.OPENAI_DEFAULT_MODEL || "gpt-4.1-mini") as ModelType;
-      config = getProviderConfigByModel(model);
+      model = (process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini") as ModelType;
+      const forced = getProviderConfigByModel(model);
+      config.provider = forced.provider;
+      config.apiKey = forced.apiKey;
+      config.baseURL = forced.baseURL;
     }
-    // For OpenAI, files must be referenced via the file_search tool
-    // The content array does not need to include file objects; instead, the tool is configured below
   }
-
   if (content.length) {
     messages.push({ role: "user", content });
   }
 
-  // Select model factory
-  let modelFactory;
-  // if fileIds are provided, and provider is not OpenAI, use the default openai model for the provider
-  if (config.provider !== "openai" && fileIds && fileIds.length) {
+  // Safety net: remove unsupported sampling params for models that don't allow them
+  try {
+    const modelForCheck = (model || (process.env.OPENAI_DEFAULT_MODEL as ModelType) || ("gpt-5-mini" as ModelType)) as ModelType;
+    if (!modelSupportsTemperature(modelForCheck)) {
+      const toStrip: Array<keyof typeof rest> = [
+        "temperature" as keyof typeof rest,
+        "top_p" as keyof typeof rest,
+        "frequency_penalty" as keyof typeof rest,
+        "presence_penalty" as keyof typeof rest,
+      ];
+      const beforeKeys = Object.keys(rest ?? {});
+      for (const key of toStrip) {
+        if (rest && Object.prototype.hasOwnProperty.call(rest, key)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (rest as any)[key];
+        }
+      }
+      const afterKeys = Object.keys(rest ?? {});
+      if (process.env.NODE_ENV !== "production" && beforeKeys.some((k) => !afterKeys.includes(k))) {
+        const removed = beforeKeys.filter((k) => !afterKeys.includes(k));
+        console.debug(`🧊 Stripped unsupported params for model '${modelForCheck}': ${removed.join(", ")}`);
+      }
+    }
+  } catch {
+    // ignore
   }
+
+  // Direct OpenAI Responses path for models that reject temperature (text-only)
+  if (config.provider === "openai" && !modelSupportsTemperature(model)) {
+    try {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`↪️ Using direct OpenAI Responses API path for model '${model}' (no temperature)`);
+      }
+      // Map messages to input_text content items (strongly typed, no 'any')
+      type MessageTextPart = { type: "text"; text: string };
+      type MessageImagePart = { type: "image"; image: string };
+      type MessagePart = MessageTextPart | MessageImagePart;
+      type Message = { role: string; content: MessagePart[] };
+
+      type InputPart = { type: "input_text"; text: string };
+      type InputTurn = { role: string; content: InputPart[] };
+
+      const isTextPart = (p: MessagePart): p is MessageTextPart => p.type === "text";
+      const typedMessages = messages as Message[];
+
+      const inputTurns: InputTurn[] = typedMessages
+        .map((m) => ({
+          role: m.role ?? "user",
+          content: Array.isArray(m.content)
+            ? m.content
+                .filter(isTextPart)
+                .map((p) => ({ type: "input_text" as const, text: p.text }))
+            : [],
+        }))
+        .filter((t) => t.content.length > 0);
+      const resp = await legacyOpenai.responses.create({
+        model,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        input: inputTurns as any,
+        ...(rest && typeof rest === "object" && "max_tokens" in rest
+          ? { max_output_tokens: (rest as Record<string, unknown>)["max_tokens"] as number }
+          : {}),
+      });
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const anyResp: any = resp as any;
+      const text: string =
+        anyResp?.output_text ??
+        (Array.isArray(anyResp?.output)
+          ? ((anyResp.output
+              .flatMap((o: any) => (Array.isArray(o?.content) ? o.content.map((c: any) => c?.text?.value || c?.text || "").join("") : ""))
+              .join("") as unknown) as string)
+          : "");
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+      return { text: text || "" };
+    } catch (err) {
+      console.warn(`Direct OpenAI Responses call failed for model '${model}', falling back to SDK:`, err);
+      // Fall back to SDK path below
+    }
+  }
+
+  // Select model factory (SDK path)
+  let modelFactory;
   if (config.provider === "openai") {
-    modelFactory = openai.responses(
-      model || process.env.OPENAI_DEFAULT_MODEL || "gpt-4.1-mini"
-    );
+    modelFactory = openai.responses(model || process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini");
   } else if (config.provider === "openrouter") {
-    modelFactory = openrouter(
-      model || process.env.OPENROUTER_DEFAULT_MODEL || "google/gemini-2.5-flash"
-    );
+    modelFactory = openrouter(model || process.env.OPENROUTER_DEFAULT_MODEL || "google/gemini-2.5-flash");
   } else {
     throw new Error("Unknown provider");
   }
 
-  // For file search, add the file_search tool (as a string identifier) and pass file_ids in the request body
+  // For file search, add the file_search tool and pass file_ids where applicable
   let finalTools = tools;
-  if (
-    config.provider === "openai" &&
-    fileIds &&
-    fileIds.length &&
-    enableFileSearch
-  ) {
-    // Check if we have a vector store ID (starts with 'vs_')
+  if (config.provider === "openai" && fileIds && fileIds.length && enableFileSearch) {
     const hasVectorStore = fileIds.some((id) => id.startsWith("vs_"));
     if (hasVectorStore) {
-      // Use vector store IDs
-      rest.tool_resources = {
-        file_search: {
-          vector_store_ids: fileIds.filter((id) => id.startsWith("vs_")),
-        },
-      };
+      rest.tool_resources = { file_search: { vector_store_ids: fileIds.filter((id) => id.startsWith("vs_")) } };
     } else {
-      // Use individual file IDs
       rest.file_ids = fileIds;
     }
-    // Use a minimal valid tool object for file_search
     finalTools = { ...(tools || {}), file_search: fileSearchTool };
-  } else if (
-    config.provider === "openai" &&
-    fileIds &&
-    fileIds.length &&
-    !enableFileSearch
-  ) {
-    // Just pass file IDs for context without enabling the file_search tool
+  } else if (config.provider === "openai" && fileIds && fileIds.length && !enableFileSearch) {
     rest.file_ids = fileIds;
   }
 
-  // Build the argument object for generateText
   const generateTextArgs = {
-    model: modelFactory, // modelFactory is always LanguageModelV1
+    model: modelFactory,
     messages,
     ...rest,
     ...(finalTools ? { tools: finalTools } : {}),
   };
+  // Final defensive strip of sampling controls
+  try {
+    const toStrip = ["temperature", "top_p", "frequency_penalty", "presence_penalty"] as const;
+    for (const k of toStrip) {
+      if (k in (generateTextArgs as Record<string, unknown>)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (generateTextArgs as any)[k];
+      }
+    }
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(
+        `🛡️ generateText args keys for model '${model || process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini"}':`,
+        Object.keys(generateTextArgs)
+      );
+    }
+  } catch {
+    // ignore
+  }
+
   const { text, ...raw } = await generateText(
     generateTextArgs as {
       model: typeof modelFactory;
@@ -387,7 +450,7 @@ export type CategorizeInput =
  * If `opts.model` is omitted, the function falls back to:
  *   1. process.env.DEFAULT_CATEGORIZATION_MODEL
  *   2. process.env.OPENAI_DEFAULT_MODEL
- *   3. "gpt-4.1-mini"
+ *   3. "gpt-5-mini"
  */
 export async function categorizeDocument(
   input: CategorizeInput,
@@ -396,7 +459,7 @@ export async function categorizeDocument(
   const model: ModelType = (opts.model ||
     (process.env.DEFAULT_CATEGORIZATION_MODEL as ModelType) ||
     (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
-    "gpt-4.1-mini") as ModelType;
+    "gpt-5-mini") as ModelType;
 
   const providerConfig = getProviderConfigByModel(model);
   const categories = await readDocumentCategories();

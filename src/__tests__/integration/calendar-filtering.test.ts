@@ -44,7 +44,7 @@ describe("Calendar Filtering Integration Test", () => {
       const action = await aiService.processMessage(
         testPrompt,
         [],
-        "gpt-4.1-mini"
+        "gpt-5-mini"
       );
 
       // Verify the AI correctly interpreted the request

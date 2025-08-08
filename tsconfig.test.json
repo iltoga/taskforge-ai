@@ -1,17 +1,18 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["jest", "@testing-library/jest-dom"]
-  },
-  "baseUrl": "./src",
-  "paths": {
-    "@/*": ["./*"]
+    "types": ["jest", "@testing-library/jest-dom"],
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "src/**/*",
     "jest.setup.js",
     "next-env.d.ts",
-    "**/*.ts", "**/*.tsx",
+    "**/*.ts",
+    "**/*.tsx",
     ".next/types/**/*.ts"
   ],
   "exclude": [

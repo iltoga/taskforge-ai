@@ -58,7 +58,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Show me my events",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 5, maxToolCalls: 3 }
     );
 
@@ -116,7 +116,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Show me events",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 3, maxToolCalls: 2 }
     );
 
@@ -187,7 +187,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Simple test request",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 5, maxToolCalls: 3 }
     );
 

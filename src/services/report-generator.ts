@@ -1,8 +1,8 @@
 import { generateTextWithProvider, type AIProviderConfig } from "@/lib/openai";
-import { ModelType } from "../appconfig/models";
+import { ModelType, supportsTemperature } from "../appconfig/models";
 import { CalendarEvent } from "../types/calendar";
 
-const TEMPERATURE_UNSUPPORTED = ["o4-mini", "o4-mini-high", "o3", "o3-mini"];
+// Use central supportsTemperature helper; keep legacy constant removed
 
 export async function generateReport(
   events: CalendarEvent[],
@@ -59,7 +59,7 @@ ${events
 Total events in period: ${events.length}
 `;
 
-  const supportsTemp = !TEMPERATURE_UNSUPPORTED.includes(model);
+  const supportsTemp = supportsTemperature(model);
 
   const { text } = await generateTextWithProvider(
     userPrompt,

@@ -1,3 +1,4 @@
+import { supportsTemperature } from "@/appconfig/models";
 import {
   SynthesisToolInput,
   SynthesisToolOutput,
@@ -187,16 +188,13 @@ export class SynthesisTools {
       // fallback dummy config (should not be used in production)
       config = { provider: "openai", apiKey: "dummy" };
     }
-    const supportsTemperature = ![
-      "o4-mini",
-      "o4-mini-high",
-      "o3",
-      "o3-mini",
-    ].includes(model);
+    const allowTemp = supportsTemperature(
+      model as unknown as import("@/appconfig/models").ModelType
+    );
 
     const response = await generateTextWithProvider(prompt, config, {
       model,
-      ...(supportsTemperature && { temperature: 0.3 }),
+      ...(allowTemp && { temperature: 0.3 }),
     });
 
     return {
@@ -326,16 +324,13 @@ Create your response below:
     } else {
       config = { provider: "openai", apiKey: "dummy" };
     }
-    const supportsTemperature = ![
-      "o4-mini",
-      "o4-mini-high",
-      "o3",
-      "o3-mini",
-    ].includes(model);
+    const allowTemp = supportsTemperature(
+      model as unknown as import("@/appconfig/models").ModelType
+    );
 
     const response = await generateTextWithProvider(prompt, config, {
       model,
-      ...(supportsTemperature && { temperature: 0.3 }),
+      ...(allowTemp && { temperature: 0.3 }),
     });
 
     return {

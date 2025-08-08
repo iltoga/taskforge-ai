@@ -101,7 +101,8 @@ export class ToolOrchestrator {
     userMessage: string,
     chatHistory: ChatHistory,
     toolRegistry: ToolRegistry,
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     cfg: OrchestratorConfig = {},
     processedFiles: Array<ProcessedFile> = []
   ): Promise<OrchestrationResult> {

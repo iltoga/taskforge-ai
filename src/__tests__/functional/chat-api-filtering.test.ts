@@ -170,7 +170,7 @@ describe("Chat API - TechcorpFiltering Test", () => {
       method: "POST",
       body: JSON.stringify({
         message: "list all events relative to techcorpfrom march to june 2025",
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
       }),
     });
 
@@ -182,7 +182,7 @@ describe("Chat API - TechcorpFiltering Test", () => {
     expect(mockAIProcessMessage).toHaveBeenCalledWith(
       "list all events relative to techcorpfrom march to june 2025",
       mockCalendarEvents.items,
-      "gpt-4.1-mini"
+      "gpt-5-mini"
     );
 
     // Verify calendar service was called with correct date range (no search query since we do client-side filtering)
@@ -284,7 +284,7 @@ describe("Chat API - TechcorpFiltering Test", () => {
       method: "POST",
       body: JSON.stringify({
         message: "list events for nespola",
-        model: "gpt-4.1-mini",
+        model: "gpt-5-mini",
       }),
     });
 

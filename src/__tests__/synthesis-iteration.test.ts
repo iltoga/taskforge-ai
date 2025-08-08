@@ -171,7 +171,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       "how is the techcorpproject going between march and june 2025?",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       {
         developmentMode: true,
         maxSteps: 15,
@@ -269,7 +269,7 @@ FORMAT_ACCEPTABLE: The response properly addresses the user's request with appro
       "list all techcorpevents",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { developmentMode: true }
     );
 

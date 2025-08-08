@@ -131,7 +131,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
           [testFileId],
           [{ imageData: imageDataUrl, mimeType: "image/png" }],
           undefined,
-          "gpt-4.1-mini"
+          "gpt-5-mini"
         )
       ).resolves.not.toThrow();
       const multiFilePrompt = `You have access to two documents: one is a PDF and one is a PNG image. For each document, identify its type (e.g., passport, ID, etc.), and extract the full name(s) present if any.\n\nReturn a JSON array with one object per document, each with these fields: { source: 'pdf' | 'image', type: string, names: string[] }. Example:\n[\n  {\n    source: 'pdf',\n    type: 'passport',\n    names: ['John Doe']\n  },\n  {\n    source: 'image',\n    type: 'passport',\n    names: ['Jane Doe']\n  }\n]`;
@@ -184,7 +184,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
     it("should process a PDF file and return structured JSON", async () => {
       const pdfPrompt = `Analyze the PDF document using the file_search tool and extract information.\nReturn a JSON object with these fields: { source: 'pdf', type: string, names: string[] }`;
       await expect(
-        fileSearchTool.initialize([testFileId], undefined, "gpt-4.1-mini")
+        fileSearchTool.initialize([testFileId], undefined, "gpt-5-mini")
       ).resolves.not.toThrow();
       const results = await fileSearchTool.searchFiles(pdfPrompt);
       expect(results).toBeDefined();
@@ -222,7 +222,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
           [],
           [{ imageData: imageDataUrl, mimeType: "image/png" }],
           undefined,
-          "gpt-4.1-mini"
+          "gpt-5-mini"
         )
       ).resolves.not.toThrow();
       const imagePrompt = `Analyze the PNG image using your vision capabilities and extract information.\nReturn a JSON object with these fields: { source: 'image', type: string, names: string[] }`;
@@ -264,7 +264,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
       console.log("🚀 Testing FileSearchTool initialization...");
 
       await expect(
-        fileSearchTool.initialize([testFileId], undefined, "gpt-4.1-mini")
+        fileSearchTool.initialize([testFileId], undefined, "gpt-5-mini")
       ).resolves.not.toThrow();
 
       console.log("✅ FileSearchTool initialized successfully");
@@ -396,7 +396,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
         invalidFileSearchTool.initialize(
           ["file-invalid123"],
           undefined,
-          "gpt-4.1-mini"
+          "gpt-5-mini"
         )
       ).rejects.toThrow();
 
@@ -410,7 +410,7 @@ describe("FileSearchTool - Real OpenAI API Integration", () => {
 
       // Should not throw for empty file list (early return)
       await expect(
-        emptyFileSearchTool.initialize([], undefined, "gpt-4.1-mini")
+        emptyFileSearchTool.initialize([], undefined, "gpt-5-mini")
       ).resolves.not.toThrow();
 
       console.log("✅ Empty file list handled correctly");

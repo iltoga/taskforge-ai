@@ -31,7 +31,7 @@
  *                       type: number
  *               model:
  *                 type: string
- *                 description: "The AI model to use (default: gpt-4.1-mini)"
+ *                 description: "The AI model to use (default: gpt-5-mini)"
  *               useTools:
  *                 type: boolean
  *                 description: "Whether to use tool-based orchestration (default: false)"
@@ -62,6 +62,7 @@
  *         description: "Internal server error"
  */
 import { ModelType } from "@/appconfig/models";
+import { auth, createGoogleAuth, isServiceAccountAvailable } from "@/lib/auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
@@ -71,7 +72,6 @@ import { EmailTools } from "@/tools/email-tools";
 import { FileSearchTools } from "@/tools/file-search-tools";
 import { PassportTools } from "@/tools/passport-tools";
 import { createToolRegistry } from "@/tools/tool-registry";
-import { auth, createGoogleAuth } from "../../../../auth";
 // import { WebTools } from '@/tools/web-tools'; // Disabled to force vector search usage
 
 import { registerKnowledgeTools } from "@/tools/knowledge-tools";
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     const session = (await auth()) as ExtendedSession;
 
     // Check authentication mode
-    const useServiceAccountMode =
+    let useServiceAccountMode =
       process.env.BYPASS_GOOGLE_AUTH === "true" || isServiceAccountMode();
 
     // In service account mode, we still need user authentication for the app
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
     const {
       message,
       messages,
-      model = "gpt-4.1-mini",
+      model = (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini",
       useTools = false,
       developmentMode = false,
       calendarId = "primary",
@@ -188,6 +188,18 @@ export async function POST(request: Request) {
 
     // Initialize calendar service based on authentication mode
     let calendarService: CalendarService;
+
+    // Decide final mode with fallback before branching
+    if (
+      useServiceAccountMode &&
+      !isServiceAccountAvailable() &&
+      session?.accessToken
+    ) {
+      console.warn(
+        "⚠️ Service account unavailable; falling back to user OAuth for chat."
+      );
+      useServiceAccountMode = false;
+    }
 
     if (useServiceAccountMode) {
       // Service Account Mode: Use service account for calendar operations

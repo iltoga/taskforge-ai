@@ -62,7 +62,7 @@ export default function Home() {
 
                   <div className="card-actions justify-center w-full">
                     <button
-                      onClick={() => signIn('google')}
+                      onClick={() => signIn()}
                       className="btn btn-primary btn-lg w-full gap-3"
                     >
                       <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

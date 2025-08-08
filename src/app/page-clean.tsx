@@ -39,7 +39,7 @@ export default function Home() {
                 Your intelligent assistant for seamless Google Calendar management.
               </p>
               <button
-                onClick={() => signIn('google')}
+                onClick={() => signIn()}
                 className="btn btn-primary btn-lg w-full flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-shadow duration-300"
               >
                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">

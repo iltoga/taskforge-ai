@@ -50,9 +50,9 @@ describe("Full chat API flow with image upload", () => {
     const requestBody = {
       message: prompt,
       messages: [],
-      model: "gpt-4.1-mini",
+      model: "gpt-5-mini",
       useTools: true,
-      orchestratorModel: "gpt-4.1-mini",
+      orchestratorModel: "gpt-5-mini",
       developmentMode: true, // Use agentic mode
       calendarId: "primary",
       fileIds: [],

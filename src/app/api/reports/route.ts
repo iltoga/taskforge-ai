@@ -28,7 +28,7 @@
  *                 description: "Calendar ID to use (default: primary)"
  *               model:
  *                 type: string
- *                 description: "AI model to use (default: gpt-4.1-mini)"
+ *                 description: "AI model to use (default: gpt-5-mini)"
  *               reportType:
  *                 type: string
  *                 enum: [weekly, monthly, quarterly]
@@ -49,13 +49,13 @@
  *         description: "Failed to generate report"
  */
 import { ModelType } from "@/appconfig/models";
-import { auth, createGoogleAuth } from "../../../../auth";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
+import { auth, createGoogleAuth } from "../../../../auth";
 
 export async function POST(request: Request) {
   console.log("🚀 Reports API called");
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       calendarId: rawCalendarId = "primary",
-      model = "gpt-4.1-mini",
+      model = (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini",
       reportType = "weekly",
     } = body as {
       company?: string;

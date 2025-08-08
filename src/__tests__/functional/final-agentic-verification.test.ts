@@ -124,7 +124,7 @@ Both events show active Techcorpproject work during Q2 2025.`,
       "summarize all events for techonebetween march and june 2025",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { developmentMode: true }
     );
 
@@ -262,7 +262,7 @@ CALL_TOOLS:
       "find test events",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini"
+      "gpt-5-mini"
     );
 
     expect(result.success).toBe(true);
