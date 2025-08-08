@@ -310,7 +310,8 @@ export function generateDecisionRules(registry: ToolRegistry): string {
   if (cat.includes("calendar")) {
     rules.push(
       `${n++}. **Calendar queries** → ALWAYS use \`searchEvents\` or \`getEvents\` before answering.`,
-      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`
+      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`,
+      `${n++}. **Before creating** → check for likely duplicates with \`searchEvents\` when possible to avoid duplicates.`
     );
   }
 
@@ -322,7 +323,8 @@ export function generateDecisionRules(registry: ToolRegistry): string {
 
   if (cat.includes("passport")) {
     rules.push(
-      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`
+      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`,
+      `${n++}. **Dependency ordering** → if later steps require DB data (IDs, numbers), plan a \`getPassports\` step first to retrieve them.`
     );
   }
 
@@ -341,7 +343,8 @@ export function generateDecisionRules(registry: ToolRegistry): string {
 
   rules.push(
     `${n++}. If unsure which tool yields the required info, ask for clarification.`,
-    `${n++}. If no tool can help and you have sufficient info to answer user's question, reply with **SUFFICIENT_INFO** explaining why.`
+    `${n++}. If no tool can help and you have sufficient info to answer user's question, reply with **SUFFICIENT_INFO** explaining why.`,
+    `${n++}. Avoid inserting extremely sensitive PII into calendar descriptions or public outputs unless explicitly required by the user.`
   );
 
   return `**DECISION RULES**\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
@@ -380,15 +383,25 @@ export function generateCompactRules(registry: ToolRegistry): string {
   const rules: string[] = [];
 
   if (cat.includes("calendar"))
-    rules.push("- Calendar queries → use searchEvents/getEvents first");
+    rules.push(
+      "- Calendar queries → use searchEvents/getEvents first",
+      "- Before creating events, search for duplicates when possible"
+    );
   if (cat.includes("file-search"))
     rules.push("- File operations → use searchFiles with query parameter");
   if (cat.includes("passport"))
-    rules.push("- Passport data → use passport tools, translate to English");
+    rules.push(
+      "- Passport data → use passport tools, translate to English",
+      "- When an action depends on data from DB, plan a retrieval step first (get → then act)"
+    );
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rules.push("- Knowledge queries → use vectorFileSearch");
   }
-  rules.push("- If unsure → ask for clarification");
+  rules.push(
+    "- Sequence steps by dependency: collect identifiers/data first, then perform actions",
+    "- Avoid inserting extremely sensitive PII into public artifacts unless explicitly required",
+    "- If unsure → ask for clarification"
+  );
 
   return rules.join("\n");
 }

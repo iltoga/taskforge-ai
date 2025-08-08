@@ -200,7 +200,7 @@ export class ToolOrchestrator {
       });
 
       /* ----------- create initial plan (Plan‑then‑Act) ----------- */
-      const initialPlan: PlannedStep[] = await generatePlan(
+      let initialPlan: PlannedStep[] = await generatePlan(
         ctx,
         userMessage,
         toolRegistry,
@@ -210,6 +210,37 @@ export class ToolOrchestrator {
         ctxString,
         toolLog
       );
+      // If planner produced nothing, try to parse a plan directly from analysis content
+      if (initialPlan.length === 0) {
+        this.logProgress(
+          "🔁 Planner returned empty plan. Attempting to extract PLAN_JSON from analysis..."
+        );
+        // Build valid tool names set locally
+        const validToolNames = new Set(
+          toolRegistry.getAvailableTools().map((t) => t.name)
+        );
+        if (this.vectorStoreIds.length === 0) {
+          validToolNames.delete("vectorFileSearch");
+        }
+        validToolNames.delete("synthesizeFinalAnswer");
+        validToolNames.delete("initializeFileSearch");
+
+        const extracted = utils.parsePlanFromText(
+          analysis.content,
+          validToolNames
+        );
+        if (extracted.length > 0) {
+          initialPlan = extracted.map((raw, idx) => ({
+            id: `plan_${stepId}_${idx}`,
+            goal: raw.tool,
+            tool: raw.tool,
+            parameters: raw.parameters,
+          }));
+          this.logProgress(
+            `✅ Extracted ${initialPlan.length} plan step(s) from analysis`
+          );
+        }
+      }
       let plannedSteps: PlannedStep[] = [...initialPlan];
 
       /* ----------- main loop ----------- */
@@ -235,13 +266,32 @@ export class ToolOrchestrator {
 
         const nextPlan = plannedSteps.shift();
         if (!nextPlan) {
-          throw new Error("Planner returned no tool actions");
+          // Try a quick replan once more using current context
+          this.logProgress("📜 Plan exhausted – generating new sub‑plan");
+          plannedSteps = await generatePlan(
+            ctx,
+            userMessage,
+            toolRegistry,
+            model,
+            stepId,
+            processedFiles,
+            ctxString,
+            toolLog
+          );
+          if (plannedSteps.length === 0) {
+            this.logProgress(
+              "🛑 Planner returned no tool actions after retry. Ending orchestration gracefully."
+            );
+            break;
+          }
         }
 
         let plannedCalls: {
           name: string;
           parameters: Record<string, unknown>;
-        }[] = [{ name: nextPlan.tool, parameters: nextPlan.parameters }];
+        }[] = nextPlan
+          ? [{ name: nextPlan.tool, parameters: nextPlan.parameters }]
+          : [];
 
         /* auto-inject vectorStoreIds */
         plannedCalls = plannedCalls

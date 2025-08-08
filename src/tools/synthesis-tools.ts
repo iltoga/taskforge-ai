@@ -156,6 +156,8 @@ export class SynthesisTools {
 
   If the user requested an action (create, update, delete) but no tools were called, or tools returned no relevant data, you MUST state that no information was found rather than generating any content. NEVER make up or fabricate information.
 
+  If the user's request requires tools that are not available in the current registry, say so clearly and list the missing capability.
+
   Create your comprehensive, well-formatted markdown response below:
   `;
 

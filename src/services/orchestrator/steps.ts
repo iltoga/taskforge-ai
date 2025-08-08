@@ -214,8 +214,9 @@ Return **only** valid JSON like:
     max_tokens: 512,
     ...(supportsTemperature(model) && { temperature: 0 }),
   });
-  ctx.log(`� [generatePlan] LLM response:\n${llm?.text}`);
+  ctx.log(`🟦 [generatePlan] LLM response:\n${llm?.text}`);
 
+  // Primary parse path: CALL_TOOLS JSON blocks
   let plannedCalls: RawPlanCall[] =
     utils.parseToolDecisions(llm?.text ?? "") || [];
 
@@ -224,7 +225,9 @@ Return **only** valid JSON like:
     try {
       plannedCalls = JSON.parse(llm?.text ?? "[]");
     } catch {
-      plannedCalls = [];
+      // Try robust PLAN_JSON/array extraction
+      const arr = utils.extractJsonArrayFromText(llm?.text ?? "");
+      plannedCalls = (Array.isArray(arr) ? arr : []) as RawPlanCall[];
     }
   }
 
@@ -278,6 +281,58 @@ Return **only** valid JSON like:
     } as PlannedStep;
   });
   ctx.log(`🗺️ Planned steps:\n${JSON.stringify(res, null, 2)}`);
+  // Fallback: if still empty, construct a minimal heuristic plan
+  if (!res.length) {
+    ctx.log(
+      "📉 Planner produced no steps – attempting heuristic fallback plan"
+    );
+    const tools = new Set(toolRegistry.getAvailableTools().map((t) => t.name));
+    const steps: PlannedStep[] = [];
+
+    // Heuristic: if message mentions passport and calendar
+    const mentionsPassport = /passport/i.test(userMessage);
+    const mentionsCalendar =
+      /(calendar|meeting|event|schedule|appointment)/i.test(userMessage);
+    if (mentionsPassport && tools.has("getPassports")) {
+      steps.push({
+        id: `plan_${stepId}_0`,
+        goal: "Find passport by provided filters (surname/given_names if present)",
+        tool: "getPassports",
+        parameters: {},
+      });
+    }
+    if (mentionsCalendar && tools.has("createEvent")) {
+      steps.push({
+        id: `plan_${stepId}_1`,
+        goal: "Create or update calendar event as requested",
+        tool: "createEvent",
+        parameters: { eventData: { summary: "", start: {}, end: {} } },
+      });
+    }
+
+    // If we built any heuristic steps, return them
+    if (steps.length) {
+      ctx.log(`🧭 Heuristic steps used:\n${JSON.stringify(steps, null, 2)}`);
+      return steps;
+    }
+
+    // Last resort: if knowledge tool exists and message looks like a question
+    if (tools.has("vectorFileSearch") && /\?$/.test(userMessage)) {
+      return [
+        {
+          id: `plan_${stepId}_0`,
+          goal: "Search knowledge base for answer",
+          tool: "vectorFileSearch",
+          parameters: {
+            query: userMessage,
+            vectorStoreIds: ctx.vectorStoreIds,
+          },
+        },
+      ];
+    }
+
+    return [];
+  }
   return res;
 }
 

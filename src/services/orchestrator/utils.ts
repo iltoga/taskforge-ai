@@ -243,6 +243,114 @@ export function parseToolDecisions(
 }
 
 /* ------------------------------------------------------------------ */
+/* PLAN JSON PARSERS (robust)                                         */
+/* ------------------------------------------------------------------ */
+/**
+ * Try to extract a JSON array from arbitrary text. Looks for:
+ * - fenced code blocks ```json [ ... ] ```
+ * - the first top-level [ ... ] sequence
+ * - PLAN_JSON sections
+ */
+export function extractJsonArrayFromText(text: string): unknown[] | null {
+  if (!text) return null;
+
+  // 1) Fenced code blocks labelled json
+  const codeBlockRegex = /```json\s*([\s\S]*?)\s*```/gi;
+  let m = codeBlockRegex.exec(text);
+  while (m) {
+    const candidate = m[1].trim();
+    if (candidate.startsWith("[") && candidate.endsWith("]")) {
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // continue
+      }
+    }
+    m = codeBlockRegex.exec(text);
+  }
+
+  // 2) PLAN_JSON section
+  const planSectionRegex = /PLAN_JSON[\s\S]*?(\[[\s\S]*?\])/i;
+  const planMatch = text.match(planSectionRegex);
+  if (planMatch) {
+    try {
+      return JSON.parse(planMatch[1]);
+    } catch {
+      // fallthrough
+    }
+  }
+
+  // 3) First array-looking bracket block
+  const arrayRegex = /(\[[\s\S]*\])/m; // greedy, but we JSON.parse and fallback on error
+  const arrMatch = text.match(arrayRegex);
+  if (arrMatch) {
+    try {
+      return JSON.parse(arrMatch[1]);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Normalize raw planned calls coming from LLM to a consistent shape.
+ */
+export function normalizeRawPlanCalls(
+  rawItems: unknown[],
+  validToolNames: Set<string>
+): Array<{ name: string; tool: string; parameters: Record<string, unknown> }> {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as Record<string, unknown>;
+      let name = String(obj.name ?? obj.tool ?? "").trim();
+      if (!name) return null;
+      // Remove category prefixes like "PASSPORT.getPassports"
+      if (name.includes(".")) name = name.split(".").pop() as string;
+      // Common alias fixups
+      if (name === "fileSearchTool") name = "searchFiles";
+      // Skip invalid tools
+      if (!validToolNames.has(name)) return null;
+      const parameters =
+        obj.parameters && typeof obj.parameters === "object"
+          ? (obj.parameters as Record<string, unknown>)
+          : {};
+      return { name, tool: name, parameters };
+    })
+    .filter(Boolean) as Array<{
+    name: string;
+    tool: string;
+    parameters: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * Parse a plan from arbitrary text (e.g., analysis SCRATCHPAD with PLAN_JSON),
+ * returning normalized name/tool/parameters tuples.
+ */
+export function parsePlanFromText(
+  text: string,
+  validToolNames: Set<string>
+): Array<{ name: string; tool: string; parameters: Record<string, unknown> }> {
+  // Try CALL_TOOLS first
+  const callTools = parseToolDecisions(text);
+  if (callTools.length) {
+    return normalizeRawPlanCalls(callTools as unknown[], validToolNames);
+  }
+
+  // Then generic JSON array extraction
+  const arr = extractJsonArrayFromText(text);
+  if (arr) {
+    return normalizeRawPlanCalls(arr, validToolNames);
+  }
+
+  return [];
+}
+
+/* ------------------------------------------------------------------ */
 /* CONTEXT BUILDING                                                   */
 /* ------------------------------------------------------------------ */
 export function buildUpdatedContext(
