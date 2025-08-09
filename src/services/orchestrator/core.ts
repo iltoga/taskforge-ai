@@ -394,6 +394,31 @@ export class ToolOrchestrator {
           }
 
           // Log what is being passed to the tool
+          // Pre-execution sanitization for calendar events
+          if (
+            (call.name === "createEvent" || call.name === "updateEvent") &&
+            call.parameters &&
+            typeof call.parameters === "object"
+          ) {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const p: any = call.parameters;
+              if (call.name === "createEvent" && p.eventData) {
+                p.eventData = this.sanitizeCalendarEventData(
+                  userMessage,
+                  p.eventData
+                );
+              } else if (call.name === "updateEvent" && p.changes) {
+                p.changes = this.sanitizeCalendarEventData(
+                  userMessage,
+                  p.changes
+                );
+              }
+            } catch (e) {
+              console.warn("Calendar payload sanitize failed:", e);
+            }
+          }
+
           this.logProgress(
             `🔧 Executing ${call.name} with parameters: ${JSON.stringify(
               call.parameters
@@ -625,5 +650,102 @@ export class ToolOrchestrator {
 
   private isFormatAcceptable(validation: string): boolean {
     return /^FORMAT_ACCEPTABLE/i.test(validation.trim());
+  }
+
+  /**
+   * Ensure calendar event payloads are consistent and robust:
+   * - If only start.date is provided, auto-set end.date = start + 1 day (all-day event)
+   * - If only start.dateTime is provided, auto-set end.dateTime = start + 1 hour (UTC preserved if provided)
+   * - If start/end mix date and dateTime, prefer all-day when the user did not specify a time; otherwise coerce to dateTime pair
+   * - If only end is provided, infer start accordingly
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private sanitizeCalendarEventData(userMessage: string, data: any): any {
+    if (!data || typeof data !== "object") return data;
+
+    const clone = { ...data };
+    clone.start = clone.start || {};
+    clone.end = clone.end || {};
+
+    const hasStartDate = typeof clone.start.date === "string";
+    const hasStartDT = typeof clone.start.dateTime === "string";
+    const hasEndDate = typeof clone.end.date === "string";
+    const hasEndDT = typeof clone.end.dateTime === "string";
+
+    const userMentionsTime =
+      /(\d{1,2}:\d{2})|noon|morning|afternoon|evening|am|pm/i.test(userMessage);
+
+    const prefersAllDay = !userMentionsTime || hasStartDate || hasEndDate;
+
+    // Helper to add days to YYYY-MM-DD
+    const addDays = (isoDate: string, days: number) => {
+      const d = new Date(isoDate + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+
+    // If only end is provided, infer start
+    if (!hasStartDate && !hasStartDT && (hasEndDate || hasEndDT)) {
+      if (hasEndDate) {
+        // Make a 1-day all-day ending at end.date => start = end - 1 day
+        clone.start.date = addDays(clone.end.date, -1);
+      } else if (hasEndDT) {
+        const end = new Date(clone.end.dateTime);
+        const start = new Date(end.getTime() - 60 * 60 * 1000);
+        clone.start.dateTime = start.toISOString();
+      }
+    }
+
+    // Recompute flags
+    const _hasStartDate = typeof clone.start.date === "string";
+    const _hasStartDT = typeof clone.start.dateTime === "string";
+    const _hasEndDate = typeof clone.end.date === "string";
+    const _hasEndDT = typeof clone.end.dateTime === "string";
+
+    // If both are missing, leave to upstream validation
+    if (!_hasStartDate && !_hasStartDT && !_hasEndDate && !_hasEndDT) {
+      return clone;
+    }
+
+    // If start provided, ensure end exists and types match
+    if (_hasStartDate || _hasEndDate || prefersAllDay) {
+      // Prefer all-day
+      const startDate = _hasStartDate
+        ? clone.start.date
+        : _hasStartDT
+        ? clone.start.dateTime.slice(0, 10)
+        : undefined;
+      if (startDate) {
+        clone.start = { date: startDate, timeZone: clone.start.timeZone };
+        clone.end = {
+          date: addDays(startDate, 1),
+          timeZone: clone.end.timeZone || clone.start.timeZone,
+        };
+        return clone;
+      }
+    }
+
+    // Otherwise ensure dateTime pair
+    if (_hasStartDT || _hasEndDT) {
+      const startDT = _hasStartDT
+        ? new Date(clone.start.dateTime)
+        : _hasStartDate
+        ? new Date(clone.start.date + "T09:00:00Z")
+        : new Date();
+      const endDT = _hasEndDT
+        ? new Date(clone.end.dateTime)
+        : new Date(startDT.getTime() + 60 * 60 * 1000);
+      clone.start = {
+        dateTime: startDT.toISOString(),
+        timeZone: clone.start.timeZone,
+      };
+      clone.end = {
+        dateTime: endDT.toISOString(),
+        timeZone: clone.end.timeZone || clone.start.timeZone,
+      };
+      return clone;
+    }
+
+    return clone;
   }
 }

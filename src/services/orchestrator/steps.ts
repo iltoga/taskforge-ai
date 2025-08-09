@@ -192,6 +192,7 @@ IMPORTANT: For calendar operations:
 - When user says "tomorrow", use the next day after current date
 - Always include proper time zones (e.g., "+02:00" or "UTC") in dateTime fields
 - Example: {"tool": "createEvent", "parameters": {"eventData": {"summary": "Meeting", "start": {"dateTime": "2025-07-17T14:00:00+02:00"}, "end": {"dateTime": "2025-07-17T15:00:00+02:00"}}}}
+ - If the user does not specify a time, prefer creating an all-day event using start.date and end.date (next day)
 
 Return **only** valid JSON like:
 [

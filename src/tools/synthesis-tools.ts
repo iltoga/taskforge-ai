@@ -129,17 +129,16 @@ export class SynthesisTools {
   ### 2. MARKDOWN FORMATTING REQUIREMENTS
 
   **CRITICAL:**
-  - **In CASE any tool output must be shown to the user to answer their question, you MUST reformat and summarize that output into well-structured, user-friendly markdown too, as part of your answer.**
-  - **For any structured or extracted data (from any tool), always present it as a clear markdown table, list, or section.**
-  - **If a tool returns a raw string, bullet list, or unformatted data, you MUST reformat it for clarity and readability.**
-  - **ALL TABLES returnded by tools must be formatted as markdown tables.**
+  - Prefer compact sections and short bullet lists for narrow chat panels.
+  - Use markdown tables only when they fit within a typical chat column. If a table would be wide, convert it to a short list with key-value pairs instead.
+  - If showing tabular data, keep to ≤4 concise columns; truncate or summarize fields to prevent overflow.
+  - Reformat any raw tool output into readable lists or compact tables.
 
-  **Example Structure:**
-  ## [Summary Title]
-
-  ### [Section Title]
-  - Use bullet points, tables, or lists for structured data
-  - Always use clear section headings
+  **Example Structure (panel-friendly):**
+  ## [Title]
+  - Key point A: value
+  - Key point B: value
+  - Use a small 2–4 column table only if it fits; otherwise keep as bullets
 
   ## Summary
   [Summarize the results and actions, based only on tool outputs]
