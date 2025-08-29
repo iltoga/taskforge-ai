@@ -9,9 +9,8 @@ export type ModelType =
   | "o3"
   | "o4-mini"
   | "o4-mini-high"
-  | "google/gemini-2.0-flash-001"
-  | "google/gemini-2.5-flash"
-  | "google/gemini-2.5-flash-lite-preview-06-17"
+  | "google/gemini-2.0-flash-exp:free"
+  | "google/gemini-2.5-flash-lite"
   | "microsoft/phi-4-reasoning-plus:free"
   | "meta-llama/llama-4-maverick:free"
   | "google/gemini-2.5-pro-preview"
@@ -148,19 +147,8 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: true,
   },
   {
-    id: "google/gemini-2.0-flash-001",
-    name: "Gemini 2.0 Flash",
-    description: "Google Gemini 2.0 Flash",
-    pricing: "$0.10/1M tokens",
-    contextWindow: "1M",
-    provider: "openrouter",
-    badge: "OpenRouter",
-    supportsAssistantAPI: false,
-    supportsFileSearch: false,
-  },
-  {
-    id: "google/gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
+    id: "google/gemini-2.0-flash-exp:free",
+    name: "Gemini 2.0 Flash Exp (Free)",
     description: "Reasoning & coding",
     pricing: "$0.15/1M tokens",
     contextWindow: "1M",
@@ -170,7 +158,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: false,
   },
   {
-    id: "google/gemini-2.5-flash-lite-preview-06-17",
+    id: "google/gemini-2.5-flash-lite",
     name: "Gemini 2.5 Flash Lite",
     description: "Lightweight Gemini 2.5 Flash",
     pricing: "$0.075/1M tokens",
@@ -284,23 +272,4 @@ export function supportsFileSearch(modelId: ModelType): boolean {
 export function supportsAssistantAPI(modelId: ModelType): boolean {
   const config = getModelConfig(modelId);
   return config?.supportsAssistantAPI === true;
-}
-
-/**
- * Whether the given model supports the `temperature` parameter.
- * Some OpenAI reasoning and new 5.x models don't accept temperature via the Responses API.
- * Centralize the policy here to avoid scattering allow/deny lists.
- */
-export function supportsTemperature(modelId: ModelType): boolean {
-  // Deny-list of models where OpenAI rejects `temperature`
-  // Keep this list in sync with provider behavior and server errors seen upstream.
-  const NO_TEMP: Set<ModelType> = new Set([
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "o3",
-    "o4-mini",
-    "o4-mini-high",
-  ]);
-  return !NO_TEMP.has(modelId);
 }

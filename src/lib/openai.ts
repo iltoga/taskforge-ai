@@ -1,8 +1,4 @@
-import {
-  MODEL_CONFIGS,
-  ModelType,
-  supportsTemperature as modelSupportsTemperature,
-} from "@/appconfig/models";
+import { MODEL_CONFIGS, ModelType } from "@/appconfig/models";
 import { openai as legacyOpenai } from "@/services/_openai-client";
 import fs from "fs/promises";
 import path from "path";
@@ -56,7 +52,7 @@ export async function uploadFileToProvider(
 }
 /**
  * Returns the correct model factory for the given provider and model.
- * Usage: const modelFactory = getProviderModelFactory({provider: 'openai', ...}, 'gpt-4o-mini', {responses: true})
+ * Usage: const modelFactory = getProviderModelFactory({provider: 'openai', ...}, 'gpt-5-mini', {responses: true})
  */
 export function getProviderModelFactory(
   config: AIProviderConfig,
@@ -77,6 +73,7 @@ export function getProviderModelFactory(
 // --- Vercel AI SDK Unified Wrapper for OpenAI & OpenRouter ---
 import { openai } from "@ai-sdk/openai";
 import { openrouter } from "@openrouter/ai-sdk-provider";
+import type { CoreMessage, LanguageModelV1 } from "ai";
 import { generateText } from "ai";
 
 export type ProviderType = "openai" | "openrouter";
@@ -164,21 +161,30 @@ export async function generateTextWithProvider(
   config: AIProviderConfig,
   options: GenerateTextOptions = {}
 ): Promise<GenerateTextResult> {
-  const { images, fileIds, tools, model: modelName, enableFileSearch = true, ...rest } = options;
+  const {
+    images,
+    fileIds,
+    tools,
+    model: modelName,
+    enableFileSearch = true,
+    ...rest
+  } = options;
   let model: ModelType = modelName as ModelType;
 
-  // Build messages array for text and images
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages: any[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content: any[] = [];
-  if (input) {
-    content.push({ type: "text", text: input });
-  }
-  if (images && images.length) {
-    for (const img of images) {
+  // Build messages (typed) for the AI SDK
+  const hasImages = Array.isArray(images) && images.length > 0;
+  const messages: CoreMessage[] = [];
+  if (hasImages) {
+    const content = [] as Array<
+      { type: "text"; text: string } | { type: "image"; image: string }
+    >;
+    if (input) content.push({ type: "text", text: input });
+    for (const img of images!) {
       content.push({ type: "image", image: img.imageData });
     }
+    messages.push({ role: "user", content });
+  } else {
+    messages.push({ role: "user", content: input || "" });
   }
   // File handling: if we need file search with non-OpenAI, force OpenAI
   if (fileIds && fileIds.length) {
@@ -190,146 +196,91 @@ export async function generateTextWithProvider(
       config.baseURL = forced.baseURL;
     }
   }
-  if (content.length) {
-    messages.push({ role: "user", content });
-  }
-
-  // Safety net: remove unsupported sampling params for models that don't allow them
-  try {
-    const modelForCheck = (model || (process.env.OPENAI_DEFAULT_MODEL as ModelType) || ("gpt-5-mini" as ModelType)) as ModelType;
-    if (!modelSupportsTemperature(modelForCheck)) {
-      const toStrip: Array<keyof typeof rest> = [
-        "temperature" as keyof typeof rest,
-        "top_p" as keyof typeof rest,
-        "frequency_penalty" as keyof typeof rest,
-        "presence_penalty" as keyof typeof rest,
-      ];
-      const beforeKeys = Object.keys(rest ?? {});
-      for (const key of toStrip) {
-        if (rest && Object.prototype.hasOwnProperty.call(rest, key)) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          delete (rest as any)[key];
-        }
-      }
-      const afterKeys = Object.keys(rest ?? {});
-      if (process.env.NODE_ENV !== "production" && beforeKeys.some((k) => !afterKeys.includes(k))) {
-        const removed = beforeKeys.filter((k) => !afterKeys.includes(k));
-        console.debug(`🧊 Stripped unsupported params for model '${modelForCheck}': ${removed.join(", ")}`);
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // Direct OpenAI Responses path for models that reject temperature (text-only)
-  if (config.provider === "openai" && !modelSupportsTemperature(model)) {
-    try {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug(`↪️ Using direct OpenAI Responses API path for model '${model}' (no temperature)`);
-      }
-      // Map messages to input_text content items (strongly typed, no 'any')
-      type MessageTextPart = { type: "text"; text: string };
-      type MessageImagePart = { type: "image"; image: string };
-      type MessagePart = MessageTextPart | MessageImagePart;
-      type Message = { role: string; content: MessagePart[] };
-
-      type InputPart = { type: "input_text"; text: string };
-      type InputTurn = { role: string; content: InputPart[] };
-
-      const isTextPart = (p: MessagePart): p is MessageTextPart => p.type === "text";
-      const typedMessages = messages as Message[];
-
-      const inputTurns: InputTurn[] = typedMessages
-        .map((m) => ({
-          role: m.role ?? "user",
-          content: Array.isArray(m.content)
-            ? m.content
-                .filter(isTextPart)
-                .map((p) => ({ type: "input_text" as const, text: p.text }))
-            : [],
-        }))
-        .filter((t) => t.content.length > 0);
-      const resp = await legacyOpenai.responses.create({
-        model,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        input: inputTurns as any,
-        ...(rest && typeof rest === "object" && "max_tokens" in rest
-          ? { max_output_tokens: (rest as Record<string, unknown>)["max_tokens"] as number }
-          : {}),
-      });
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      const anyResp: any = resp as any;
-      const text: string =
-        anyResp?.output_text ??
-        (Array.isArray(anyResp?.output)
-          ? ((anyResp.output
-              .flatMap((o: any) => (Array.isArray(o?.content) ? o.content.map((c: any) => c?.text?.value || c?.text || "").join("") : ""))
-              .join("") as unknown) as string)
-          : "");
-      /* eslint-enable @typescript-eslint/no-explicit-any */
-      return { text: text || "" };
-    } catch (err) {
-      console.warn(`Direct OpenAI Responses call failed for model '${model}', falling back to SDK:`, err);
-      // Fall back to SDK path below
-    }
-  }
 
   // Select model factory (SDK path)
-  let modelFactory;
+  // Use a relaxed type for modelFactory to accommodate test environments
+  // where providers may be partially mocked.
+  let modelFactory: unknown;
   if (config.provider === "openai") {
-    modelFactory = openai.responses(model || process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini");
+    // Some unit tests mock @ai-sdk/openai and may not provide the 'responses' factory.
+    // Fall back to using the raw model string when unavailable to allow jest mocks of generateText to work.
+    const anyOpenai: unknown = openai as unknown;
+    const defaultModel =
+      model || process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini";
+
+    // For other models, use responses factory if available
+    const hasResponses =
+      anyOpenai &&
+      typeof (anyOpenai as { responses?: (m: string) => unknown }).responses ===
+        "function";
+    if (hasResponses) {
+      modelFactory = (
+        anyOpenai as { responses: (m: string) => unknown }
+      ).responses(defaultModel as string);
+    } else {
+      if (typeof anyOpenai === "function") {
+        modelFactory = (anyOpenai as (m: string) => unknown)(
+          defaultModel as string
+        );
+      } else {
+        modelFactory = defaultModel as string;
+      }
+    }
   } else if (config.provider === "openrouter") {
-    modelFactory = openrouter(model || process.env.OPENROUTER_DEFAULT_MODEL || "google/gemini-2.5-flash");
+    const anyOpenrouter: unknown = openrouter as unknown;
+    const defaultModel =
+      model ||
+      process.env.OPENROUTER_DEFAULT_MODEL ||
+      "google/gemini-2.0-flash-exp:free";
+    if (typeof anyOpenrouter === "function") {
+      // openrouter provider is a function that returns a model factory
+      modelFactory = (anyOpenrouter as (m: string) => unknown)(
+        defaultModel as string
+      );
+    } else {
+      // Fallback: pass through the model id
+      modelFactory = defaultModel as string;
+    }
   } else {
     throw new Error("Unknown provider");
   }
 
   // For file search, add the file_search tool and pass file_ids where applicable
   let finalTools = tools;
-  if (config.provider === "openai" && fileIds && fileIds.length && enableFileSearch) {
+  if (
+    config.provider === "openai" &&
+    fileIds &&
+    fileIds.length &&
+    enableFileSearch
+  ) {
     const hasVectorStore = fileIds.some((id) => id.startsWith("vs_"));
     if (hasVectorStore) {
-      rest.tool_resources = { file_search: { vector_store_ids: fileIds.filter((id) => id.startsWith("vs_")) } };
+      rest.tool_resources = {
+        file_search: {
+          vector_store_ids: fileIds.filter((id) => id.startsWith("vs_")),
+        },
+      };
     } else {
       rest.file_ids = fileIds;
     }
     finalTools = { ...(tools || {}), file_search: fileSearchTool };
-  } else if (config.provider === "openai" && fileIds && fileIds.length && !enableFileSearch) {
+  } else if (
+    config.provider === "openai" &&
+    fileIds &&
+    fileIds.length &&
+    !enableFileSearch
+  ) {
     rest.file_ids = fileIds;
   }
 
   const generateTextArgs = {
-    model: modelFactory,
+    model: modelFactory as LanguageModelV1,
     messages,
     ...rest,
     ...(finalTools ? { tools: finalTools } : {}),
   };
-  // Final defensive strip of sampling controls
-  try {
-    const toStrip = ["temperature", "top_p", "frequency_penalty", "presence_penalty"] as const;
-    for (const k of toStrip) {
-      if (k in (generateTextArgs as Record<string, unknown>)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (generateTextArgs as any)[k];
-      }
-    }
-    if (process.env.NODE_ENV !== "production") {
-      console.debug(
-        `🛡️ generateText args keys for model '${model || process.env.OPENAI_DEFAULT_MODEL || "gpt-5-mini"}':`,
-        Object.keys(generateTextArgs)
-      );
-    }
-  } catch {
-    // ignore
-  }
 
-  const { text, ...raw } = await generateText(
-    generateTextArgs as {
-      model: typeof modelFactory;
-      messages: typeof messages;
-      [key: string]: unknown;
-    }
-  );
+  const { text, ...raw } = await generateText(generateTextArgs);
   return { text, raw };
 }
 

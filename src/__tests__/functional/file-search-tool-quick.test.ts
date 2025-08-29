@@ -1,10 +1,10 @@
 import fs from "fs";
 import OpenAI from "openai";
 import path from "path";
-import { FileSearchTool } from "../../services/file-search-tool";
+import { FileSearchTools } from "../../tools/file-search-tools";
 
-describe("FileSearchTool - Quick TDD Test", () => {
-  let fileSearchTool: FileSearchTool;
+describe("FileSearchTools - Quick TDD Test", () => {
+  let fileSearchTool: FileSearchTools;
   let openai: OpenAI;
   let uploadedFileId: string | null = null;
 
@@ -16,7 +16,7 @@ describe("FileSearchTool - Quick TDD Test", () => {
       );
     }
 
-    fileSearchTool = new FileSearchTool(apiKey);
+    fileSearchTool = new FileSearchTools();
     openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
   });
 
@@ -77,23 +77,44 @@ describe("FileSearchTool - Quick TDD Test", () => {
 
     // Step 3: Initialize FileSearchTool
     console.log("🚀 Initializing FileSearchTool...");
-    await fileSearchTool.initialize(
-      [uploadedFileId],
-      "You are a document analysis expert. Extract all visible data from the uploaded file and provide a comprehensive summary.",
+    const processedFiles = [
+      {
+        name: uploadedFileId,
+        size: 548, // From the upload response
+        type: "application/pdf",
+        isImage: false,
+        processAsImage: false,
+        convertedImages: [],
+      },
+    ];
+
+    const initResult = await fileSearchTool.initializeFileSearch(
+      processedFiles,
       "gpt-5-mini"
     );
 
+    expect(initResult.success).toBe(true);
+
     // Step 4: Test file search with data extraction query
     console.log("🔍 Testing data extraction...");
-    const results = await fileSearchTool.searchFiles(
-      "extract all data from the file and summarize them"
-    );
+    const searchResult = await fileSearchTool.searchFiles({
+      query: "extract all data from the file and summarize them",
+    });
 
     // Step 5: Validate results
-    expect(results).toBeDefined();
-    expect(results.length).toBeGreaterThan(0);
+    expect(searchResult.success).toBe(true);
+    expect(searchResult.data).toBeDefined();
 
-    const firstResult = results[0];
+    const data = searchResult.data as {
+      results: any[];
+      query: string;
+      method: string;
+    };
+    expect(data.results).toBeDefined();
+    expect(Array.isArray(data.results)).toBe(true);
+    expect(data.results.length).toBeGreaterThan(0);
+
+    const firstResult = data.results[0];
     expect(firstResult.content).toBeDefined();
     expect(firstResult.content.length).toBeGreaterThan(50); // Should have substantial content
 

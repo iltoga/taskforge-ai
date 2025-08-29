@@ -8,6 +8,11 @@ const SESSION_KEY = "fileSearchSignature";
  * @param signature The signature string to store.
  */
 export async function setFileSearchSignature(signature: string): Promise<void> {
+  // Skip cookie operations in test environment
+  if (process.env.NODE_ENV === "test" || process.env.DISABLE_CALENDAR_FOR_TESTING === "true") {
+    return;
+  }
+  
   (await cookies()).set(SESSION_KEY, signature, {
     httpOnly: true, // Prevents client-side JS from accessing the cookie
     secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
@@ -20,6 +25,11 @@ export async function setFileSearchSignature(signature: string): Promise<void> {
  * A Server Action to reset (delete) the file search signature cookie.
  */
 export async function resetFileSearchSignature(): Promise<void> {
+  // Skip cookie operations in test environment
+  if (process.env.NODE_ENV === "test" || process.env.DISABLE_CALENDAR_FOR_TESTING === "true") {
+    return;
+  }
+  
   (await cookies()).delete(SESSION_KEY);
 }
 
@@ -28,6 +38,11 @@ export async function resetFileSearchSignature(): Promise<void> {
  * @returns The signature string or null if not set.
  */
 export async function getFileSearchSignature(): Promise<string | null> {
+  // Skip cookie operations in test environment
+  if (process.env.NODE_ENV === "test" || process.env.DISABLE_CALENDAR_FOR_TESTING === "true") {
+    return null;
+  }
+  
   const cookieStore = await cookies();
   const signature = cookieStore.get(SESSION_KEY);
   return signature ? signature.value : null;

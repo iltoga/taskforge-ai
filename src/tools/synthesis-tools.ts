@@ -1,4 +1,3 @@
-import { supportsTemperature } from "@/appconfig/models";
 import {
   SynthesisToolInput,
   SynthesisToolOutput,
@@ -189,20 +188,24 @@ export class SynthesisTools {
       // fallback dummy config (should not be used in production)
       config = { provider: "openai", apiKey: "dummy" };
     }
-    const allowTemp = supportsTemperature(
-      model as unknown as import("@/appconfig/models").ModelType
-    );
 
-    const response = await generateTextWithProvider(prompt, config, {
-      model,
-      ...(allowTemp && { temperature: 0.3 }),
-    });
+    try {
+      const response = await generateTextWithProvider(prompt, config, {
+        model,
+      });
 
-    return {
-      content: response?.text || "No response text available",
-      reasoning:
-        "Comprehensive synthesis of all gathered information into a user-friendly response",
-    };
+      return {
+        content: response?.text || "No response text available",
+        reasoning:
+          "Comprehensive synthesis of all gathered information into a user-friendly response",
+      };
+    } catch (error) {
+      console.error("Error in synthesizeFinalAnswer:", error);
+      return {
+        content: "Error generating final synthesis response",
+        reasoning: `Final synthesis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
+    }
   }
 
   /**
@@ -325,19 +328,23 @@ Create your response below:
     } else {
       config = { provider: "openai", apiKey: "dummy" };
     }
-    const allowTemp = supportsTemperature(
-      model as unknown as import("@/appconfig/models").ModelType
-    );
 
-    const response = await generateTextWithProvider(prompt, config, {
-      model,
-      ...(allowTemp && { temperature: 0.3 }),
-    });
+    try {
+      const response = await generateTextWithProvider(prompt, config, {
+        model,
+      });
 
-    return {
-      content: response?.text || "No response text available",
-      reasoning:
-        "Conversational synthesis of tool results and chat context into a user-friendly markdown reply",
-    };
+      return {
+        content: response?.text || "No response text available",
+        reasoning:
+          "Conversational synthesis of tool results and chat context into a user-friendly markdown reply",
+      };
+    } catch (error) {
+      console.error("Error in synthesizeChat:", error);
+      return {
+        content: "Error generating synthesis response",
+        reasoning: `Synthesis failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      };
+    }
   }
 }

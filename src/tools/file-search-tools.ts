@@ -142,6 +142,14 @@ export class FileSearchTools {
       };
     }
   }
+
+  /**
+   * Clean up resources
+   */
+  async cleanup(deleteDiskFiles: boolean = false): Promise<void> {
+    await this.fileSearchService.cleanup(deleteDiskFiles);
+    this.isInitialized = false;
+  }
 }
 
 /**

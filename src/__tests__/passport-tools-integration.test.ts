@@ -43,6 +43,7 @@ describe("Passport Tools Integration", () => {
     // Should have both calendar and passport tools
     expect(availableCategories).toContain("calendar");
     expect(availableCategories).toContain("passport");
+    expect(availableCategories).toContain("synthesis");
 
     const calendarTools = registry.getToolsByCategory("calendar");
     expect(calendarTools).toHaveLength(5);
@@ -69,7 +70,7 @@ describe("Passport Tools Integration", () => {
     );
 
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual(["calendar"]); // Only calendar
+    expect(availableCategories).toEqual(["calendar", "synthesis"]); // Only calendar
     expect(availableCategories).not.toContain("passport");
 
     const passportTools = registry.getToolsByCategory("passport");

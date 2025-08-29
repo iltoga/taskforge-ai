@@ -6,20 +6,50 @@
  * Quick test to verify the agentic mode routing fix
  */
 
-import { NextRequest } from "next/server";
+// Add global fetch polyfill for Node environment
+import "whatwg-fetch";
+
+// Mock Next.js Request/Response
+Object.defineProperty(global, "Request", {
+  value: class Request {
+    constructor(public input: string, public init?: RequestInit) {}
+    async json() {
+      return JSON.parse((this.init?.body as string) || "{}");
+    }
+  },
+});
+
+Object.defineProperty(global, "Response", {
+  value: class Response {
+    constructor(public body?: any, public init?: ResponseInit) {}
+    static json(data: any, init?: ResponseInit) {
+      return new Response(JSON.stringify(data), {
+        ...init,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      });
+    }
+  },
+});
+
 import { POST } from "../app/api/chat/route";
 
 // Mock local auth module used by the route
-jest.mock("@/lib/auth", () => ({
+jest.mock("../../auth", () => ({
   __esModule: true,
   auth: jest.fn(),
+  handlers: {},
+  signIn: jest.fn(),
+  signOut: jest.fn(),
+  authConfig: {},
   createGoogleAuth: jest.fn(),
+  isServiceAccountAvailable: jest.fn(),
 }));
 
-// Mock the auth module
+// Mock the auth module that the route actually imports from
 jest.mock("@/lib/auth", () => ({
-  authOptions: {},
+  auth: jest.fn(),
   createGoogleAuth: jest.fn(),
+  isServiceAccountAvailable: jest.fn(),
 }));
 
 // Mock calendar service
@@ -32,7 +62,7 @@ import { auth, createGoogleAuth } from "@/lib/auth";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
 
-const mockAuth = auth as jest.MockedFunction<typeof auth>;
+const mockAuth = auth as jest.MockedFunction<any>;
 const mockCreateGoogleAuth = createGoogleAuth as jest.MockedFunction<
   typeof createGoogleAuth
 >;
@@ -46,7 +76,7 @@ describe("Agentic Mode Routing Fix", () => {
     jest.clearAllMocks();
 
     // Mock authenticated session
-    (mockAuth as unknown as jest.Mock).mockResolvedValue({
+    mockAuth.mockResolvedValue({
       accessToken: "mock_access_token",
       user: { email: "test@example.com" },
     } as any);
@@ -56,6 +86,7 @@ describe("Agentic Mode Routing Fix", () => {
 
     // Set up environment variable
     process.env.OPENAI_API_KEY = "mock_openai_key";
+    process.env.BYPASS_GOOGLE_AUTH = "false";
   });
 
   test("should use agentic mode when developmentMode=true regardless of message content", async () => {
@@ -79,7 +110,7 @@ describe("Agentic Mode Routing Fix", () => {
     MockedCalendarService.mockImplementation(() => ({} as any));
 
     // Create request with agentic mode enabled (developmentMode=true)
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new Request("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({
         message: "summarize all events for techonebetween march and june 2025",
@@ -108,11 +139,6 @@ describe("Agentic Mode Routing Fix", () => {
     expect(responseData.approach).toBe("agentic");
     expect(responseData.success).toBe(true);
     expect(responseData.message).toContain("Techcorpevents");
-
-    console.log("✅ FIXED: Agentic mode now works when developmentMode=true");
-    console.log("   - Orchestrator was called with the correct parameters");
-    console.log('   - Response approach is "agentic"');
-    console.log('   - No longer requires "agentic" keyword in message');
   });
 
   test("should use simple tool mode when developmentMode=false", async () => {
@@ -133,7 +159,7 @@ describe("Agentic Mode Routing Fix", () => {
     MockedCalendarService.mockImplementation(() => ({} as any));
 
     // Create request with agentic mode disabled (developmentMode=false)
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    const request = new Request("http://localhost:3000/api/chat", {
       method: "POST",
       body: JSON.stringify({
         message: "summarize all events for techonebetween march and june 2025",
@@ -157,7 +183,5 @@ describe("Agentic Mode Routing Fix", () => {
     // Verify response indicates tools approach
     expect(responseData.approach).toBe("tools");
     expect(responseData.success).toBe(true);
-
-    console.log("✅ Simple tool mode still works when developmentMode=false");
   });
 });

@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import fs from "fs";
-import { NextRequest } from "next/server";
 import path from "path";
 import { POST } from "../../app/api/chat/route";
 
@@ -59,13 +58,13 @@ describe("Full chat API flow with image upload", () => {
       processedFiles: processedFiles,
     };
 
-    // Create a mock NextRequest
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    // Create a simple Request object instead of NextRequest
+    const request = new Request("http://localhost:3000/api/chat", {
       method: "POST",
-      body: JSON.stringify(requestBody),
       headers: {
         "content-type": "application/json",
       },
+      body: JSON.stringify(requestBody),
     });
 
     // Mock the auth session for the API

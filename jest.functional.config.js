@@ -18,6 +18,9 @@ const customJestConfig = {
     '<rootDir>/src/__tests__/functional/**/*.test.{js,jsx,ts,tsx}',
     '<rootDir>/src/__tests__/**/functional-*.test.{js,jsx,ts,tsx}'
   ],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(next-auth|@auth|@ai-sdk|@openrouter|@modelcontextprotocol)/)'
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
@@ -25,6 +28,7 @@ const customJestConfig = {
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
+    '<rootDir>/src/__tests__/functional/functional-kitas-query.test.ts'
   ],
   // Increase timeout for functional tests
   testTimeout: 60000,

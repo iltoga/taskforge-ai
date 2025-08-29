@@ -35,7 +35,7 @@ export function generateAnalysisInstructions(registry: ToolRegistry): string {
 
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     out.push(
-      "- For general knowledge / documentation / policy / visa questions, default to vectorFileSearch."
+      "- For general knowledge / documentation / policy / knowledge base questions, default to vectorFileSearch."
     );
   }
   if (registry.getAvailableCategories().includes("passport")) {
@@ -89,7 +89,7 @@ export function generateContextInstructions(registry: ToolRegistry): string {
   }
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     blocks.push(
-      "**KNOWLEDGE CONTEXT**: Questions about policies, visas, procedures, or general info require vectorFileSearch."
+      "**KNOWLEDGE CONTEXT**: Questions about policies, procedures, internal documentation, or general info require vectorFileSearch."
     );
   }
   if (cat.includes("calendar")) {
@@ -238,9 +238,9 @@ export function generateToolExamples(
   /* Vector search */
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rows.push(
-      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "vectorFileSearch",\n    "parameters": {\n      "query": "visa requirements italy to indonesia",\n      "vectorStoreIds": ' +
+      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "vectorFileSearch",\n    "parameters": {\n      "query": "remote work policy",\n      "vectorStoreIds": ' +
         JSON.stringify(vectorStoreIds) +
-        '\n    },\n    "reasoning": "Retrieve official visa requirement document." \n  }\n]\n```'
+        '\n    },\n    "reasoning": "Retrieve internal policy document." \n  }\n]\n```'
     );
   }
 
@@ -288,6 +288,9 @@ export function generatePriorityOrder(registry: ToolRegistry): string {
   const cat = registry.getAvailableCategories();
   const parts: string[] = ["**CATEGORY PRIORITY**"];
 
+  // Prefer MCP filesystem tools when available for local/project file tasks
+  if (cat.includes("mcp-filesystem")) parts.push("1. MCP Filesystem tools");
+
   if (cat.includes("file-search")) parts.push("1. File search tools");
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch"))
     parts.push(`${parts.length}. 2. Knowledge (vectorFileSearch)`);
@@ -307,6 +310,14 @@ export function generateDecisionRules(registry: ToolRegistry): string {
   let n = 1;
   const rules: string[] = [];
 
+  if (cat.includes("mcp-filesystem")) {
+    rules.push(
+      `${n++}. For reading project/local files → prefer MCP filesystem tools (list_directory → read_file/read_text_file).`,
+      `${n++}. Never invent file paths. Always use exact paths returned by list_directory or from prior tool outputs.`,
+      `${n++}. Avoid internal searchFiles unless user has uploaded files; use MCP filesystem for repository files instead.`
+    );
+  }
+
   if (cat.includes("calendar")) {
     rules.push(
       `${n++}. **Calendar queries** → ALWAYS use \`searchEvents\` or \`getEvents\` before answering.`,
@@ -317,7 +328,7 @@ export function generateDecisionRules(registry: ToolRegistry): string {
 
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rules.push(
-      `${n++}. **Documentation / visa / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
+      `${n++}. **Documentation / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
     );
   }
 
@@ -429,7 +440,7 @@ export function generateCompactExamples(registry: ToolRegistry): string {
   }
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     examples.push(
-      'vectorFileSearch: {query: "visa requirements", vectorStoreIds: [...] }'
+      'vectorFileSearch: {query: "remote work policy", vectorStoreIds: [...] }'
     );
   }
   if (cat.includes("web")) {

@@ -63,6 +63,7 @@
  */
 import { ModelType } from "@/appconfig/models";
 import { auth, createGoogleAuth, isServiceAccountAvailable } from "@/lib/auth";
+import { generateTextWithProvider } from "@/lib/openai";
 import { isServiceAccountMode } from "@/lib/calendar-config";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
@@ -388,6 +389,21 @@ export async function POST(request: Request) {
   }
 }
 
+// Helper function to detect if message requires calendar operations
+function requiresCalendarOperations(message: string): boolean {
+  const calendarKeywords = [
+    'calendar', 'event', 'meeting', 'appointment', 'schedule', 'book', 'reserve',
+    'create event', 'add event', 'delete event', 'update event', 'list events',
+    'today', 'tomorrow', 'next week', 'this week', 'monday', 'tuesday', 'wednesday',
+    'thursday', 'friday', 'saturday', 'sunday', 'january', 'february', 'march',
+    'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november',
+    'december', 'am', 'pm', 'time', 'date', 'when', 'remind', 'reminder'
+  ];
+  
+  const messageLower = message.toLowerCase();
+  return calendarKeywords.some(keyword => messageLower.includes(keyword));
+}
+
 // Legacy JSON-based processing function
 async function processWithJsonApproach(
   englishMessage: string,
@@ -397,13 +413,20 @@ async function processWithJsonApproach(
   originalMessage: string
 ) {
   try {
-    // Get existing events for context (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const existingEvents = await calendarService.getEvents(
-      thirtyDaysAgo.toISOString(),
-      new Date().toISOString()
-    );
+    // Check if calendar operations are needed
+    const needsCalendar = requiresCalendarOperations(englishMessage);
+    
+    // Get existing events for context only if calendar operations are needed
+    let existingEvents: { items: CalendarEvent[] } = { items: [] };
+    if (needsCalendar && process.env.DISABLE_CALENDAR_FOR_TESTING !== "true") {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const eventList = await calendarService.getEvents(
+        thirtyDaysAgo.toISOString(),
+        new Date().toISOString()
+      );
+      existingEvents = { items: eventList.items || [] };
+    }
 
     // Process the message with AI
     const action = await aiService.processMessage(
@@ -419,16 +442,24 @@ async function processWithJsonApproach(
     let result: CalendarEvent | CalendarEvent[] | void = undefined;
     let responseMessage = "";
 
+    // Only execute calendar operations if they're needed and not disabled
+    const shouldExecuteCalendarOps = needsCalendar && process.env.DISABLE_CALENDAR_FOR_TESTING !== "true";
+
     switch (action.type) {
       case "create":
-        if (action.event) {
+        if (action.event && shouldExecuteCalendarOps) {
           result = await calendarService.createEvent(action.event);
           responseMessage = `✅ Created event: "${action.event.summary}"`;
+        } else if (!needsCalendar) {
+          // If calendar operations aren't needed, let AI handle the response normally
+          responseMessage = "";
+        } else {
+          responseMessage = "✅ Calendar operations disabled for testing";
         }
         break;
 
       case "update":
-        if (action.eventId && action.event) {
+        if (action.eventId && action.event && shouldExecuteCalendarOps) {
           result = await calendarService.updateEvent(
             action.eventId,
             action.event
@@ -436,97 +467,135 @@ async function processWithJsonApproach(
           responseMessage = `✅ Updated event: "${
             action.event.summary || "Event updated"
           }"`;
+        } else if (!needsCalendar) {
+          responseMessage = "";
+        } else {
+          responseMessage = "✅ Calendar operations disabled for testing";
         }
         break;
 
       case "delete":
-        if (action.eventId) {
+        if (action.eventId && shouldExecuteCalendarOps) {
           await calendarService.deleteEvent(action.eventId);
           responseMessage = "✅ Event deleted successfully";
+        } else if (!needsCalendar) {
+          responseMessage = "";
+        } else {
+          responseMessage = "✅ Calendar operations disabled for testing";
         }
         break;
 
       case "list":
-        const timeMin = action.timeRange?.start || new Date().toISOString();
-        const timeMax =
-          action.timeRange?.end ||
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        if (shouldExecuteCalendarOps) {
+          const timeMin = action.timeRange?.start || new Date().toISOString();
+          const timeMax =
+            action.timeRange?.end ||
+            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-        // Extract filter keywords from the original message
-        const messageLower = originalMessage.toLowerCase();
-        const filterKeywords: string[] = [];
+          // Extract filter keywords from the original message
+          const messageLower = originalMessage.toLowerCase();
+          const filterKeywords: string[] = [];
 
-        // Common patterns to extract filter terms (company names, project names, etc.)
-        const patterns = [
-          /(?:for|about|regarding|related to|relative to)\s+([a-zA-Z\-_]+)/gi,
-          /(?:activities for|events for|meetings for)\s+([a-zA-Z\-_]+)/gi,
-          /([a-zA-Z\-_]+)\s+(?:activities|events|meetings|work|project)/gi,
-          /(?:list|show|find)\s+([a-zA-Z\-_]+)\s+(?:activities|events|meetings)/gi,
-        ];
+          // Common patterns to extract filter terms (company names, project names, etc.)
+          const patterns = [
+            /(?:for|about|regarding|related to|relative to)\s+([a-zA-Z\-_]+)/gi,
+            /(?:activities for|events for|meetings for)\s+([a-zA-Z\-_]+)/gi,
+            /([a-zA-Z\-_]+)\s+(?:activities|events|meetings|work|project)/gi,
+            /(?:list|show|find)\s+([a-zA-Z\-_]+)\s+(?:activities|events|meetings)/gi,
+          ];
 
-        patterns.forEach((pattern) => {
-          const matches = messageLower.matchAll(pattern);
-          for (const match of matches) {
-            if (
-              match[1] &&
-              match[1].length > 2 &&
-              match[1] !== "all" &&
-              match[1] !== "events"
-            ) {
-              // Avoid short words and generic terms
-              filterKeywords.push(match[1].toLowerCase().trim());
+          patterns.forEach((pattern) => {
+            const matches = messageLower.matchAll(pattern);
+            for (const match of matches) {
+              if (
+                match[1] &&
+                match[1].length > 2 &&
+                match[1] !== "all" &&
+                match[1] !== "events"
+              ) {
+                // Avoid short words and generic terms
+                filterKeywords.push(match[1].toLowerCase().trim());
+              }
             }
-          }
-        });
-
-        // Get all events without server-side filtering for better transparency
-        const events = await calendarService.getEvents(
-          timeMin,
-          timeMax,
-          2500, // maxResults
-          undefined, // No server-side search query
-          false, // showDeleted
-          "startTime", // orderBy
-          "Asia/Makassar" // timeZone
-        );
-
-        // Apply client-side filtering if we have filter keywords
-        let filteredEvents = events.items;
-        if (filterKeywords.length > 0) {
-          filteredEvents = events.items.filter((event) => {
-            const eventText = `${event.summary || ""} ${
-              event.description || ""
-            }`.toLowerCase();
-            return filterKeywords.some((keyword) =>
-              eventText.includes(keyword)
-            );
           });
-        }
 
-        result = filteredEvents;
+          // Get all events without server-side filtering for better transparency
+          const events = await calendarService.getEvents(
+            timeMin,
+            timeMax,
+            2500, // maxResults
+            undefined, // No server-side search query
+            false, // showDeleted
+            "startTime", // orderBy
+            "Asia/Makassar" // timeZone
+          );
 
-        if (filterKeywords.length > 0) {
-          responseMessage = `📅 Found ${
-            filteredEvents.length
-          } event(s) matching "${filterKeywords.join(", ")}"`;
+          // Apply client-side filtering if we have filter keywords
+          let filteredEvents = events.items || [];
+          if (filterKeywords.length > 0) {
+            filteredEvents = (events.items || []).filter((event: CalendarEvent) => {
+              const eventText = `${event.summary || ""} ${
+                event.description || ""
+              }`.toLowerCase();
+              return filterKeywords.some((keyword) =>
+                eventText.includes(keyword)
+              );
+            });
+          }
+
+          result = filteredEvents;
+
+          if (filterKeywords.length > 0) {
+            responseMessage = `📅 Found ${
+              filteredEvents.length
+            } event(s) matching "${filterKeywords.join(", ")}"`;
+          } else {
+            responseMessage = `📅 Found ${filteredEvents.length} event(s)`;
+          }
+
+          // Add time range info to response
+          const startDate = new Date(timeMin).toLocaleDateString();
+          const endDate = new Date(timeMax).toLocaleDateString();
+          if (startDate !== endDate) {
+            responseMessage += ` from ${startDate} to ${endDate}`;
+          } else {
+            responseMessage += ` for ${startDate}`;
+          }
+        } else if (!needsCalendar) {
+          responseMessage = "";
         } else {
-          responseMessage = `📅 Found ${filteredEvents.length} event(s)`;
+          responseMessage = "📅 Calendar operations disabled for testing";
         }
-
-        // Add time range info to response
-        const startDate = new Date(timeMin).toLocaleDateString();
-        const endDate = new Date(timeMax).toLocaleDateString();
-        if (startDate !== endDate) {
-          responseMessage += ` from ${startDate} to ${endDate}`;
-        } else {
-          responseMessage += ` for ${startDate}`;
-        }
-
         break;
 
       default:
         responseMessage =
           "I'm not sure how to help with that. Please try rephrasing your request.";
+    }
+
+    // If no calendar operations were needed and no response message was set,
+    // generate a direct AI response
+    if (!needsCalendar && !responseMessage) {
+      const systemPrompt = "You are a helpful AI assistant. Provide a clear, concise, and helpful response to the user's question or request.";
+      const fullPrompt = `${systemPrompt}\n\nUser: ${englishMessage}\n\nAssistant:`;
+      
+      const result = await generateTextWithProvider(
+        fullPrompt,
+        { 
+          provider: "openai",
+          apiKey: process.env.OPENAI_API_KEY || ""
+        },
+        { 
+          model,
+        }
+      );
+      
+      return NextResponse.json({
+        success: true,
+        response: result.text,
+        action: "direct_response",
+        approach: "legacy",
+      });
     }
 
     return NextResponse.json({

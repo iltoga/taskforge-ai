@@ -3,11 +3,11 @@ import { CalendarEvent } from "../types/calendar";
 
 // Mock the OpenAI SDK client
 jest.mock("@/lib/openai", () => ({
-  createOpenAI: jest.fn(),
+  generateTextWithProvider: jest.fn(),
 }));
 
-import { createOpenAI } from "../lib/openai";
-const mockCreateOpenAI = jest.mocked(createOpenAI);
+import { generateTextWithProvider } from "../lib/openai";
+const mockGenerateTextWithProvider = jest.mocked(generateTextWithProvider);
 
 // Helper to create a mock OpenAI client
 function makeMockOpenAIClient(mockResponse: any) {
@@ -42,10 +42,8 @@ describe("AIService", () => {
           end: { dateTime: "2024-06-16T15:00:00+08:00" },
         },
       });
-      const mockResponse = { choices: [{ message: { content: mockContent } }] };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockResponse) as any
-      );
+      const mockResponse = { text: mockContent };
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -65,10 +63,8 @@ describe("AIService", () => {
           end: "2024-06-23T23:59:59+08:00",
         },
       });
-      const mockResponse = { choices: [{ message: { content: mockContent } }] };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockResponse) as any
-      );
+      const mockResponse = { text: mockContent };
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -93,10 +89,8 @@ describe("AIService", () => {
           end: { date: "2024-06-16" },
         },
       });
-      const mockResponse = { choices: [{ message: { content: mockContent } }] };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockResponse) as any
-      );
+      const mockResponse = { text: mockContent };
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(userMessage);
@@ -130,10 +124,8 @@ describe("AIService", () => {
             "• Worked on API integration\n• Fixed bugs in payment system\n• Added code review session with team",
         },
       });
-      const mockResponse = { choices: [{ message: { content: mockContent } }] };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockResponse) as any
-      );
+      const mockResponse = { text: mockContent };
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.processMessage(
@@ -154,7 +146,10 @@ describe("AIService", () => {
       (mockClient.chat.completions.create as jest.Mock).mockRejectedValue(
         new Error("OpenAI API Error")
       );
-      mockCreateOpenAI.mockReturnValue(mockClient as any);
+      mockGenerateTextWithProvider.mockReturnValue(mockClient as any);
+      mockGenerateTextWithProvider.mockRejectedValue(
+        new Error("OpenAI API Error")
+      );
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow(
@@ -166,10 +161,8 @@ describe("AIService", () => {
       // Arrange
       const userMessage = "Create a meeting";
       const mockContent = "Invalid JSON response";
-      const mockResponse = { choices: [{ message: { content: mockContent } }] };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockResponse) as any
-      );
+      const mockResponse = { text: mockContent };
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act & Assert
       await expect(aiService.processMessage(userMessage)).rejects.toThrow();
@@ -219,9 +212,7 @@ This week focused primarily on API development and code quality improvements. Su
           },
         ],
       };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockWeeklyReportResponse) as any
-      );
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.generateWeeklyReport(
@@ -258,9 +249,7 @@ This week focused primarily on API development and code quality improvements. Su
           },
         ],
       };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockTranslationResponse) as any
-      );
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.translateToEnglish(italianText);
@@ -282,9 +271,7 @@ This week focused primarily on API development and code quality improvements. Su
       const mockEnglishResponse = {
         choices: [{ message: { content: englishText } }],
       };
-      mockCreateOpenAI.mockReturnValue(
-        makeMockOpenAIClient(mockEnglishResponse) as any
-      );
+      mockGenerateTextWithProvider.mockResolvedValue(mockResponse);
 
       // Act
       const result = await aiService.translateToEnglish(englishText);

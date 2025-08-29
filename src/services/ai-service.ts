@@ -1,4 +1,4 @@
-import { ModelType, supportsTemperature } from "@/appconfig/models";
+import { ModelType } from "@/appconfig/models";
 import { generateTextWithProvider, type AIProviderConfig } from "@/lib/openai";
 import { CalendarTools } from "@/tools/calendar-tools";
 import {
@@ -57,9 +57,6 @@ export class AIService {
     }
 
     try {
-      // Use temperature only for models that support it (some reasoning/5.x models don't)
-      const allowTemp = supportsTemperature(model);
-
       const { text } = await generateTextWithProvider(
         message,
         providerConfig || {
@@ -72,7 +69,6 @@ export class AIService {
             { role: "system", content: systemContent },
             { role: "user", content: message },
           ],
-          temperature: allowTemp ? 0.1 : undefined,
         }
       );
 
@@ -176,6 +172,14 @@ export class AIService {
     try {
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import("@/services/orchestrator/core");
+      const { initializeMCP } = await import("@/services/mcp/mcp-api");
+
+      // Initialize MCP if not already done
+      try {
+        await initializeMCP();
+      } catch (error) {
+        console.warn("MCP initialization failed, continuing without MCP:", error);
+      }
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -249,6 +253,14 @@ export class AIService {
     try {
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import("@/services/orchestrator/core");
+      const { initializeMCP } = await import("@/services/mcp/mcp-api");
+
+      // Initialize MCP if not already done
+      try {
+        await initializeMCP();
+      } catch (error) {
+        console.warn("MCP initialization failed, continuing without MCP:", error);
+      }
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -345,7 +357,6 @@ Return ONLY the JSON object, no other text.`;
     try {
       const model =
         (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini";
-      const allowTemp = supportsTemperature(model);
 
       const { text } = await generateTextWithProvider(
         message,
@@ -356,7 +367,6 @@ Return ONLY the JSON object, no other text.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: message },
           ],
-          temperature: allowTemp ? 0.1 : undefined,
         }
       );
 
@@ -709,7 +719,6 @@ Please create an appropriate response based on the user's request.`;
     try {
       const model =
         (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini";
-      const allowTemp = supportsTemperature(model);
 
       const { text } = await generateTextWithProvider(
         userPrompt,
@@ -720,7 +729,6 @@ Please create an appropriate response based on the user's request.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: allowTemp ? 0.3 : undefined,
         }
       );
 
@@ -764,8 +772,6 @@ Please create an appropriate response based on the user's request.`;
     const systemPrompt = `Translate the following text to English. If the text is already in English, return it EXACTLY as provided without any modifications or comments about the language.`;
 
     try {
-      const allowTemp = supportsTemperature(model);
-
       const { text: translatedText } = await generateTextWithProvider(
         text,
         providerConfig || {
@@ -778,7 +784,6 @@ Please create an appropriate response based on the user's request.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
           ],
-          temperature: allowTemp ? 0.1 : undefined,
         }
       );
 

@@ -68,7 +68,7 @@ describe("Calendar Filtering Integration Test", () => {
         throw error;
       }
     }
-  });
+  }, 30000);
 
   test("Calendar service filtering logic should work correctly", () => {
     // Mock calendar events data

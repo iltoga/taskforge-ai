@@ -96,7 +96,12 @@ describe("Chat Flow - Orchestrator Triggering (Mocked Session)", () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+    });
+
+    // Set the request body
+    Object.defineProperty(request, "json", {
+      value: async () => requestBody,
+      writable: true,
     });
 
     console.log("� Calling chat API directly...");

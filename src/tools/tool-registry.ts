@@ -1,5 +1,5 @@
-import fs from "fs";
-import path from "path";
+import * as fs from "fs";
+import * as path from "path";
 import { z } from "zod";
 import { CalendarTools } from "./calendar-tools";
 import { EmailTools } from "./email-tools";
@@ -12,6 +12,8 @@ import { registerPassportTools } from "./register-passport-tools";
 import { registerSynthesisTools } from "./register-synthesis-tools";
 import { registerWebTools } from "./register-web-tools";
 import { WebTools } from "./web-tools";
+import { getMCPApi } from "../services/mcp/mcp-api";
+import { MCPTool } from "../services/mcp/types";
 
 // Base interfaces for tools
 export interface ToolDefinition {
@@ -19,6 +21,8 @@ export interface ToolDefinition {
   description: string;
   parameters: z.ZodSchema<unknown>;
   category: string;
+  source?: "internal" | "mcp";
+  serverName?: string; // For MCP tools
 }
 
 export interface ToolResult {
@@ -60,14 +64,36 @@ export class DefaultToolRegistry implements ToolRegistry {
     string,
     { definition: ToolDefinition; executor: ToolExecutor }
   >();
+  private enableMCP: boolean;
+  private mcpCategoriesCache: string[] = [];
+  private mcpToolsCache: ToolDefinition[] = [];
+  private lastMCPUpdate = 0;
+  private readonly MCP_CACHE_TTL = 30000; // 30 seconds
+
+  constructor(enableMCP = true) {
+    this.enableMCP = enableMCP;
+    // Initialize MCP cache in background
+    if (this.enableMCP) {
+      this.refreshMCPCache().catch(error => {
+        console.warn("Failed to initialize MCP cache:", error);
+      });
+    }
+  }
 
   registerTool(definition: ToolDefinition, executor: ToolExecutor): void {
     this.tools.set(definition.name, { definition, executor });
   }
 
   getAvailableTools(): ToolDefinition[] {
-    // Only return tools that are actually registered (and thus enabled)
-    return Array.from(this.tools.values()).map((tool) => tool.definition);
+    // Get internal tools
+    const internalTools = Array.from(this.tools.values()).map((tool) => tool.definition);
+    
+    // Add cached MCP tools if available and not stale
+    if (this.enableMCP && this.isMCPCacheValid()) {
+      return [...internalTools, ...this.mcpToolsCache];
+    }
+    
+    return internalTools;
   }
 
   getToolDefinition(name: string): ToolDefinition | undefined {
@@ -81,38 +107,231 @@ export class DefaultToolRegistry implements ToolRegistry {
   }
 
   getAvailableCategories(): string[] {
-    // Only return categories for registered/enabled tools
+    // Get internal tool categories
     const categories = new Set<string>();
     this.tools.forEach((tool) => categories.add(tool.definition.category));
+    
+    // Add cached MCP categories if available and not stale
+    if (this.enableMCP && this.isMCPCacheValid()) {
+      this.mcpCategoriesCache.forEach(category => categories.add(category));
+    }
+    
     return Array.from(categories).sort();
+  }
+
+  /**
+   * Get all available tools including MCP tools (async)
+   */
+  async getAllAvailableTools(): Promise<ToolDefinition[]> {
+    // Get internal tools
+    const internalTools = Array.from(this.tools.values()).map((tool) => tool.definition);
+    
+    // Refresh MCP cache if needed
+    if (this.enableMCP && !this.isMCPCacheValid()) {
+      await this.refreshMCPCache();
+    }
+    
+    return [...internalTools, ...this.mcpToolsCache];
+  }
+
+  /**
+   * Get all available categories including MCP categories (async)
+   */
+  async getAllAvailableCategories(): Promise<string[]> {
+    // Get categories from internal tools
+    const categories = new Set<string>();
+    this.tools.forEach((tool) => categories.add(tool.definition.category));
+    
+    // Add MCP categories
+    if (this.enableMCP) {
+      try {
+        const mcpApi = getMCPApi();
+        const mcpTools = await mcpApi.getAvailableTools();
+        mcpTools.forEach((tool) => {
+          const category = this.getMCPToolCategory(tool);
+          categories.add(category);
+        });
+      } catch (error) {
+        console.warn("Failed to get MCP tool categories:", error);
+      }
+    }
+    
+    return Array.from(categories).sort();
+  }
+
+  /**
+   * Convert MCP tool to internal ToolDefinition format
+   */
+  private convertMCPToolToDefinition(mcpTool: MCPTool): ToolDefinition {
+    return {
+      name: mcpTool.name,
+      description: mcpTool.description,
+      parameters: this.jsonSchemaToZod(mcpTool.inputSchema),
+      category: this.getMCPToolCategory(mcpTool),
+      source: "mcp",
+      serverName: mcpTool.serverName,
+    };
+  }
+
+  /**
+   * Convert MCP result to internal ToolResult format
+   */
+  private convertMCPResultToToolResult(mcpResult: any): ToolResult {
+    if (mcpResult.isError) {
+      return {
+        success: false,
+        error: mcpResult.content?.[0]?.text || "MCP tool execution failed",
+      };
+    }
+
+    // Extract text content from MCP result
+    const textContent = mcpResult.content
+      ?.filter((item: any) => item.type === "text")
+      ?.map((item: any) => item.text)
+      ?.join("\n");
+
+    return {
+      success: true,
+      data: textContent || mcpResult,
+      message: "MCP tool executed successfully",
+    };
+  }
+
+  /**
+   * Get category for MCP tool (could be enhanced with server-specific mapping)
+   */
+  private getMCPToolCategory(mcpTool: MCPTool): string {
+    // You could implement more sophisticated category mapping here
+    // For now, use server name as category
+    return `mcp-${mcpTool.serverName}`;
+  }
+
+  /**
+   * Convert JSON Schema to Zod schema (simplified implementation)
+   */
+  private jsonSchemaToZod(schema: any): z.ZodSchema<unknown> {
+    if (schema.type === "object") {
+      const shape: Record<string, z.ZodSchema<unknown>> = {};
+      
+      for (const [key, prop] of Object.entries(schema.properties || {})) {
+        const propSchema = prop as any;
+        let zodSchema: z.ZodSchema<unknown>;
+        
+        switch (propSchema.type) {
+          case "string":
+            zodSchema = z.string();
+            break;
+          case "number":
+            zodSchema = z.number();
+            break;
+          case "boolean":
+            zodSchema = z.boolean();
+            break;
+          case "array":
+            zodSchema = z.array(z.unknown());
+            break;
+          default:
+            zodSchema = z.unknown();
+        }
+        
+        if (propSchema.description) {
+          zodSchema = zodSchema.describe(propSchema.description);
+        }
+        
+        if (!schema.required?.includes(key)) {
+          zodSchema = zodSchema.optional();
+        }
+        
+        shape[key] = zodSchema;
+      }
+      
+      return z.object(shape);
+    }
+    
+    return z.unknown();
+  }
+
+  /**
+   * Check if MCP cache is still valid
+   */
+  private isMCPCacheValid(): boolean {
+    return Date.now() - this.lastMCPUpdate < this.MCP_CACHE_TTL;
+  }
+
+  /**
+   * Refresh MCP cache in background
+   */
+  private async refreshMCPCache(): Promise<void> {
+    if (!this.enableMCP) return;
+    
+    try {
+      const mcpApi = getMCPApi();
+      const mcpToolList = await mcpApi.getAvailableTools();
+      
+      // Update tools cache
+      this.mcpToolsCache = mcpToolList.map(this.convertMCPToolToDefinition.bind(this));
+      
+      // Update categories cache
+      const categories = new Set<string>();
+      mcpToolList.forEach((tool) => {
+        const category = this.getMCPToolCategory(tool);
+        categories.add(category);
+      });
+      this.mcpCategoriesCache = Array.from(categories);
+      
+      this.lastMCPUpdate = Date.now();
+      console.log(`Updated MCP cache: ${this.mcpToolsCache.length} tools, ${this.mcpCategoriesCache.length} categories`);
+    } catch (error) {
+      console.warn("Failed to refresh MCP cache:", error);
+    }
+  }
+
+  /**
+   * Force refresh MCP cache
+   */
+  async refreshMCP(): Promise<void> {
+    await this.refreshMCPCache();
   }
 
   async executeTool(
     name: string,
     parameters: Record<string, unknown>
   ): Promise<ToolResult> {
+    // Try internal tools first
     const tool = this.tools.get(name);
-    if (!tool) {
-      return {
-        success: false,
-        error: `Tool '${name}' not found`,
-        message: `Unknown tool: ${name}`,
-      };
+    if (tool) {
+      try {
+        // Validate parameters
+        const validatedParams = tool.definition.parameters.parse(parameters);
+
+        // Execute the tool
+        return await tool.executor(validatedParams as Record<string, unknown>);
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+          message: `Failed to execute tool: ${name}`,
+        };
+      }
     }
 
-    try {
-      // Validate parameters
-      const validatedParams = tool.definition.parameters.parse(parameters);
-
-      // Execute the tool
-      return await tool.executor(validatedParams as Record<string, unknown>);
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-        message: `Failed to execute tool: ${name}`,
-      };
+    // Try MCP tools if not found in internal tools
+    if (this.enableMCP) {
+      try {
+        const mcpApi = getMCPApi();
+        const mcpResult = await mcpApi.executeTool(name, parameters);
+        return this.convertMCPResultToToolResult(mcpResult);
+      } catch (error) {
+        // If MCP tool execution fails, fall through to not found error
+        console.warn(`MCP tool execution failed for ${name}:`, error);
+      }
     }
+
+    return {
+      success: false,
+      error: `Tool '${name}' not found`,
+      message: `Unknown tool: ${name}`,
+    };
   }
 }
 
@@ -151,9 +370,10 @@ export function createToolRegistry(
   webTools?: WebTools,
   passportTools?: PassportTools,
   fileSearchTools?: FileSearchTools,
-  configOverride?: { [key: string]: boolean }
+  configOverride?: { [key: string]: boolean },
+  enableMCP = true
 ): ToolRegistry {
-  const registry = new DefaultToolRegistry();
+  const registry = new DefaultToolRegistry(enableMCP);
 
   // Load enabled tool categories from settings/enabled-tools-categories.json or use override
   const enabled = configOverride || loadToolConfiguration();
@@ -177,6 +397,15 @@ export function createToolRegistry(
 
   // Register synthesis tools (always enabled for orchestration)
   registerSynthesisTools(registry);
+
+  // MCP tools are integrated dynamically when enabled
+  if (enableMCP) {
+    console.log("MCP integration enabled in tool registry");
+    // Trigger initial MCP cache refresh in background
+    (registry as DefaultToolRegistry).refreshMCP().catch(error => {
+      console.warn("Initial MCP refresh failed:", error);
+    });
+  }
 
   return registry;
 }

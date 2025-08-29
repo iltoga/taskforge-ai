@@ -1,6 +1,7 @@
 /**
  * Simple verification test for provider selection refactoring
  */
+import { ModelType } from "../appconfig/models";
 import { getModelInfo } from "../components/ModelSelector";
 
 describe("Provider Selection", () => {
@@ -8,12 +9,12 @@ describe("Provider Selection", () => {
     const gpt4Info = getModelInfo("gpt-5-mini");
     expect(gpt4Info?.provider).toBe("openai");
 
-    const o3Info = getModelInfo("o3-mini");
+    const o3Info = getModelInfo("o3" as ModelType);
     expect(o3Info?.provider).toBe("openai");
   });
 
   it("should correctly identify OpenRouter models", () => {
-    const geminiInfo = getModelInfo("google/gemini-2.0-flash-001");
+    const geminiInfo = getModelInfo("google/gemini-2.0-flash-exp:free");
     expect(geminiInfo?.provider).toBe("openrouter");
   });
 

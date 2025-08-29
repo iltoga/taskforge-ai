@@ -30,8 +30,6 @@ We have successfully refactored Calendar Assistant to implement a true agentic, 
 - Support for new agentic orchestration mode
 - Backward compatibility with legacy and simple tool modes
 
-- Proper temperature handling for reasoning models (o3, o3-mini)
-
 #### 4. **Dual Model Selection UI**
 
 - **Chat Model Selector**: For general conversation and legacy mode

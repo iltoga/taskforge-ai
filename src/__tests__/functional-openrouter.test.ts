@@ -28,7 +28,7 @@ describe("Functional Test: OpenRouter Integration", () => {
       );
     }
 
-    aiService = new AIService(openAiApiKey);
+    aiService = new AIService();
   });
 
   it("should correctly process a calendar request using Gemini model via OpenRouter", async () => {
@@ -39,13 +39,13 @@ describe("Functional Test: OpenRouter Integration", () => {
     const mockExistingEvents: CalendarEvent[] = [];
 
     console.log("Sending message to OpenRouter Gemini:", userMessage);
-    console.log("Using model: google/gemini-2.0-flash-001");
+    console.log("Using model: google/gemini-2.0-flash-exp:free");
 
     // Call the AI service with Gemini model
     const result = await aiService.processMessage(
       userMessage,
       mockExistingEvents,
-      "google/gemini-2.0-flash-001"
+      "gpt-5-mini"
     );
 
     console.log("Gemini Response:", JSON.stringify(result, null, 2));
@@ -109,7 +109,7 @@ describe("Functional Test: OpenRouter Integration", () => {
     const openRouterResult = await aiService.processMessage(
       userMessage,
       mockEvents,
-      "google/gemini-2.0-flash-001"
+      "gpt-5-mini"
     );
     console.log("OpenRouter result:", openRouterResult.type);
 
