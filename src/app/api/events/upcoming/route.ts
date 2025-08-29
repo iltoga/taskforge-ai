@@ -37,7 +37,11 @@ import { CalendarService } from "@/services/calendar-service";
 import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { ExtendedSession } from "@/types/auth";
 import { NextResponse } from "next/server";
-import { auth, createGoogleAuth } from "../../../../../auth";
+import {
+  auth,
+  createGoogleAuth,
+  isServiceAccountAvailable,
+} from "../../../../../auth";
 
 export async function GET(request: Request) {
   try {
@@ -45,7 +49,7 @@ export async function GET(request: Request) {
 
     // Check authentication modes
     const isBypassMode = process.env.BYPASS_GOOGLE_AUTH === "true";
-    const useServiceAccountMode = isBypassMode || isServiceAccountMode();
+    let useServiceAccountMode = isBypassMode || isServiceAccountMode();
 
     // If bypass mode is enabled, always use service account for calendar operations
     // In service account mode, we still need user authentication for the app
@@ -76,6 +80,18 @@ export async function GET(request: Request) {
     const calendarId = searchParams.get("calendarId") || "primary";
 
     console.log(`📅 Using calendar: ${calendarId}`);
+
+    // Determine final mode with fallback BEFORE branching
+    if (
+      useServiceAccountMode &&
+      !isServiceAccountAvailable() &&
+      session?.accessToken
+    ) {
+      console.warn(
+        "⚠️ Service account unavailable; falling back to user OAuth for events."
+      );
+      useServiceAccountMode = false;
+    }
 
     // Initialize calendar service based on authentication mode
     let calendarService: CalendarService;

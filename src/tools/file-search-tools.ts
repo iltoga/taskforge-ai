@@ -28,7 +28,7 @@ export class FileSearchTools {
   async initializeFileSearch(
     files: ProcessedFile[],
     model: ModelType = (process.env
-      .OPENAI_DEFAULT_FILE_SEARCH_MODEL as ModelType) || "gpt-4.1-mini"
+      .OPENAI_DEFAULT_FILE_SEARCH_MODEL as ModelType) || "gpt-5-mini"
   ): Promise<ToolResult> {
     try {
       const currentSignature = createFileSignature(files);
@@ -141,6 +141,14 @@ export class FileSearchTools {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Clean up resources
+   */
+  async cleanup(deleteDiskFiles: boolean = false): Promise<void> {
+    await this.fileSearchService.cleanup(deleteDiskFiles);
+    this.isInitialized = false;
   }
 }
 

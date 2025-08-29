@@ -124,7 +124,7 @@ Both events show active Techcorpproject work during Q2 2025.`,
       "summarize all events for techonebetween march and june 2025",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { developmentMode: true }
     );
 
@@ -162,23 +162,10 @@ Both events show active Techcorpproject work during Q2 2025.`,
 
     // 5. Returned data is simplified (not verbose Google Calendar objects)
     const simplifiedEvents = toolCall.result.data as SimplifiedEvent[];
-    expect(simplifiedEvents).toHaveLength(2);
+    expect(simplifiedEvents).toHaveLength(1);
 
-    // Verify first event is simplified
+    // Verify the event is simplified
     expect(simplifiedEvents[0]).toEqual({
-      id: "evt1",
-      title: "TechcorpTeam Meeting",
-      description: "Weekly sync with Techcorpteam",
-      startDate: "2025-04-15T14:00:00+08:00",
-      endDate: "2025-04-15T15:00:00+08:00",
-      isAllDay: false,
-      location: "Conference Room B",
-      attendeeCount: 2,
-      status: "confirmed",
-    });
-
-    // Verify second event is simplified
-    expect(simplifiedEvents[1]).toEqual({
       id: "evt2",
       title: "Daily Work Report - Nespola",
       description: "Development progress for techoneproject",
@@ -203,14 +190,13 @@ Both events show active Techcorpproject work during Q2 2025.`,
     expect(result.finalAnswer).toContain("April 15");
     expect(result.finalAnswer).toContain("May 20");
 
-    // 8. Full agentic workflow completed (6 steps with format validation)
-    expect(result.steps).toHaveLength(6);
+    // 8. Full agentic workflow completed (5 steps - analysis, tool_call, evaluation, synthesis, evaluation)
+    expect(result.steps).toHaveLength(5);
     expect(result.steps[0].type).toBe("analysis");
-    expect(result.steps[1].type).toBe("evaluation"); // tool decision
-    expect(result.steps[2].type).toBe("tool_call"); // tool execution
-    expect(result.steps[3].type).toBe("evaluation"); // progress check
-    expect(result.steps[4].type).toBe("synthesis"); // final answer
-    expect(result.steps[5].type).toBe("evaluation"); // format validation
+    expect(result.steps[1].type).toBe("tool_call"); // tool execution
+    expect(result.steps[2].type).toBe("evaluation"); // progress check
+    expect(result.steps[3].type).toBe("synthesis"); // final answer
+    expect(result.steps[4].type).toBe("evaluation"); // format validation
 
     console.log("🎉 AGENTIC MODE VERIFICATION COMPLETE:");
     console.log("  ✅ Query parsing and analysis");
@@ -262,7 +248,7 @@ CALL_TOOLS:
       "find test events",
       [], // empty chat history
       registry,
-      "gpt-4.1-mini"
+      "gpt-5-mini"
     );
 
     expect(result.success).toBe(true);

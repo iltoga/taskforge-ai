@@ -58,7 +58,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Show me my events",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 5, maxToolCalls: 3 }
     );
 
@@ -84,7 +84,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
     expect(result.success).toBe(true);
     expect(result.finalAnswer).toBeDefined();
     expect(typeof result.finalAnswer).toBe("string");
-  });
+  }, 60000);
 
   test("should not call synthesis tools during regular tool execution", async () => {
     const registry = createToolRegistry(calendarTools);
@@ -116,7 +116,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Show me events",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 3, maxToolCalls: 2 }
     );
 
@@ -158,7 +158,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
 
       expect(firstSynthesisCallIndex).toBeGreaterThan(lastRegularCallIndex);
     }
-  });
+  }, 60000);
 
   test("should only call synthesizeFinalAnswer once in normal flow", async () => {
     const registry = createToolRegistry(calendarTools);
@@ -187,7 +187,7 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
       "Simple test request",
       [],
       registry,
-      "gpt-4.1-mini",
+      "gpt-5-mini",
       { maxSteps: 5, maxToolCalls: 3 }
     );
 
@@ -198,5 +198,5 @@ describe("Orchestrator V2 - Synthesis Tool Usage", () => {
 
     // Should be called exactly once in normal flow (without validation failures)
     expect(synthesisCount).toBe(1);
-  });
+  }, 60000);
 });

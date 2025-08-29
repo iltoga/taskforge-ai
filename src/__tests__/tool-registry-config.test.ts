@@ -47,7 +47,7 @@ describe("Tool Registry Configuration", () => {
 
     // Should only have calendar tools
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual(["calendar"]);
+    expect(availableCategories).toEqual(["calendar", "synthesis"]);
 
     const calendarTools = registry.getToolsByCategory("calendar");
     expect(calendarTools).toHaveLength(5); // 5 calendar tools
@@ -68,7 +68,7 @@ describe("Tool Registry Configuration", () => {
 
     // Should have calendar tools (only ones provided)
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual(["calendar"]);
+    expect(availableCategories).toEqual(["calendar", "synthesis"]);
 
     const calendarTools = registry.getToolsByCategory("calendar");
     expect(calendarTools).toHaveLength(5);
@@ -85,7 +85,7 @@ describe("Tool Registry Configuration", () => {
     const registry = createToolRegistry(mockCalendarTools);
 
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual(["calendar"]);
+    expect(availableCategories).toEqual(["calendar", "synthesis"]);
   });
 
   it("should respect disabled calendar tools", () => {
@@ -104,10 +104,10 @@ describe("Tool Registry Configuration", () => {
 
     // Should have no tools since calendar is disabled and others are not provided
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual([]);
+    expect(availableCategories).toEqual(["synthesis"]);
 
     const allTools = registry.getAvailableTools();
-    expect(allTools).toHaveLength(0);
+    expect(allTools).toHaveLength(2); // 2 synthesis tools
   });
 
   it("should handle partial tool providers with mixed configuration", () => {
@@ -126,7 +126,7 @@ describe("Tool Registry Configuration", () => {
 
     // Should only have calendar tools since that's the only provider given
     const availableCategories = registry.getAvailableCategories();
-    expect(availableCategories).toEqual(["calendar"]);
+    expect(availableCategories).toEqual(["calendar", "synthesis"]);
 
     const calendarTools = registry.getToolsByCategory("calendar");
     expect(calendarTools).toHaveLength(5);

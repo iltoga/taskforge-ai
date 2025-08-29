@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import fs from "fs";
-import { NextRequest } from "next/server";
 import path from "path";
 import { POST } from "../../app/api/chat/route";
 
@@ -50,22 +49,22 @@ describe("Full chat API flow with image upload", () => {
     const requestBody = {
       message: prompt,
       messages: [],
-      model: "gpt-4.1-mini",
+      model: "gpt-5-mini",
       useTools: true,
-      orchestratorModel: "gpt-4.1-mini",
+      orchestratorModel: "gpt-5-mini",
       developmentMode: true, // Use agentic mode
       calendarId: "primary",
       fileIds: [],
       processedFiles: processedFiles,
     };
 
-    // Create a mock NextRequest
-    const request = new NextRequest("http://localhost:3000/api/chat", {
+    // Create a simple Request object instead of NextRequest
+    const request = new Request("http://localhost:3000/api/chat", {
       method: "POST",
-      body: JSON.stringify(requestBody),
       headers: {
         "content-type": "application/json",
       },
+      body: JSON.stringify(requestBody),
     });
 
     // Mock the auth session for the API

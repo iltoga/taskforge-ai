@@ -83,7 +83,7 @@ describe("Chat Flow - Orchestrator Triggering (Mocked Session)", () => {
     // Create request body matching exactly what the backend expects
     const requestBody = {
       message: userMessage,
-      model: "gpt-4.1-mini",
+      model: "gpt-5-mini",
       useTools: true, // Backend expects 'useTools' not 'toolMode'
       developmentMode: true, // Enable agentic mode
     };
@@ -96,7 +96,12 @@ describe("Chat Flow - Orchestrator Triggering (Mocked Session)", () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+    });
+
+    // Set the request body
+    Object.defineProperty(request, "json", {
+      value: async () => requestBody,
+      writable: true,
     });
 
     console.log("� Calling chat API directly...");

@@ -25,7 +25,7 @@
  *                 description: "Enable tool usage (default: false)"
  *               orchestratorModel:
  *                 type: string
- *                 description: "AI model for orchestration (default: gpt-4.1-mini)"
+ *                 description: "AI model for orchestration (default: gpt-5-mini)"
  *               developmentMode:
  *                 type: boolean
  *                 description: "Enable development features (default: false)"
@@ -54,6 +54,7 @@
 import { ModelType } from "@/appconfig/models";
 import { AIService } from "@/services/ai-service";
 import { CalendarService } from "@/services/calendar-service";
+import { EnhancedCalendarService } from "@/services/enhanced-calendar-service";
 import { CalendarTools } from "@/tools/calendar-tools";
 import { EmailTools } from "@/tools/email-tools";
 import { FileSearchTools } from "@/tools/file-search-tools";
@@ -71,15 +72,13 @@ export async function POST(request: Request) {
   try {
     const session = (await auth()) as ExtendedSession;
 
-    if (!session?.accessToken) {
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    // Determine auth preference (service account vs user OAuth)
+    const preferServiceAccount =
+      process.env.BYPASS_GOOGLE_AUTH === "true" ||
+      process.env.CALENDAR_AUTH_MODE === "service-account";
 
-    // Check for token refresh errors
-    if (session.error === "RefreshAccessTokenError") {
+    // Check for token refresh errors only when relying on user OAuth
+    if (!preferServiceAccount && session?.error === "RefreshAccessTokenError") {
       return new Response(
         JSON.stringify({
           error:
@@ -93,7 +92,8 @@ export async function POST(request: Request) {
       message,
       messages,
       useTools = false,
-      orchestratorModel = "gpt-4.1-mini",
+      orchestratorModel = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+        "gpt-5-mini",
       developmentMode = false,
       calendarId = "primary",
       processedFiles = [],
@@ -120,7 +120,53 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log(`📅 Using calendar: ${calendarId}`);
+    let effectiveCalendarId = calendarId;
+    console.log(`📅 Requested calendar: ${calendarId}`);
+
+    // Enforce configured calendar in bypass or service-account mode
+    const useBypass = process.env.BYPASS_GOOGLE_AUTH === "true";
+    const isServiceAccountEnv =
+      process.env.CALENDAR_AUTH_MODE === "service-account";
+    if (
+      (useBypass || isServiceAccountEnv) &&
+      effectiveCalendarId === "primary"
+    ) {
+      try {
+        const { loadAllowedCalendars, decodeCalendarId } = await import(
+          "@/lib/calendar-config"
+        );
+        const allowed = loadAllowedCalendars();
+        if (allowed.length > 0) {
+          const decoded = decodeCalendarId(allowed[0].cid);
+          effectiveCalendarId = decoded || effectiveCalendarId;
+          console.log(
+            `📅 Stream: Enforcing configured calendar: ${effectiveCalendarId}`
+          );
+        }
+      } catch (e) {
+        console.warn("Stream route: failed to resolve configured calendar", e);
+      }
+    } else if (effectiveCalendarId === "primary") {
+      // If service account is available, prefer configured calendars as a conservative default
+      try {
+        const { isServiceAccountAvailable } = await import("@/lib/auth");
+        if (isServiceAccountAvailable()) {
+          const { loadAllowedCalendars, decodeCalendarId } = await import(
+            "@/lib/calendar-config"
+          );
+          const allowed = loadAllowedCalendars();
+          if (allowed.length > 0) {
+            const decoded = decodeCalendarId(allowed[0].cid);
+            effectiveCalendarId = decoded || effectiveCalendarId;
+            console.log(
+              `📅 Stream: Service account available, using configured calendar: ${effectiveCalendarId}`
+            );
+          }
+        }
+      } catch (e) {
+        console.warn("Stream route: failed to resolve configured calendar", e);
+      }
+    }
 
     // Only stream for agentic mode
     if (!useTools || !developmentMode) {
@@ -130,12 +176,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // Initialize services
-    const googleAuth = createGoogleAuth(
-      session.accessToken,
-      session.refreshToken
-    );
-    const calendarService = new CalendarService(googleAuth);
+    // Initialize calendar service with automatic fallback
+    let primaryAuth: import("google-auth-library").OAuth2Client | undefined;
+    if (session?.accessToken) {
+      primaryAuth = createGoogleAuth(session.accessToken, session.refreshToken);
+    }
+
+    let calendarService: CalendarService;
+    try {
+      const enhanced = await EnhancedCalendarService.createWithFallback(
+        primaryAuth,
+        preferServiceAccount
+      );
+      calendarService = enhanced as unknown as CalendarService;
+      console.log(
+        `🔐 Stream calendar auth: ${enhanced.getAuthType()} (preferSA=${preferServiceAccount})`
+      );
+    } catch {
+      // If we failed to create any auth client, require authentication
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
     const aiService = new AIService();
 
     // Translate message to English if needed
@@ -176,7 +239,7 @@ export async function POST(request: Request) {
 
             const calendarTools = new CalendarTools(
               calendarService,
-              calendarId
+              effectiveCalendarId
             );
             const emailTools = new EmailTools();
             const passportTools = new PassportTools();

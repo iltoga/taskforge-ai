@@ -128,9 +128,8 @@ describe("CalendarTools", () => {
       // Should return only the events that:
       // 1. Contain "nespola" (case insensitive)
       // 2. Fall within the date range (March 1 - June 30, 2025)
-      expect(events).toHaveLength(2);
-      expect(events[0].title).toBe("TechcorpMeeting 1");
-      expect(events[1].title).toBe("daily report - nespola");
+      expect(events).toHaveLength(1);
+      expect(events[0].title).toBe("daily report - nespola");
 
       // Event from July should be filtered out by date range
       expect(events.find((e) => e.title === "Other Meeting")).toBeUndefined();

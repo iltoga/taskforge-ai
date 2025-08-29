@@ -28,7 +28,7 @@
  *                 description: "Calendar ID to use (default: primary)"
  *               model:
  *                 type: string
- *                 description: "AI model to use (default: gpt-4.1-mini)"
+ *                 description: "AI model to use (default: gpt-5-mini)"
  *             required:
  *               - startDate
  *               - endDate
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       startDate,
       endDate,
       calendarId: rawCalendarId = "primary",
-      model = "gpt-4.1-mini",
+      model = (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini",
     } = body as {
       company?: string;
       startDate: string;

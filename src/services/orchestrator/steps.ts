@@ -15,30 +15,34 @@ import * as utils from "./utils";
 
 /* internal ---------------------------------------------------------------- */
 
-const TEMP_SENSITIVE_MODELS = new Set([
-  "o4-mini",
-  "o4-mini-high",
-  "o3",
-  "o3-mini",
-]);
-
-function supportsTemperature(model: ModelType): boolean {
-  return !TEMP_SENSITIVE_MODELS.has(model as never);
-}
-
 // Shared utility to reduce duplication between performAnalysis and generatePlan
-function createSharedPlanningContext(
+async function createSharedPlanningContext(
   toolRegistry: ToolRegistry,
   vectorStoreIds: string[],
   processedFiles: ProcessedFile[] = [],
   toolExecutions?: ToolExecution[],
   currentContext?: string
 ) {
-  const categorizedTools = toolListWithParams(toolRegistry, vectorStoreIds);
+  const categorizedTools = await toolListWithParams(
+    toolRegistry,
+    vectorStoreIds
+  );
 
-  // Create valid tool names set
-  const validToolNames = new Set(
-    toolRegistry.getAvailableTools().map((t) => t.name)
+  // Create valid tool names set - use async method to include MCP tools
+  let allTools: Array<{ name: string }>;
+  const maybeAsync = toolRegistry as unknown as {
+    getAllAvailableTools?: () => Promise<Array<{ name: string }>>;
+  };
+  if (typeof maybeAsync.getAllAvailableTools === "function") {
+    allTools = await maybeAsync.getAllAvailableTools();
+  } else {
+    const internal = toolRegistry.getAvailableTools() as unknown as Array<{
+      name: string;
+    }>;
+    allTools = internal;
+  }
+  const validToolNames: Set<string> = new Set(
+    allTools.map((t: { name: string }) => t.name)
   );
   if (vectorStoreIds.length === 0) {
     validToolNames.delete("vectorFileSearch");
@@ -100,12 +104,16 @@ function createSharedPlanningContext(
         }`
       : "";
 
+  // Provide project root to help MCP filesystem tools avoid placeholder paths
+  const projectRoot = process.cwd();
+
   return {
     categorizedTools,
     validToolNames,
     fileInfoForAnalysis,
     fileInfoForPlanning,
     previousToolContext,
+    projectRoot,
   };
 }
 
@@ -120,13 +128,39 @@ function createSharedPlanningContext(
 //   );
 // }
 
-function toolListWithParams(reg: ToolRegistry, vectorIds: string[]) {
-  return reg
-    .getAvailableCategories()
-    .map((cat) => {
-      const items = reg
-        .getToolsByCategory(cat)
-        .filter((t) => t.name !== "synthesizeFinalAnswer") // Exclude only synthesizeFinalAnswer from planning
+async function toolListWithParams(reg: ToolRegistry, vectorIds: string[]) {
+  // Prefer async all-tools (includes MCP), fallback to sync internal-only
+  const maybeAsync = reg as unknown as {
+    getAllAvailableTools?: () => Promise<
+      Array<{ name: string; description: string; category: string }>
+    >;
+  };
+  const tools: Array<{ name: string; description: string; category: string }> =
+    typeof maybeAsync.getAllAvailableTools === "function"
+      ? await maybeAsync.getAllAvailableTools()
+      : (reg.getAvailableTools() as unknown as Array<{
+          name: string;
+          description: string;
+          category: string;
+        }>);
+
+  // Group by category
+  const byCategory = new Map<
+    string,
+    Array<{ name: string; description: string }>
+  >();
+  for (const t of tools) {
+    if (t.name === "synthesizeFinalAnswer") continue; // Exclude from planning
+    const list = byCategory.get(t.category) || [];
+    list.push({ name: t.name, description: t.description });
+    byCategory.set(t.category, list);
+  }
+
+  // Build string
+  return Array.from(byCategory.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([cat, items]) => {
+      const body = items
         .map(
           (t) =>
             `  - ${t.name}: ${
@@ -134,7 +168,7 @@ function toolListWithParams(reg: ToolRegistry, vectorIds: string[]) {
             }\n    Parameters: ${utils.getToolParameterInfo(t.name, vectorIds)}`
         )
         .join("\n");
-      return items ? `**${cat.toUpperCase()}**:\n${items}` : null;
+      return body ? `**${cat.toUpperCase()}**:\n${body}` : null;
     })
     .filter(Boolean)
     .join("\n\n");
@@ -161,7 +195,8 @@ export async function generatePlan(
     validToolNames,
     fileInfoForPlanning: fileInfo,
     previousToolContext,
-  } = createSharedPlanningContext(
+    projectRoot,
+  } = await createSharedPlanningContext(
     toolRegistry,
     ctx.vectorStoreIds,
     processedFiles,
@@ -188,8 +223,15 @@ ${previousToolContext}
 Available tools:
 ${categorizedTools}
 ${fileInfo}
+PROJECT_ROOT: ${projectRoot}
 
 Create the most efficient, shortest path plan to fulfil the goal.
+
+IMPORTANT: Prefer MCP filesystem tools for repository/local files when available.
+- Typical flow: list_directory to discover exact paths, then read_text_file or read_file with the returned path.
+- Never invent or guess file paths. Do not use placeholders like "/path/to/file".
+- If there are NO uploaded files, do NOT use searchFiles; use MCP filesystem tools instead.
+- Only use searchFiles when the user has uploaded files in this session (see UPLOADED FILES section).
 
 IMPORTANT: For file search operations:
 - Use "searchFiles" with a "query" parameter (natural language query)
@@ -201,6 +243,7 @@ IMPORTANT: For calendar operations:
 - When user says "tomorrow", use the next day after current date
 - Always include proper time zones (e.g., "+02:00" or "UTC") in dateTime fields
 - Example: {"tool": "createEvent", "parameters": {"eventData": {"summary": "Meeting", "start": {"dateTime": "2025-07-17T14:00:00+02:00"}, "end": {"dateTime": "2025-07-17T15:00:00+02:00"}}}}
+ - If the user does not specify a time, prefer creating an all-day event using start.date and end.date (next day)
 
 Return **only** valid JSON like:
 [
@@ -220,11 +263,11 @@ Return **only** valid JSON like:
   ctx.log(`🟦 [generatePlan] Prompt sent to LLM:\n${prompt}`);
   const llm = await generateTextWithProvider(prompt, ctx.getAIConfig(model), {
     model,
-    max_tokens: 512,
-    temperature: 0,
+    max_tokens: 2048, // Increased from 512 to allow for complete plan generation
   });
-  ctx.log(`� [generatePlan] LLM response:\n${llm?.text}`);
+  ctx.log(`🟦 [generatePlan] LLM response:\n${llm?.text}`);
 
+  // Primary parse path: CALL_TOOLS JSON blocks
   let plannedCalls: RawPlanCall[] =
     utils.parseToolDecisions(llm?.text ?? "") || [];
 
@@ -233,7 +276,9 @@ Return **only** valid JSON like:
     try {
       plannedCalls = JSON.parse(llm?.text ?? "[]");
     } catch {
-      plannedCalls = [];
+      // Try robust PLAN_JSON/array extraction
+      const arr = utils.extractJsonArrayFromText(llm?.text ?? "");
+      plannedCalls = (Array.isArray(arr) ? arr : []) as RawPlanCall[];
     }
   }
 
@@ -287,10 +332,293 @@ Return **only** valid JSON like:
     } as PlannedStep;
   });
   ctx.log(`🗺️ Planned steps:\n${JSON.stringify(res, null, 2)}`);
+  // Fallback: if still empty, construct a minimal heuristic plan
+  if (!res.length) {
+    ctx.log(
+      "📉 Planner produced no steps – attempting heuristic fallback plan"
+    );
+    const tools = new Set(toolRegistry.getAvailableTools().map((t) => t.name));
+    const steps: PlannedStep[] = [];
+
+    // Heuristic: if message mentions passport and calendar
+    const mentionsPassport = /passport/i.test(userMessage);
+    const mentionsCalendar =
+      /(calendar|meeting|event|schedule|appointment)/i.test(userMessage);
+    if (mentionsPassport && tools.has("getPassports")) {
+      steps.push({
+        id: `plan_${stepId}_0`,
+        goal: "Find passport by provided filters (surname/given_names if present)",
+        tool: "getPassports",
+        parameters: {},
+      });
+    }
+    if (mentionsCalendar && tools.has("createEvent")) {
+      // Attempt lightweight natural language extraction for common patterns like
+      // "next week, tuesday at 9 am" or "tomorrow" to avoid empty event payloads.
+      const lowered = userMessage.toLowerCase();
+      const now = new Date();
+      const weekdayMap = new Map([
+        ["sunday", 0],
+        ["monday", 1],
+        ["tuesday", 2],
+        ["wednesday", 3],
+        ["thursday", 4],
+        ["friday", 5],
+        ["saturday", 6],
+      ]);
+      function nextWeekday(targetDow: number): Date {
+        const d = new Date(now);
+        const currentDow = d.getDay();
+        let delta = (targetDow - currentDow + 7) % 7;
+        if (delta === 0) delta = 7; // next occurrence
+        // If phrase includes 'next week' and delta < 7, push a full week
+        if (/next week/.test(lowered)) delta += 7;
+        d.setDate(d.getDate() + delta);
+        return d;
+      }
+      let startDate: Date | undefined;
+      for (const [name, dow] of weekdayMap.entries()) {
+        if (lowered.includes(name)) {
+          startDate = nextWeekday(dow);
+          break;
+        }
+      }
+      if (!startDate && /tomorrow/.test(lowered)) {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() + 1);
+      }
+      if (!startDate && /today/.test(lowered)) {
+        startDate = new Date(now);
+      }
+      // Default: if still unknown but user mentions 'next week', choose 7 days ahead
+      if (!startDate && /next week/.test(lowered)) {
+        startDate = new Date(now);
+        startDate.setDate(startDate.getDate() + 7);
+      }
+
+      // Time extraction (simple): look for '9 am', '14:30', etc.
+      let explicitTime = false;
+      let hour = 9;
+      let minute = 0;
+      const timeMatch = lowered.match(/(\b\d{1,2})(?::(\d{2}))?\s?(am|pm)?/);
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1]);
+        const m = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+        const mer = timeMatch[3];
+        if (mer === "pm" && h < 12) h += 12;
+        if (mer === "am" && h === 12) h = 0;
+        hour = h;
+        minute = m;
+        explicitTime = true;
+      } else if (/morning/.test(lowered)) {
+        hour = 9;
+        explicitTime = true;
+      } else if (/afternoon/.test(lowered)) {
+        hour = 14;
+        explicitTime = true;
+      } else if (/evening/.test(lowered)) {
+        hour = 18;
+        explicitTime = true;
+      }
+
+      // Derive a tentative summary from the user message in a GENERIC way (no domain hard‑coding)
+      // 1. Attempt to capture a name pattern after "for <First> <Last>"
+      let guessedName = "";
+      const nameMatch = userMessage.match(
+        /for\s+([A-Z]?[a-z]+)\s+([A-Z]?[a-z]+)/i
+      );
+      if (nameMatch) {
+        const part1 = nameMatch[1];
+        const part2 = nameMatch[2];
+        guessedName = `${part1.charAt(0).toUpperCase()}${part1.slice(1)} ${part2
+          .charAt(0)
+          .toUpperCase()}${part2.slice(1)}`;
+      }
+
+      // 2. Generic action phrase extraction: common initiating verbs followed by up to 3 words (non‑stopwords)
+      let actionPhrase = "Event";
+      const verbPattern =
+        /(start|begin|kickoff|submit|review|plan|create|schedule)\s+([^\.]{0,60})/i;
+      const actionMatch = userMessage.match(verbPattern);
+      if (actionMatch) {
+        // Clean trailing punctuation and limit to a few words (avoid entire sentence)
+        const rawTail = actionMatch[2]
+          .replace(/\s+/g, " ")
+          .trim()
+          .replace(/[.,;:!?].*$/, "");
+        const words = rawTail.split(/\s+/).filter(Boolean).slice(0, 3); // up to 3 words
+        const base = [actionMatch[1], ...words]
+          .join(" ")
+          .replace(/\b(\w)/g, (c) => c.toUpperCase());
+        actionPhrase = base;
+      }
+
+      const defaultSummary = guessedName
+        ? `${actionPhrase} — ${guessedName}`
+        : actionPhrase;
+      const eventData: Record<string, unknown> = { summary: defaultSummary };
+      if (startDate) {
+        if (explicitTime) {
+          const startDT = new Date(startDate);
+          startDT.setHours(hour, minute, 0, 0);
+          const endDT = new Date(startDT.getTime() + 60 * 60 * 1000); // default 1h
+          const iso = (d: Date) => d.toISOString();
+          eventData.start = { dateTime: iso(startDT) };
+          eventData.end = { dateTime: iso(endDT) };
+        } else {
+          // all‑day
+          const yyyyMmDd = startDate.toISOString().slice(0, 10);
+          const nextDay = new Date(startDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const yyyyMmDd2 = nextDay.toISOString().slice(0, 10);
+          eventData.start = { date: yyyyMmDd };
+          eventData.end = { date: yyyyMmDd2 };
+        }
+      } else {
+        eventData.start = {};
+        eventData.end = {};
+      }
+
+      steps.push({
+        id: `plan_${stepId}_1`,
+        goal: "Create or update calendar event as requested",
+        tool: "createEvent",
+        parameters: { eventData },
+      });
+    }
+
+    // If we built any heuristic steps, return them
+    if (steps.length) {
+      ctx.log(`🧭 Heuristic steps used:\n${JSON.stringify(steps, null, 2)}`);
+      return steps;
+    }
+
+    // Last resort: if knowledge tool exists and message looks like a question
+    if (tools.has("vectorFileSearch") && /\?$/.test(userMessage)) {
+      return [
+        {
+          id: `plan_${stepId}_0`,
+          goal: "Search knowledge base for answer",
+          tool: "vectorFileSearch",
+          parameters: {
+            query: userMessage,
+            vectorStoreIds: ctx.vectorStoreIds,
+          },
+        },
+      ];
+    }
+
+    return [];
+  }
   return res;
 }
 
+/* === PHASE 1 OPTIMIZATION: COMBINED ANALYZE + PLAN ================== */
+/**
+ * analyzeAndPlan: merges performAnalysis + generatePlan into a single LLM call
+ * to save one round‑trip. Returns both an analysis step (for logs) and the
+ * parsed planned steps. Falls back silently to empty array if parsing fails.
+ */
+export async function analyzeAndPlan(
+  ctx: OrchestratorContext,
+  userMessage: string,
+  toolRegistry: ToolRegistry,
+  model: ModelType,
+  stepId: number,
+  processedFiles: ProcessedFile[] = [],
+  currentContext?: string,
+  previousToolExecutions?: ToolExecution[]
+): Promise<{ analysisContent: string; planned: PlannedStep[] }> {
+  const {
+    categorizedTools,
+    validToolNames,
+    fileInfoForPlanning: fileInfo,
+    previousToolContext,
+    projectRoot,
+  } = await createSharedPlanningContext(
+    toolRegistry,
+    ctx.vectorStoreIds,
+    processedFiles,
+    previousToolExecutions,
+    currentContext
+  );
+
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  // ultra‑compact tool list: name + category only (include MCP tools via async registry when available)
+  let toolsForList: Array<{ name: string; category?: string }>;
+  const maybeAsyncTools = toolRegistry as unknown as {
+    getAllAvailableTools?: () => Promise<
+      Array<{ name: string; category?: string }>
+    >;
+  };
+  if (typeof maybeAsyncTools.getAllAvailableTools === "function") {
+    toolsForList = await maybeAsyncTools.getAllAvailableTools();
+  } else {
+    toolsForList = toolRegistry.getAvailableTools() as unknown as Array<{
+      name: string;
+      category?: string;
+    }>;
+  }
+  const toolList = toolsForList
+    .map(
+      (t: { name: string; category?: string }) =>
+        `${t.name}:${t.category ?? "uncategorized"}`
+    )
+    .join(", ");
+
+  const prompt = `ROLE: AnalyzeAndPlanGPT
+DATE: ${currentDate}
+USER: "${userMessage}"
+CONTEXT: ${previousToolContext || "(none)"}
+FILES: ${fileInfo || "(none)"}
+TOOLS: ${toolList}
+TOOLS_BY_CATEGORY:\n${categorizedTools}
+RULES:
+- Output one JSON plan only (no prose outside sections below)
+- Each step exactly one tool; max 6 steps
+- If user did not specify time for calendar actions → use all‑day (start.date + end.date next day)
+- Get identifiers (e.g. getPassports/searchEvents) before create/update/delete
+- If no tool can satisfy request → return PLAN_JSON = [] and note reason in SCRATCHPAD
+ - Prefer MCP filesystem tools (list_directory, read_text_file/read_file) for repository/local file access; avoid searchFiles unless there are uploaded files
+ - Never use placeholder paths; always pass exact paths returned by prior steps
+ - Anchor filesystem paths to PROJECT_ROOT when exploring repository files
+PROJECT_ROOT: ${projectRoot}
+FORMAT:
+### SCRATCHPAD\n<brief reasoning bullets>\n\n### PLAN_JSON\n[ ... ]\n\n### SELF_CHECK\n<OK or issues>
+Return the sections exactly.
+`;
+
+  ctx.log(`🟦 [analyzeAndPlan] Prompt sent to LLM:\n${prompt}`);
+  const llm = await generateTextWithProvider(prompt, ctx.getAIConfig(model), {
+    model,
+    max_tokens: 800,
+  });
+  const text = llm?.text || "";
+  ctx.log(`🟩 [analyzeAndPlan] LLM response:\n${text}`);
+
+  // Parse steps using existing robust parser
+  const parsed = utils.parsePlanFromText(text, validToolNames);
+  const planned: PlannedStep[] = parsed.map((p, idx) => ({
+    id: `plan_${stepId}_${idx}`,
+    goal: p.tool,
+    tool: p.tool,
+    parameters: p.parameters,
+  }));
+
+  return { analysisContent: text, planned };
+}
+
 /* === ANALYSIS ========================================================= */
+/**
+ * @deprecated performAnalysis is deprecated and may be removed in future releases.
+ * Use analyzeAndPlan for combined analysis and planning.
+ */
 export async function performAnalysis(
   ctx: OrchestratorContext,
   userMessage: string,
@@ -300,7 +628,7 @@ export async function performAnalysis(
   stepId: number,
   processedFiles: ProcessedFile[] = []
 ): Promise<OrchestrationStep> {
-  const { fileInfoForAnalysis } = createSharedPlanningContext(
+  const { fileInfoForAnalysis } = await createSharedPlanningContext(
     toolRegistry,
     ctx.vectorStoreIds,
     processedFiles
@@ -323,7 +651,6 @@ export async function performAnalysis(
       // images: processedFiles.length
       //   ? await imagesFromFiles(processedFiles)
       //   : undefined,
-      ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
   ctx.log(`� [performAnalysis] LLM response:\n${response?.text}`);
@@ -349,7 +676,10 @@ export async function decideToolUsage(
   internalConv: Array<{ role: "user" | "assistant"; content: string }> = [],
   processedFiles: ProcessedFile[] = []
 ): Promise<OrchestrationStep> {
-  const categorizedTools = toolListWithParams(toolRegistry, ctx.vectorStoreIds);
+  const categorizedTools = await toolListWithParams(
+    toolRegistry,
+    ctx.vectorStoreIds
+  );
 
   const prevCalls =
     previousToolCalls.length > 0
@@ -403,7 +733,6 @@ Respond with either CALL_TOOLS json array or SUFFICIENT_INFO message exactly as 
       // images: processedFiles.length
       //   ? await imagesFromFiles(processedFiles)
       //   : undefined,
-      ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
   ctx.log(`🟩 [decideToolUsage] LLM response:\n${response?.text}`);
@@ -477,7 +806,6 @@ Respond with \`CONTINUE:\` or \`COMPLETE:\` and your reasoning.
     ctx.getAIConfig(model),
     {
       model,
-      ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
   ctx.log(`🟩 [evaluateProgress] LLM response:\n${response?.text}`);
@@ -523,7 +851,6 @@ FORMAT_NEEDS_REFINEMENT: explanation...
     ctx.getAIConfig(model),
     {
       model,
-      ...(supportsTemperature(model) && { temperature: 0.1 }),
     }
   );
   ctx.log(`🟩 [validateResponseFormat] LLM response:\n${response?.text}`);
@@ -578,7 +905,6 @@ Produce improved final answer.
     ctx.getAIConfig(model),
     {
       model,
-      ...(supportsTemperature(model) && { temperature: 0.3 }),
     }
   );
   ctx.log(`🟩 [refineSynthesis] LLM response:\n${response?.text}`);
@@ -634,7 +960,6 @@ Use markdown; keep it concise but complete.
     ctx.getAIConfig(model),
     {
       model,
-      ...(supportsTemperature(model) && { temperature: 0.3 }),
     }
   );
   ctx.log(`🟩 [synthesizeFinalResponse] LLM response:\n${response?.text}`);

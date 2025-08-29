@@ -2,8 +2,6 @@ import { generateTextWithProvider, type AIProviderConfig } from "@/lib/openai";
 import { ModelType } from "../appconfig/models";
 import { CalendarEvent } from "../types/calendar";
 
-const TEMPERATURE_UNSUPPORTED = ["o4-mini", "o4-mini-high", "o3", "o3-mini"];
-
 export async function generateReport(
   events: CalendarEvent[],
   company: string,
@@ -59,8 +57,6 @@ ${events
 Total events in period: ${events.length}
 `;
 
-  const supportsTemp = !TEMPERATURE_UNSUPPORTED.includes(model);
-
   const { text } = await generateTextWithProvider(
     userPrompt,
     providerConfig || {
@@ -73,7 +69,6 @@ Total events in period: ${events.length}
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: supportsTemp ? 0.3 : undefined,
     }
   );
 

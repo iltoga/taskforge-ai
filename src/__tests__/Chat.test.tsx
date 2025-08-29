@@ -86,9 +86,9 @@ describe('Chat Component', () => {
         body: JSON.stringify({
           message: 'Create a meeting tomorrow at 2 PM',
           messages: [], // Now includes messages array (empty for first message)
-          model: 'gpt-4.1-mini',
+          model: 'gpt-5-mini',
           useTools: true, // Updated default
-          orchestratorModel: 'gpt-4.1-mini',
+          orchestratorModel: 'gpt-5-mini',
           developmentMode: false, // Updated default (false = SIMPLE mode)
           calendarId: 'primary', // Default calendar
           fileIds: [], // Empty file IDs array

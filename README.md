@@ -1,21 +1,22 @@
-# 🚀 AI Calendar Assistant � AI Calendar Assistant
+# 🤖 TaskForge AI - Agentic Task Orchestrator
 
-> **A next-generation agentic AI system that transforms calendar management through sophisticated multi-step reasoning and extensible tool orchestration**
+> **A next-generation agentic AI system that transforms task execution through sophisticated multi-step reasoning, extensible tool orchestration, and Model Context Protocol (MCP) integration**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15+-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19+-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4.1%20%7C%20o3-412991?style=for-the-badge&logo=openai)](https://openai.com/)
+[![MCP](https://img.shields.io/badge/MCP-Protocol-FF6B35?style=for-the-badge&logo=protocol)](https://modelcontextprotocol.io/)
 [![Prisma](https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
 
 ## ✨ **Why This Project Stands Out**
 
-This isn't just another calendar app. It's a **sophisticated agentic AI system** that demonstrates cutting-edge software engineering practices, modern architecture patterns, and advanced AI integration. Built with enterprise-grade technologies, it showcases skills that are highly valued in today's tech industry.
+This isn't just another AI chatbot. It's a **sophisticated agentic task orchestrator** that demonstrates cutting-edge software engineering practices, modern architecture patterns, and advanced AI integration with Model Context Protocol (MCP). Built with enterprise-grade technologies, it showcases the future of AI-powered task automation and tool orchestration.
 
 ## 🎯 **Core Features**
 
-### � **Agentic AI Orchestration**
+### 🤖 **Agentic Task Orchestration**
 
 - **Multi-Step Reasoning**: AI that analyzes, plans, executes, evaluates, and synthesizes
 - **Dynamic Tool Selection**: Intelligent decision-making based on context and intermediate results
@@ -23,19 +24,26 @@ This isn't just another calendar app. It's a **sophisticated agentic AI system**
 - **Error Recovery**: Graceful handling with alternative strategies
 - **Development Transparency**: Full visibility into AI reasoning steps
 
-### 🛠️ **Advanced Tool Architecture**
+### � **Moddel Context Protocol (MCP) Integration**
 
-- **Extensible Framework**: Modular tool system supporting multiple categories
+- **External Tool Servers**: Seamless integration with MCP-compatible tools
+- **Automatic Discovery**: MCP tools appear alongside internal tools in the UI
+- **Server Management**: Auto-start, health monitoring, and graceful degradation
+- **Extensible Ecosystem**: File systems, databases, Git, web search, and more
+
+### �️* **Advanced Tool Architecture**
+
+- **Hybrid Tool System**: Internal tools + external MCP servers
 - **Type-Safe Operations**: Full Zod schema validation for all tool parameters
 - **Registry Pattern**: Centralized tool management with clean separation of concerns
-- **Category Support**: Calendar, Email, File, Web, and Document processing tools
+- **Category Support**: Calendar, Email, File, Web, Database, Version Control, and Document processing
 
-### 📅 **Smart Calendar Management**
+### 🎯 **Task-Oriented Intelligence**
 
-- **Natural Language Interface**: "Schedule meeting with John tomorrow at 2 PM"
-- **Complex Queries**: "Show me all Techcorpevents from March to June 2025"
-- **Conflict Resolution**: Intelligent scheduling with conflict detection
-- **Weekly Analytics**: AI-powered work reports and summaries
+- **Natural Language Interface**: "Read my project files and create a summary report"
+- **Complex Workflows**: "Check my calendar, find conflicts, and reschedule meetings"
+- **Cross-Domain Tasks**: "Search the web, save results to files, and update my database"
+- **Contextual Execution**: AI maintains context across multiple tool calls
 
 ### 🎛️ **Dual AI Model System**
 
@@ -65,6 +73,7 @@ This isn't just another calendar app. It's a **sophisticated agentic AI system**
 - **OpenAI API**: GPT-4.1, o3, o3-mini with function calling
 - **OpenRouter Integration**: Access to Gemini, DeepSeek, Claude, and more
 - **Agentic Architecture**: Custom orchestration engine for multi-step reasoning
+- **MCP Integration**: Model Context Protocol for external tool servers
 - **Tool Orchestration**: Sophisticated AI workflow management
 
 ### **Backend & Database**
@@ -83,28 +92,47 @@ This isn't just another calendar app. It's a **sophisticated agentic AI system**
 
 ## 🏗️ **Architecture Highlights**
 
-### **Agentic AI System**
+### **Agentic Task Orchestration**
 
 ```typescript
 // Multi-step reasoning with dynamic tool selection
 const result = await orchestrator.orchestrate(
   userMessage,
-  registry,
-  'gpt-4.1-mini',
+  toolRegistry, // Includes both internal and MCP tools
+  'gpt-5-mini',
   { developmentMode: true }
 );
 ```
 
-### **Extensible Tool Registry**
+### **MCP Server Integration**
 
 ```typescript
-// Clean, modular tool registration pattern
-registry.registerTool({
-  name: 'createEvent',
-  description: 'Create a new calendar event',
-  parameters: EventSchema,
-  category: 'calendar'
-}, calendarTools.createEvent);
+// Automatic MCP server management
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/project/path"],
+      "disabled": false,
+      "autoApprove": ["read_file", "list_directory"]
+    }
+  }
+}
+```
+
+### **Hybrid Tool Registry**
+
+```typescript
+// Internal tools + MCP tools in unified registry
+const registry = createToolRegistry(
+  calendarTools,
+  emailTools,
+  fileTools,
+  webTools,
+  passportTools,
+  undefined, // config override
+  true       // enable MCP integration
+);
 ```
 
 ### **Type-Safe Database Operations**
@@ -139,6 +167,9 @@ cd taskforge-ai
 # Install dependencies
 npm install
 
+# Install MCP prerequisites (for external tools)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Set up environment variables
 cp .env.example .env.local
 # Edit .env.local with your API keys and database URL
@@ -147,7 +178,10 @@ cp .env.example .env.local
 npx prisma migrate deploy
 npx prisma generate
 
-# Start development server
+# Initialize MCP configuration (optional)
+npm run mcp:init
+
+# Start development server (auto-starts MCP servers)
 npm run dev
 ```
 
@@ -155,13 +189,13 @@ npm run dev
 
 ```env
 # Database
-DATABASE_URL="postgresql://user:password@localhost:5432/calendar_assistant"
+DATABASE_URL="postgresql://user:password@localhost:5432/taskforge_ai"
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="your-secret-key"
 
-# Google OAuth2
+# Google OAuth2 (for calendar tools)
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
 
@@ -170,48 +204,64 @@ OPENAI_API_KEY="your-openai-api-key"
 
 # OpenRouter (optional)
 OPENROUTER_API_KEY="your-openrouter-api-key"
+
+# MCP Server Environment Variables (optional)
+POSTGRES_CONNECTION_STRING="postgresql://user:pass@localhost:5432/db"
+BRAVE_API_KEY="your-brave-search-api-key"
 ```
 
 ## 🎮 **Usage Examples**
 
-### **Natural Language Calendar Operations**
+### **Cross-Domain Task Orchestration**
 
 ```typescript
-// Complex multi-step queries
-"Find all meetings with Techcorpbetween March and June 2025,
-then create a summary report"
+// Complex multi-step workflows across different tools
+"Read my project README file, search for similar projects online,
+and create a comparison report in my database"
 
-"Schedule a meeting with the engineering team next Tuesday at 2 PM,
-but check for conflicts first"
+"Check my calendar for conflicts, reschedule overlapping meetings,
+and send email notifications to attendees"
 
-"Show me my busiest days this month and suggest optimization"
+"Analyze my Git repository commits, find the most active files,
+and create a development summary report"
 ```
 
-### **Document Processing**
+### **MCP Tool Integration**
 
 ```typescript
-// Upload and process passport documents
-// The AI automatically extracts structured data:
+// Seamless integration of external MCP servers
+"List all files in my project directory, read the main config file,
+and update my database with the current project status"
+
+// Uses: filesystem MCP server + database MCP server + internal tools
+```
+
+### **Document Processing & Data Extraction**
+
+```typescript
+// Upload and process documents with AI extraction
 {
   passport_number: "ZH9876543",
   surname: "MÜLLER",
   given_names: "JÜRGEN",
   nationality: "GERMAN",
   date_of_birth: "1975-12-31",
-  // ... and more fields
+  // ... automatically extracted and validated
 }
 ```
 
 ### **Agentic Workflow Example**
 
 ```
-User: "Create a weekly report for all my work meetings"
+User: "Analyze my project files and create a development report"
 
-AI Analysis:
-1. 🔍 Search for work-related calendar events
-2. 📊 Analyze meeting patterns and duration
-3. 📝 Generate comprehensive summary
-4. 💾 Save report for future reference
+AI Orchestration:
+1. 🔍 Use filesystem MCP server to list project files
+2. 📖 Read key files (README, package.json, source code)
+3. 🔍 Search web for similar projects and best practices
+4. 📊 Analyze code patterns and structure
+5. 📝 Generate comprehensive development report
+6. 💾 Save report to database for future reference
 ```
 
 ## 🧪 **Testing & Quality Assurance**
@@ -224,13 +274,15 @@ This project maintains **94/94 passing tests** across multiple categories:
 - ✅ **Integration Tests**: API endpoint validation
 - ✅ **Functional Tests**: End-to-end workflow testing
 - ✅ **Orchestrator Tests**: AI reasoning validation
+- ✅ **MCP Integration Tests**: External tool server testing
 - ✅ **Database Tests**: Prisma operations testing
 
 ```bash
 # Run test suite
-npm test                 # All tests
+npm test                 # All tests (including MCP integration)
 npm run test:coverage    # With coverage report
 npm run test:functional  # Functional tests only
+npm run mcp:test        # Test MCP servers independently
 ```
 
 ### **Code Quality Metrics**
@@ -255,15 +307,16 @@ src/
 │   └── ModelSelector.tsx # AI model selection
 │
 ├── services/              # Business logic layer
-│   ├── tool-orchestrator.ts  # Agentic AI engine
+│   ├── orchestrator/         # Agentic AI orchestration engine
+│   ├── mcp/                  # Model Context Protocol integration
 │   ├── calendar-service.ts   # Google Calendar integration
 │   └── ai-service.ts         # OpenAI/OpenRouter wrapper
 │
-├── tools/                 # Extensible tool system
-│   ├── tool-registry.ts      # Central tool registry
+├── tools/                 # Hybrid tool system
+│   ├── tool-registry.ts      # Unified internal + MCP tool registry
 │   ├── calendar-tools.ts     # Calendar operations
 │   ├── passport-tools.ts     # Document processing
-│   └── register-*-tools.ts   # Modular registrations
+│   └── register-*-tools.ts   # Modular tool registrations
 │
 ├── lib/                   # Utility libraries
 │   ├── auth.ts           # NextAuth configuration
@@ -277,19 +330,26 @@ src/
 
 ## 🎯 **Key Technical Achievements**
 
-### **Agentic AI Implementation**
+### **Agentic Task Orchestration**
 
-- **5-Phase Orchestration**: Analysis → Tool Selection → Execution → Evaluation → Synthesis
+- **5-Phase Orchestration**: Analysis → Planning → Execution → Evaluation → Synthesis
 - **Context-Aware Reasoning**: Maintains state across multiple tool calls
 - **Dynamic Tool Selection**: AI chooses optimal tools based on intermediate results
 - **Error Recovery**: Intelligent fallback strategies for failed operations
 
-### **Extensible Architecture**
+### **Model Context Protocol Integration**
 
-- **Modular Tool System**: Easy addition of new tool categories
-- **Type-Safe Operations**: Full TypeScript + Zod validation
+- **External Tool Servers**: Seamless integration with MCP ecosystem
+- **Automatic Server Management**: Auto-start, health monitoring, graceful shutdown
+- **Unified Tool Registry**: Internal and external tools in single interface
+- **Real-time Discovery**: MCP tools appear automatically in UI
+
+### **Hybrid Architecture**
+
+- **Internal + External Tools**: Best of both worlds approach
+- **Type-Safe Operations**: Full TypeScript + Zod validation for all tools
 - **Registry Pattern**: Centralized tool management with clean APIs
-- **Plugin Architecture**: Seamless integration of new capabilities
+- **Extensible Design**: Easy addition of new tool categories and MCP servers
 
 ### **Production-Ready Features**
 
@@ -300,17 +360,30 @@ src/
 
 ## 🛠️ **Advanced Features**
 
+### **MCP Server Ecosystem**
+
+```typescript
+// Available MCP servers for external tool integration
+const mcpServers = {
+  filesystem: "File system operations (read, write, list)",
+  postgres: "Database operations (query, tables, schemas)",
+  git: "Version control (status, log, diff, commits)",
+  "brave-search": "Web search and content retrieval",
+  "aws-docs": "AWS documentation search and reference"
+};
+```
+
 ### **Document Processing Pipeline**
 
 ```typescript
-// Automatic passport data extraction and validation
-interface PassportData {
+// Automatic document data extraction and validation
+interface ExtractedData {
   passport_number: string;
   surname: string;
   given_names: string;
   nationality: string; // Auto-translated to English
   date_of_birth: Date;
-  // ... 15+ structured fields
+  // ... 15+ structured fields with validation
 }
 ```
 
@@ -323,10 +396,12 @@ interface PassportData {
 
 ### **Multi-Domain Tool Support**
 
-- **Calendar Tools**: Full CRUD operations with Google Calendar
-- **Document Tools**: OCR, LLM processing, structured extraction
-- **File Tools**: Upload, processing, and management
-- **Web Tools**: Search and content fetching capabilities
+- **Internal Tools**: Calendar, Email, Document processing, File management
+- **MCP File System**: Read, write, list files and directories
+- **MCP Database**: PostgreSQL queries, schema inspection, data operations
+- **MCP Version Control**: Git operations, repository management
+- **MCP Web Search**: Brave Search API, content retrieval
+- **MCP Documentation**: AWS docs, technical reference search
 
 ## 📊 **Performance & Metrics**
 
@@ -351,7 +426,8 @@ interface PassportData {
 This project demonstrates **cutting-edge software engineering practices**:
 
 - Modern React/Next.js patterns with the latest features
-- Sophisticated AI integration beyond simple API calls
+- Sophisticated AI orchestration beyond simple API calls
+- Model Context Protocol integration for external tool servers
 - Production-grade architecture with proper separation of concerns
 - Comprehensive testing strategies for AI-powered applications
 
@@ -359,20 +435,20 @@ This project demonstrates **cutting-edge software engineering practices**:
 
 Key skills demonstrated:
 
-- **AI/ML Integration**: Advanced orchestration beyond basic ChatGPT wrappers
+- **AI/ML Integration**: Advanced agentic orchestration with multi-step reasoning
+- **MCP Integration**: Model Context Protocol for external tool servers
 - **Full-Stack Development**: React, Next.js, Node.js, PostgreSQL
 - **System Architecture**: Scalable, maintainable, enterprise-ready code
 - **API Design**: RESTful APIs with proper validation and error handling
 - **Database Design**: Complex relational models with Prisma ORM
-- **Testing**: Unit, integration, and functional test strategies
-- **DevOps**: CI/CD ready with Docker support
+- **Testing**: Unit, integration, functional, and MCP integration tests
+- **DevOps**: CI/CD ready with Docker support and automated server management
 
 ## 🚀 **Future Roadmap**
 
 ### **Short Term**
 
 - [ ] **Real-time Collaboration**: Multi-user calendar coordination
-- [ ] **Mobile App**: React Native implementation
 - [ ] **Voice Interface**: Speech-to-text calendar operations
 - [ ] **Smart Notifications**: AI-powered meeting reminders
 
@@ -397,17 +473,19 @@ We welcome contributions! This project is designed to be **developer-friendly** 
 
 ### **Areas for Contribution**
 
-- 🔧 **New Tool Categories**: Add email, file, or web tools
+- 🔧 **New MCP Servers**: Integrate additional external tool servers
+- 🛠️ **Internal Tools**: Add new tool categories and capabilities
 - 🎨 **UI/UX Improvements**: Enhanced components and interactions
-- 🧪 **Testing**: Expand test coverage and add new test scenarios
-- 📚 **Documentation**: Improve guides and add tutorials
-- 🚀 **Performance**: Optimize AI calls and database queries
+- 🧪 **Testing**: Expand test coverage including MCP integration tests
+- � **Docfumentation**: Improve guides and add MCP server tutorials
+- 🚀 **Performance**: Optimize AI calls and tool orchestration
 
 ### **Contribution Guidelines**
 
-- Follow the **agentic tool development pattern**
+- Follow the **agentic orchestration patterns**
+- Support both **internal tools and MCP integration**
 - Maintain **100% TypeScript coverage**
-- Add **comprehensive tests** for new features
+- Add **comprehensive tests** including MCP integration tests
 - Update **documentation** for user-facing changes
 
 ## 📝 **License**
@@ -428,7 +506,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **Built with ❤️ by [Stefano Galassi](https://github.com/iltoga)**
 
-*Showcasing modern AI integration, sophisticated architecture, and production-ready development practices*
+*Showcasing agentic AI orchestration, MCP integration, and production-ready development practices*
 
 [![GitHub stars](https://img.shields.io/github/stars/iltoga/taskforge-ai?style=social)](https://github.com/iltoga/taskforge-ai/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/iltoga/taskforge-ai?style=social)](https://github.com/iltoga/taskforge-ai/network/members)

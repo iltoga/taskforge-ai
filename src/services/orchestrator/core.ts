@@ -8,7 +8,7 @@ import { ToolExecution, ToolRegistry } from "@/tools/tool-registry";
 import { ChatHistory } from "@/types/chat";
 import { ProcessedFile } from "@/types/files";
 import * as steps from "./steps";
-import { generatePlan } from "./steps";
+import { analyzeAndPlan, generatePlan } from "./steps";
 import {
   OrchestrationResult,
   OrchestrationStep,
@@ -97,11 +97,34 @@ export class ToolOrchestrator {
   /* PUBLIC API                                                         */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Test helper: delegate to utils.parseToolDecisions
+   */
+
+  public parseToolDecisions(
+    content: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Array<{ name: string; parameters: Record<string, any> }> {
+    return utils.parseToolDecisions(content) as Array<{
+      name: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      parameters: Record<string, any>;
+    }>;
+  }
+
+  /**
+   * Test helper: delegate to utils.needsMoreInformation
+   */
+  public needsMoreInformation(content: string): boolean {
+    return utils.needsMoreInformation(content);
+  }
+
   async orchestrate(
     userMessage: string,
     chatHistory: ChatHistory,
     toolRegistry: ToolRegistry,
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     cfg: OrchestratorConfig = {},
     processedFiles: Array<ProcessedFile> = []
   ): Promise<OrchestrationResult> {
@@ -134,7 +157,7 @@ export class ToolOrchestrator {
         this.logProgress("📁 Initializing file search with uploaded files...");
         const hasFileSearchTools = toolRegistry
           .getAvailableTools()
-          .some((t) => t.category === "file-search");
+          .some((t: { category: string }) => t.category === "file-search");
         if (hasFileSearchTools) {
           // check if fileSignature matches the current files
           const currentSignature = createFileSignature(processedFiles);
@@ -182,33 +205,50 @@ export class ToolOrchestrator {
         }
       }
 
-      /* ----------- initial analysis ----------- */
-      const analysis = await steps.performAnalysis(
+      /* ----------- combined analyze + plan (Phase 1 optimization) ----------- */
+      const combo = await analyzeAndPlan(
         ctx,
         userMessage,
-        chatHistory,
         toolRegistry,
         model,
         stepId++,
-        processedFiles
-      );
-      stepLog.push(analysis);
-      convo.push({
-        role: "assistant",
-        content: `Analysis: ${analysis.content}`,
-      });
-
-      /* ----------- create initial plan (Plan‑then‑Act) ----------- */
-      const initialPlan: PlannedStep[] = await generatePlan(
-        ctx,
-        userMessage,
-        toolRegistry,
-        model,
-        stepId,
         processedFiles,
         ctxString,
         toolLog
       );
+      stepLog.push({
+        id: `step_${stepId - 1}`,
+        type: "analysis",
+        timestamp: Date.now(),
+        content: combo.analysisContent,
+        reasoning: "Combined analysis + initial planning",
+      });
+      const analysisPreviewLength =
+        Number(process.env.ANALYSIS_PREVIEW_LENGTH) || 400;
+      convo.push({
+        role: "assistant",
+        content: `Analysis+Plan: ${combo.analysisContent.substring(
+          0,
+          analysisPreviewLength
+        )}...`,
+      });
+
+      let initialPlan: PlannedStep[] = combo.planned;
+      if (initialPlan.length === 0) {
+        this.logProgress(
+          "⚠️ Combined planner produced no steps; attempting legacy generatePlan fallback"
+        );
+        initialPlan = await generatePlan(
+          ctx,
+          userMessage,
+          toolRegistry,
+          model,
+          stepId,
+          processedFiles,
+          ctxString,
+          toolLog
+        );
+      }
       let plannedSteps: PlannedStep[] = [...initialPlan];
 
       /* ----------- main loop ----------- */
@@ -232,194 +272,316 @@ export class ToolOrchestrator {
           );
         }
 
-        const nextPlan = plannedSteps.shift();
-        if (!nextPlan) {
-          throw new Error("Planner returned no tool actions");
-        }
-
-        let plannedCalls: {
-          name: string;
-          parameters: Record<string, unknown>;
-        }[] = [{ name: nextPlan.tool, parameters: nextPlan.parameters }];
-
-        /* auto-inject vectorStoreIds */
-        plannedCalls = plannedCalls
-          .map(
-            (
-              raw
-            ): { name: string; parameters: Record<string, unknown> } | null => {
-              let toolName = raw.name;
-
-              // If returned like "PASSPORT.getPassports", strip prefix
-              if (
-                toolName &&
-                !new Set(
-                  toolRegistry.getAvailableTools().map((t) => t.name)
-                ).has(toolName) &&
-                toolName.includes(".")
-              ) {
-                toolName = toolName.split(".").pop() as string;
-              }
-
-              // --- alias common planner mistakes -----------------
-              // The LLM sometimes returns "fileSearchTool" instead of the real
-              // tool names.  Map those variants to the correct registry names.
-              if (toolName === "fileSearchTool") {
-                // If the planner asks to *start* file search we map to
-                // initialise, otherwise default to search.
-                toolName = "searchFiles";
-              }
-
-              // Remove vectorFileSearch option if no vector store configured
-              const validToolNames = new Set(
-                toolRegistry.getAvailableTools().map((t) => t.name)
-              );
-              if (ctx.vectorStoreIds.length === 0) {
-                validToolNames.delete("vectorFileSearch");
-              }
-
-              // Remove synthesizeFinalAnswer - it should only be called as the final step
-              // Other synthesis tools like synthesizeChat can be called during execution
-              validToolNames.delete("synthesizeFinalAnswer");
-
-              // If the planner produced an unknown tool, skip this planned call
-              if (!toolName || !validToolNames.has(toolName)) {
-                ctx.log(
-                  `⚠️ Planner requested unknown tool "${toolName}". Skipping this step.`
-                );
-                return null;
-              }
-
-              return {
-                name: toolName,
-                parameters: raw.parameters ?? {},
-              };
-            }
-          )
-          .filter(
-            (
-              call
-            ): call is { name: string; parameters: Record<string, unknown> } =>
-              call !== null
+        const first = plannedSteps.shift();
+        if (!first) {
+          // Replan once if nothing
+          this.logProgress("📜 Plan exhausted – generating new sub‑plan");
+          plannedSteps = await generatePlan(
+            ctx,
+            userMessage,
+            toolRegistry,
+            model,
+            stepId,
+            processedFiles,
+            ctxString,
+            toolLog
           );
-
-        /* execution */
-        for (const call of plannedCalls) {
-          if (toolCount >= maxToolCalls) break;
-
-          // Extra safety: prevent synthesizeFinalAnswer from being called during main execution
-          // Other synthesis tools like synthesizeChat are allowed
-          if (call.name === "synthesizeFinalAnswer") {
+          if (plannedSteps.length === 0) {
             this.logProgress(
-              `⚠️ Skipping ${call.name} - reserved for final step only`
+              "🛑 Planner returned no tool actions after retry. Ending orchestration gracefully."
             );
-            continue;
-          }
-
-          /* auto-inject vectorStoreIds */
-          if (
-            call.name === "vectorFileSearch" &&
-            !("vectorStoreIds" in call.parameters)
-          ) {
-            call.parameters.vectorStoreIds = this.vectorStoreIds;
-          }
-
-          // Check for repeated tool failures - if the same tool has failed 3 times in a row,
-          // terminate the workflow early to prevent infinite loops
-          const recentFailures = toolLog
-            .slice(-3)
-            .filter((exec) => exec.tool === call.name && !exec.result.success);
-
-          if (recentFailures.length >= 3) {
-            this.logProgress(
-              `🛑 Tool ${call.name} has failed 3 times consecutively. Terminating workflow to prevent infinite loops.`
-            );
-            console.error(
-              `Tool ${call.name} failed repeatedly:`,
-              recentFailures.map((f) => f.result.error)
-            );
-            needMore = false;
             break;
           }
+        }
 
-          // Log what is being passed to the tool
+        // Collect batch: start with first (if any) then greedily pull consecutive read‑only steps
+        const batch: Array<{
+          name: string;
+          parameters: Record<string, unknown>;
+        }> = [];
+        const pushPlanned = (p: PlannedStep | undefined) => {
+          if (!p) return;
+          batch.push({ name: p.tool, parameters: p.parameters });
+        };
+        pushPlanned(first);
+
+        const batchLimit = Number(process.env.READ_ONLY_BATCH_LIMIT) || 4;
+        while (
+          batch.length < batchLimit &&
+          plannedSteps.length > 0 &&
+          toolCount + batch.length < maxToolCalls &&
+          utils.isReadOnlyTool(plannedSteps[0].tool) &&
+          utils.isReadOnlyTool(batch[0].name) // ensure first is read‑only too
+        ) {
+          pushPlanned(plannedSteps.shift());
+        }
+
+        // Normalise + alias / validate each call; drop invalid
+        // Use async method to get all tools including MCP
+        // Retrieve all available tools (prefer async method when supported to include MCP)
+        let availableTools = toolRegistry.getAvailableTools();
+        const maybeAsyncTools = toolRegistry as unknown as {
+          getAllAvailableTools?: () => Promise<typeof availableTools>;
+        };
+        if (typeof maybeAsyncTools.getAllAvailableTools === "function") {
+          availableTools = await maybeAsyncTools.getAllAvailableTools();
+        }
+        const validToolNames = new Set(availableTools.map((t) => t.name));
+        if (ctx.vectorStoreIds.length === 0)
+          validToolNames.delete("vectorFileSearch");
+        validToolNames.delete("synthesizeFinalAnswer");
+
+        const normalised = batch
+          .map((raw) => {
+            let toolName = raw.name;
+            if (
+              toolName &&
+              !validToolNames.has(toolName) &&
+              toolName.includes(".")
+            ) {
+              toolName = toolName.split(".").pop() as string;
+            }
+            if (toolName === "fileSearchTool") toolName = "searchFiles";
+            if (!toolName || !validToolNames.has(toolName)) {
+              ctx.log(
+                `⚠️ Planner requested unknown tool "${toolName}". Skipping.`
+              );
+              return null;
+            }
+            return { name: toolName, parameters: raw.parameters ?? {} };
+          })
+          .filter(
+            (c): c is { name: string; parameters: Record<string, unknown> } =>
+              c !== null
+          );
+
+        // If we have more than one and not all are read‑only, collapse to first only
+        const allReadOnly = normalised.every((c) =>
+          utils.isReadOnlyTool(c.name)
+        );
+        const executeCalls =
+          normalised.length > 1 && allReadOnly
+            ? normalised
+            : normalised.slice(0, 1);
+
+        const isBatch = executeCalls.length > 1;
+        if (isBatch) {
           this.logProgress(
-            `🔧 Executing ${call.name} with parameters: ${JSON.stringify(
-              call.parameters
-            )}`
+            `⚡ Executing read‑only batch of ${
+              executeCalls.length
+            } tools: ${executeCalls.map((c) => c.name).join(", ")}`
           );
-          this.logProgress(
-            `📋 Current context length: ${convo.length} messages`
-          );
+        }
 
-          const start = Date.now();
-          const result = await toolRegistry.executeTool(
-            call.name,
-            call.parameters
-          );
-          const end = Date.now();
+        const batchResults: ToolExecution[] = [];
 
-          const exec: ToolExecution = {
-            tool: call.name,
-            parameters: call.parameters,
-            result,
-            startTime: start,
-            endTime: end,
-            duration: end - start,
-          };
-          toolLog.push(exec);
-          toolCount++;
+        // Execute (batch or single) possibly in parallel
+        const executions = await Promise.all(
+          executeCalls.map(async (call) => {
+            if (toolCount >= maxToolCalls) return null;
 
-          stepLog.push({
-            id: `step_${stepId++}`,
-            type: "tool_call",
-            timestamp: Date.now(),
-            content: `Executed ${call.name}`,
-            toolExecution: exec,
-          });
+            if (call.name === "synthesizeFinalAnswer") {
+              this.logProgress(
+                `⚠️ Skipping ${call.name} - reserved for final step only`
+              );
+              return null;
+            }
 
-          // Log tool failure details for debugging
-          if (!result.success) {
-            console.error(
-              `❌ Tool ${call.name} failed:`,
-              result.error,
-              "Parameters:",
-              call.parameters
-            );
-            this.logProgress(`❌ Tool ${call.name} failed: ${result.error}`);
-          }
+            // vector store ids
+            if (
+              call.name === "vectorFileSearch" &&
+              !("vectorStoreIds" in call.parameters)
+            ) {
+              call.parameters.vectorStoreIds = this.vectorStoreIds;
+            }
 
-          // Inject actual tool output into conversation if it should be included
-          if (utils.shouldInjectToolResult(call.name, result, convo)) {
-            const toolOutput = utils.formatToolResultForChat(
-              call.name,
-              result,
-              call.parameters
-            );
-            convo.push({
-              role: "assistant",
-              content: toolOutput,
-            });
+            // Pre-execution sanitization for calendar events
+            if (
+              (call.name === "createEvent" || call.name === "updateEvent") &&
+              call.parameters &&
+              typeof call.parameters === "object"
+            ) {
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const p: any = call.parameters;
+                if (call.name === "createEvent" && p.eventData) {
+                  // Auto-fill summary if empty using simple heuristic from user message
+                  if (
+                    !p.eventData.summary ||
+                    p.eventData.summary.trim() === ""
+                  ) {
+                    const nameMatch = userMessage.match(
+                      /for\s+([A-Z]?[a-z]+)\s+([A-Z]?[a-z]+)/i
+                    );
+                    let guessed = "Event";
+                    if (nameMatch) {
+                      const nm = `${nameMatch[1]} ${nameMatch[2]}`.replace(
+                        /\b(\w)/g,
+                        (c) => c.toUpperCase()
+                      );
+                      // Generic action extraction (keep in sync with steps.ts heuristic)
+                      const actionMatch = userMessage.match(
+                        /(start|begin|kickoff|submit|review|plan|create|schedule)\s+([^\.]{0,60})/i
+                      );
+                      if (actionMatch) {
+                        const rawTail = actionMatch[2]
+                          .replace(/\s+/g, " ")
+                          .trim()
+                          .replace(/[.,;:!?].*$/, "");
+                        const words = rawTail
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .slice(0, 3);
+                        const base = [actionMatch[1], ...words]
+                          .join(" ")
+                          .replace(/\b(\w)/g, (c) => c.toUpperCase());
+                        guessed = `${base} — ${nm}`;
+                      } else {
+                        guessed = `Event — ${nm}`;
+                      }
+                    }
+                    p.eventData.summary = guessed;
+                  }
+
+                  // If description missing & passport data present in prior tool calls, embed it (PII awareness left to higher-level consent checks)
+                  if (!p.eventData.description) {
+                    const passportExec = [...toolLog]
+                      .reverse()
+                      .find(
+                        (e) =>
+                          e.tool === "getPassports" &&
+                          e.result.success &&
+                          e.result.data
+                      );
+                    if (
+                      passportExec &&
+                      Array.isArray(passportExec.result.data) &&
+                      passportExec.result.data.length
+                    ) {
+                      const first = passportExec.result.data[0] as Record<
+                        string,
+                        unknown
+                      >;
+                      const lines = Object.entries(first)
+                        .filter(
+                          ([k]) =>
+                            ![
+                              "id",
+                              "documentId",
+                              "createdAt",
+                              "updatedAt",
+                            ].includes(k)
+                        )
+                        .map(([k, v]) => `${k}: ${v}`);
+                      p.eventData.description = `Passport data (sensitive):\n${lines.join(
+                        "\n"
+                      )}`;
+                    }
+                  }
+                  p.eventData = this.sanitizeCalendarEventData(
+                    userMessage,
+                    p.eventData
+                  );
+                } else if (call.name === "updateEvent" && p.changes) {
+                  p.changes = this.sanitizeCalendarEventData(
+                    userMessage,
+                    p.changes
+                  );
+                }
+              } catch (e) {
+                console.warn("Calendar payload sanitize failed:", e);
+              }
+            }
+
             this.logProgress(
-              `📝 Injected tool output into conversation: ${utils.createToolExecutionSummary(
-                exec
+              `🔧 Executing ${call.name} with parameters: ${JSON.stringify(
+                call.parameters
               )}`
             );
-          } else {
-            // Use simplified message if detailed output shouldn't be injected
-            convo.push({
-              role: "assistant",
-              content: result.success
-                ? `Tool ${call.name} succeeded`
-                : `Tool ${call.name} failed`,
-            });
-            this.logProgress(
-              `📝 Used simplified tool result message for ${call.name}`
+
+            const start = Date.now();
+            const result = await toolRegistry.executeTool(
+              call.name,
+              call.parameters
             );
+            const end = Date.now();
+
+            const exec: ToolExecution = {
+              tool: call.name,
+              parameters: call.parameters,
+              result,
+              startTime: start,
+              endTime: end,
+              duration: end - start,
+            };
+            batchResults.push(exec);
+            toolLog.push(exec);
+            toolCount++;
+
+            stepLog.push({
+              id: `step_${stepId++}`,
+              type: "tool_call",
+              timestamp: Date.now(),
+              content: `Executed ${call.name}`,
+              toolExecution: exec,
+            });
+
+            if (!result.success) {
+              console.error(
+                `❌ Tool ${call.name} failed:`,
+                result.error,
+                "Parameters:",
+                call.parameters
+              );
+              this.logProgress(`❌ Tool ${call.name} failed: ${result.error}`);
+            }
+            return exec;
+          })
+        );
+
+        // Conversation injection (compact if batch)
+        if (isBatch) {
+          const summary = batchResults
+            .map((r) => `${r.tool}:${r.result.success ? "OK" : "FAIL"}`)
+            .join(" | ");
+          convo.push({
+            role: "assistant",
+            content: `Batch results: ${summary}`,
+          });
+          this.logProgress(`📝 Injected batch summary: ${summary}`);
+        } else {
+          const single = executions.find((e) => e !== null);
+          if (single) {
+            const { tool, result, parameters } = single;
+            if (utils.shouldInjectToolResult(tool, result, convo)) {
+              convo.push({
+                role: "assistant",
+                content: utils.formatToolResultForChat(
+                  tool,
+                  result,
+                  parameters
+                ),
+              });
+              this.logProgress(
+                `📝 Injected tool output into conversation: ${utils.createToolExecutionSummary(
+                  single
+                )}`
+              );
+            } else {
+              convo.push({
+                role: "assistant",
+                content: result.success
+                  ? `Tool ${tool} succeeded`
+                  : `Tool ${tool} failed`,
+              });
+              this.logProgress(
+                `📝 Used simplified tool result message for ${tool}`
+              );
+            }
           }
         }
 
-        /* evaluation */
+        /* evaluation: always run to let the LLM decide whether to continue */
         const evalStep = await steps.evaluateProgress(
           ctx,
           userMessage,
@@ -446,30 +608,24 @@ export class ToolOrchestrator {
         this.logProgress(
           `📊 Updated context with ${toolLog.length} tool executions`
         );
+        this.logProgress(`ℹ️ Current context length: ${ctxString.length}`);
       }
 
-      /* ----------- pre-synthesis validation (optional) ----------- */
-      let validationFeedback = "";
-      let needsRefinement = false;
-
-      // Collect any validation concerns before final synthesis
-      if (toolLog.length > 0) {
-        const preValidate = await steps.validateResponseFormat(
-          ctx,
+      /* Ensure context is available and log its length even if no loop iterations occurred */
+      if (!ctxString || ctxString === userMessage) {
+        ctxString = utils.buildEnhancedContext(
           userMessage,
-          utils.buildEnhancedContext(userMessage, toolLog, chatHistory), // Use enhanced context for validation
-          model,
-          stepId++
+          toolLog,
+          chatHistory
         );
-        stepLog.push(preValidate);
-
-        if (!this.isFormatAcceptable(preValidate.content)) {
-          needsRefinement = true;
-          validationFeedback = preValidate.content;
-          this.logProgress(
-            "📝 Pre-synthesis validation identified areas for improvement"
-          );
-        }
+        // Mirror loop logging semantics even if no tools ran
+        this.logProgress(
+          `📊 Updated context with ${toolLog.length} tool executions`
+        );
+        this.logProgress(`ℹ️ Current context length: ${ctxString.length}`);
+      }
+      if (toolLog.length === 0) {
+        this.logProgress("📝 Used simplified tool result (no tool executions)");
       }
 
       /* ----------- FINAL SYNTHESIS - ALWAYS USE synthesizeFinalAnswer TOOL ----------- */
@@ -493,8 +649,7 @@ export class ToolOrchestrator {
           chatHistory
         ),
         conversationHistory: convo,
-        // Include validation feedback if available
-        ...(needsRefinement && { validationFeedback }),
+        // No pre-synthesis validation; will validate after synthesis if desired
       };
 
       this.logProgress(
@@ -543,6 +698,23 @@ export class ToolOrchestrator {
       }
       stepLog.push(synth);
 
+      /* ----------- POST-SYNTHESIS VALIDATION (optional, non-blocking) ----------- */
+      if (toolLog.length > 0 && toolLog[toolLog.length - 1]?.result.success) {
+        const postValidate = await steps.validateResponseFormat(
+          ctx,
+          userMessage,
+          synth.content,
+          model,
+          stepId++
+        );
+        stepLog.push(postValidate);
+        if (!this.isFormatAcceptable(postValidate.content)) {
+          this.logProgress(
+            "📝 Post-synthesis validation suggests improvements (non-blocking)"
+          );
+        }
+      }
+
       this.logProgress("✅ Orchestration finished");
 
       return {
@@ -574,5 +746,102 @@ export class ToolOrchestrator {
 
   private isFormatAcceptable(validation: string): boolean {
     return /^FORMAT_ACCEPTABLE/i.test(validation.trim());
+  }
+
+  /**
+   * Ensure calendar event payloads are consistent and robust:
+   * - If only start.date is provided, auto-set end.date = start + 1 day (all-day event)
+   * - If only start.dateTime is provided, auto-set end.dateTime = start + 1 hour (UTC preserved if provided)
+   * - If start/end mix date and dateTime, prefer all-day when the user did not specify a time; otherwise coerce to dateTime pair
+   * - If only end is provided, infer start accordingly
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private sanitizeCalendarEventData(userMessage: string, data: any): any {
+    if (!data || typeof data !== "object") return data;
+
+    const clone = { ...data };
+    clone.start = clone.start || {};
+    clone.end = clone.end || {};
+
+    const hasStartDate = typeof clone.start.date === "string";
+    const hasStartDT = typeof clone.start.dateTime === "string";
+    const hasEndDate = typeof clone.end.date === "string";
+    const hasEndDT = typeof clone.end.dateTime === "string";
+
+    const userMentionsTime =
+      /(\d{1,2}:\d{2})|noon|morning|afternoon|evening|am|pm/i.test(userMessage);
+
+    const prefersAllDay = !userMentionsTime || hasStartDate || hasEndDate;
+
+    // Helper to add days to YYYY-MM-DD
+    const addDays = (isoDate: string, days: number) => {
+      const d = new Date(isoDate + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+
+    // If only end is provided, infer start
+    if (!hasStartDate && !hasStartDT && (hasEndDate || hasEndDT)) {
+      if (hasEndDate) {
+        // Make a 1-day all-day ending at end.date => start = end - 1 day
+        clone.start.date = addDays(clone.end.date, -1);
+      } else if (hasEndDT) {
+        const end = new Date(clone.end.dateTime);
+        const start = new Date(end.getTime() - 60 * 60 * 1000);
+        clone.start.dateTime = start.toISOString();
+      }
+    }
+
+    // Recompute flags
+    const _hasStartDate = typeof clone.start.date === "string";
+    const _hasStartDT = typeof clone.start.dateTime === "string";
+    const _hasEndDate = typeof clone.end.date === "string";
+    const _hasEndDT = typeof clone.end.dateTime === "string";
+
+    // If both are missing, leave to upstream validation
+    if (!_hasStartDate && !_hasStartDT && !_hasEndDate && !_hasEndDT) {
+      return clone;
+    }
+
+    // If start provided, ensure end exists and types match
+    if (_hasStartDate || _hasEndDate || prefersAllDay) {
+      // Prefer all-day
+      const startDate = _hasStartDate
+        ? clone.start.date
+        : _hasStartDT
+        ? clone.start.dateTime.slice(0, 10)
+        : undefined;
+      if (startDate) {
+        clone.start = { date: startDate, timeZone: clone.start.timeZone };
+        clone.end = {
+          date: addDays(startDate, 1),
+          timeZone: clone.end.timeZone || clone.start.timeZone,
+        };
+        return clone;
+      }
+    }
+
+    // Otherwise ensure dateTime pair
+    if (_hasStartDT || _hasEndDT) {
+      const startDT = _hasStartDT
+        ? new Date(clone.start.dateTime)
+        : _hasStartDate
+        ? new Date(clone.start.date + "T09:00:00Z")
+        : new Date();
+      const endDT = _hasEndDT
+        ? new Date(clone.end.dateTime)
+        : new Date(startDT.getTime() + 60 * 60 * 1000);
+      clone.start = {
+        dateTime: startDT.toISOString(),
+        timeZone: clone.start.timeZone,
+      };
+      clone.end = {
+        dateTime: endDT.toISOString(),
+        timeZone: clone.end.timeZone || clone.start.timeZone,
+      };
+      return clone;
+    }
+
+    return clone;
   }
 }

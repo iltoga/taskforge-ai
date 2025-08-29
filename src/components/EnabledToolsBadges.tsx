@@ -11,6 +11,15 @@ const TOOL_META: Record<string, { icon: React.ReactNode; label: string }> = {
   'file-search': { icon: <span>📁</span>, label: 'File Search' },
   web: { icon: <span>🌐</span>, label: 'Web' },
   passport: { icon: <span>🛂</span>, label: 'Passport Db' },
+  // MCP tool categories
+  'mcp-filesystem': { icon: <span>📂</span>, label: 'MCP Filesystem' },
+  'mcp-postgres': { icon: <span>🐘</span>, label: 'MCP PostgreSQL' },
+  'mcp-git': { icon: <span>🔀</span>, label: 'MCP Git' },
+  'file-system': { icon: <span>📂</span>, label: 'File System' },
+  'database': { icon: <span>🗄️</span>, label: 'Database' },
+  'version-control': { icon: <span>🔀</span>, label: 'Version Control' },
+  'web-search': { icon: <span>🔍</span>, label: 'Web Search' },
+  'documentation': { icon: <span>📚</span>, label: 'Documentation' },
 };
 
 export function EnabledToolsBadges({ enabledTools, className = '' }: EnabledToolsBadgesProps) {

@@ -74,7 +74,7 @@ export function Chat() {
   const [loadingStatus, setLoadingStatus] = useState<string>('');
   const [currentSteps, setCurrentSteps] = useState<Array<{ id: string; type: string; content: string; reasoning?: string }>>([]);
   const [currentProgressMessages, setCurrentProgressMessages] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('gpt-4.1-mini');
+  const [selectedModel, setSelectedModel] = useState<ModelType>((process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini");
 
   // Always use the same model for orchestrator as for chat
   const orchestratorModel = selectedModel;

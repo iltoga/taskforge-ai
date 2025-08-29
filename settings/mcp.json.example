@@ -1,0 +1,39 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "name": "filesystem",
+      "command": "mcp-server-filesystem",
+      "args": ["/Users"],
+      "description": "File system operations",
+      "category": "file-system",
+      "disabled": false,
+      "autoApprove": ["read_file", "list_directory"]
+    },
+    "postgres": {
+      "name": "postgres",
+      "command": "mcp-server-postgres",
+      "args": [],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "postgresql://user:password@hostname:5432/db_name"
+      },
+      "description": "PostgreSQL database operations",
+      "category": "database",
+      "disabled": false,
+      "autoApprove": [
+        "list_tables",
+        "describe_table",
+        "list_schemas",
+        "query"
+      ]
+    },
+    "git": {
+      "name": "git",
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."],
+      "description": "Git repository operations",
+      "category": "version-control",
+      "disabled": false,
+      "autoApprove": ["git_status", "git_log", "git_diff"]
+    }
+  }
+}

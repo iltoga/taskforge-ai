@@ -263,7 +263,7 @@ describe("Orchestrator Tool Output Injection", () => {
         userMessage,
         chatHistory,
         mockToolRegistry,
-        "gpt-4.1-mini",
+        "gpt-5-mini",
         { maxSteps: 2, maxToolCalls: 1, developmentMode: true }
       );
 

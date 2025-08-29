@@ -15,7 +15,7 @@ import path from "path";
 
 const FILE_UPLOAD_DIR = process.env.FILE_UPLOAD_DIR || "/app/tmp_data";
 const DEFAULT_FILE_SEARCH_MODEL: ModelType =
-  (process.env.OPENAI_DEFAULT_FILE_SEARCH_MODEL as ModelType) || "gpt-4.1";
+  (process.env.OPENAI_DEFAULT_FILE_SEARCH_MODEL as ModelType) || "gpt-5-mini";
 
 export interface FileSearchResult {
   content: string;

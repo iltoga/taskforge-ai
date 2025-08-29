@@ -1,4 +1,7 @@
 export type ModelType =
+  | "gpt-5"
+  | "gpt-5-mini"
+  | "gpt-5-nano"
   | "gpt-4.1-mini"
   | "gpt-4.1"
   | "gpt-4.1-nano"
@@ -6,9 +9,8 @@ export type ModelType =
   | "o3"
   | "o4-mini"
   | "o4-mini-high"
-  | "google/gemini-2.0-flash-001"
-  | "google/gemini-2.5-flash"
-  | "google/gemini-2.5-flash-lite-preview-06-17"
+  | "google/gemini-2.0-flash-exp:free"
+  | "google/gemini-2.5-flash-lite"
   | "microsoft/phi-4-reasoning-plus:free"
   | "meta-llama/llama-4-maverick:free"
   | "google/gemini-2.5-pro-preview"
@@ -31,8 +33,43 @@ export interface ModelInfo {
   supportsFileSearch?: boolean;
 }
 
-// Model configuration that can be used on both client and server
 export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
+  {
+    id: "gpt-5",
+    name: "GPT-5",
+    description:
+      "OpenAI's flagship model for coding, reasoning, and agentic tasks across domains.",
+    pricing: "Input $1.25/1M, Cached input $0.125/1M, Output $10/1M tokens",
+    contextWindow: "400K",
+    provider: "openai",
+    badge: "Premium", // from gpt-4.1
+    supportsAssistantAPI: true,
+    supportsFileSearch: true,
+  },
+  {
+    id: "gpt-5-mini",
+    name: "GPT-5 Mini",
+    description:
+      "A faster, more cost-efficient version of GPT-5 for well-defined tasks.",
+    pricing: "Input $0.25/1M, Cached input $0.025/1M, Output $2/1M tokens",
+    contextWindow: "400K",
+    provider: "openai",
+    badge: "Default", // from gpt-4.1-mini
+    supportsAssistantAPI: true,
+    supportsFileSearch: true,
+  },
+  {
+    id: "gpt-5-nano",
+    name: "GPT-5 Nano",
+    description:
+      "Fastest, most cost-efficient version of GPT-5. Great for summarization and classification tasks.",
+    pricing: "Input $0.05/1M, Cached input $0.005/1M, Output $0.40/1M tokens",
+    contextWindow: "400K",
+    provider: "openai",
+    badge: "Nano", // from gpt-4.1-nano
+    supportsAssistantAPI: true,
+    supportsFileSearch: true,
+  },
   {
     id: "gpt-4.1",
     name: "GPT-4.1",
@@ -40,7 +77,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     pricing: "$2-$8/1M tokens",
     contextWindow: "256K",
     provider: "openai",
-    badge: "Premium",
+    badge: "Legacy Premium",
     supportsAssistantAPI: true,
     supportsFileSearch: true,
   },
@@ -51,7 +88,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     pricing: "$0.40-$1.60/1M tokens",
     contextWindow: "128K",
     provider: "openai",
-    badge: "Default",
+    badge: "Legacy Default",
     supportsAssistantAPI: true,
     supportsFileSearch: true,
   },
@@ -62,7 +99,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     pricing: "$0.10-$0.40/1M tokens",
     contextWindow: "128K",
     provider: "openai",
-    badge: "Nano",
+    badge: "Legacy Nano",
     supportsAssistantAPI: true,
     supportsFileSearch: true,
   },
@@ -110,19 +147,8 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: true,
   },
   {
-    id: "google/gemini-2.0-flash-001",
-    name: "Gemini 2.0 Flash",
-    description: "Google Gemini 2.0 Flash",
-    pricing: "$0.10/1M tokens",
-    contextWindow: "1M",
-    provider: "openrouter",
-    badge: "OpenRouter",
-    supportsAssistantAPI: false,
-    supportsFileSearch: false,
-  },
-  {
-    id: "google/gemini-2.5-flash",
-    name: "Gemini 2.5 Flash",
+    id: "google/gemini-2.0-flash-exp:free",
+    name: "Gemini 2.0 Flash Exp (Free)",
     description: "Reasoning & coding",
     pricing: "$0.15/1M tokens",
     contextWindow: "1M",
@@ -132,7 +158,7 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
     supportsFileSearch: false,
   },
   {
-    id: "google/gemini-2.5-flash-lite-preview-06-17",
+    id: "google/gemini-2.5-flash-lite",
     name: "Gemini 2.5 Flash Lite",
     description: "Lightweight Gemini 2.5 Flash",
     pricing: "$0.075/1M tokens",
@@ -232,20 +258,17 @@ export const MODEL_CONFIGS: Omit<ModelInfo, "icon">[] = [
   },
 ];
 
-// Helper function to get model information (server-safe)
 export function getModelConfig(
   modelId: ModelType
 ): Omit<ModelInfo, "icon"> | undefined {
   return MODEL_CONFIGS.find((model) => model.id === modelId);
 }
 
-// Helper function to check if a model supports Assistant API file search
 export function supportsFileSearch(modelId: ModelType): boolean {
   const config = getModelConfig(modelId);
   return config?.supportsFileSearch === true;
 }
 
-// Helper function to check if a model supports Assistant API
 export function supportsAssistantAPI(modelId: ModelType): boolean {
   const config = getModelConfig(modelId);
   return config?.supportsAssistantAPI === true;

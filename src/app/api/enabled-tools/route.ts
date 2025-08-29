@@ -27,41 +27,49 @@
  *       500:
  *         description: "Failed to load enabled tools"
  */
+import { loadToolConfiguration } from "@/tools/tool-registry";
+import { getMCPApi } from "@/services/mcp/mcp-api";
 import { NextResponse } from "next/server";
-
-import { createGoogleAuthWithFallback } from "../../../../auth";
-import { CalendarService } from "@/services/calendar-service";
-import { CalendarTools } from "@/tools/calendar-tools";
-import { EmailTools } from "@/tools/email-tools";
-import { FileSearchTools } from "@/tools/file-search-tools";
-import { PassportTools } from "@/tools/passport-tools";
-import { createToolRegistry } from "@/tools/tool-registry";
-import { WebTools } from "@/tools/web-tools";
 
 export async function GET() {
   try {
-    // Use service account fallback for this endpoint (no user context)
-    const googleAuth = await createGoogleAuthWithFallback(
-      undefined,
-      undefined,
-      true
-    );
-    const calendarService = new CalendarService(googleAuth);
-    const calendarTools = new CalendarTools(calendarService);
-    const emailTools = new EmailTools();
-    const webTools = new WebTools();
-    const passportTools = new PassportTools();
-    const fileSearchTools = new FileSearchTools();
+    // Get internal tool categories
+    const cfg = loadToolConfiguration();
+    const internalTools = Object.entries(cfg)
+      .filter((entry) => Boolean(entry[1]))
+      .map(([category]) => ({
+        name: `${category}-tools`,
+        description: `Tools for ${category}`,
+        category,
+      }));
 
-    // Only enabled tools will be registered
-    const registry = createToolRegistry(
-      calendarTools,
-      emailTools,
-      webTools,
-      passportTools,
-      fileSearchTools
-    );
-    const enabledTools = registry.getAvailableTools();
+    // Get MCP tool categories
+    const mcpTools: Array<{ name: string; description: string; category: string }> = [];
+    try {
+      const mcpApi = getMCPApi();
+      const availableTools = await mcpApi.getAvailableTools();
+      
+      // Group MCP tools by category
+      const mcpCategories = new Set<string>();
+      availableTools.forEach(tool => {
+        const category = tool.serverName; // Use server name as category
+        mcpCategories.add(category);
+      });
+      
+      // Add MCP categories to the result
+      mcpCategories.forEach(category => {
+        mcpTools.push({
+          name: `mcp-${category}-tools`,
+          description: `MCP ${category} tools`,
+          category: `mcp-${category}`,
+        });
+      });
+    } catch (error) {
+      console.warn("Failed to get MCP tools for UI:", error);
+      // Continue without MCP tools if there's an error
+    }
+
+    const enabledTools = [...internalTools, ...mcpTools];
     return NextResponse.json({ enabledTools });
   } catch (err) {
     return NextResponse.json(

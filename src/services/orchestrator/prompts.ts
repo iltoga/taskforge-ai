@@ -35,7 +35,7 @@ export function generateAnalysisInstructions(registry: ToolRegistry): string {
 
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     out.push(
-      "- For general knowledge / documentation / policy / visa questions, default to vectorFileSearch."
+      "- For general knowledge / documentation / policy / knowledge base questions, default to vectorFileSearch."
     );
   }
   if (registry.getAvailableCategories().includes("passport")) {
@@ -89,7 +89,7 @@ export function generateContextInstructions(registry: ToolRegistry): string {
   }
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     blocks.push(
-      "**KNOWLEDGE CONTEXT**: Questions about policies, visas, procedures, or general info require vectorFileSearch."
+      "**KNOWLEDGE CONTEXT**: Questions about policies, procedures, internal documentation, or general info require vectorFileSearch."
     );
   }
   if (cat.includes("calendar")) {
@@ -205,11 +205,11 @@ USER: "Summarize the article at https://news.site/article"
     ex.push(
       `**Example – Synthesis summary**
 USER: "Summarize the current conversation and tool outputs so far."
-→ Tool = synthesizeChat; params = {userMessage:"Summarize the current conversation and tool outputs so far.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-4.1"}.`
+→ Tool = synthesizeChat; params = {userMessage:"Summarize the current conversation and tool outputs so far.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-5"}.`
       // Note: This example is commented out because it is used automatically by the orchestrator as final step
       //       `**Example – Final synthesis**
       // USER: "Provide the final answer to the original user request based on all gathered data."
-      // → Tool = synthesizeFinalAnswer; params = {userMessage:"Provide the final answer to the original user request based on all gathered data.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-4.1"}.`
+      // → Tool = synthesizeFinalAnswer; params = {userMessage:"Provide the final answer to the original user request based on all gathered data.", chatHistory:[...], toolCalls:[...], previousSteps:[...], model:"gpt-5"}.`
     );
   }
 
@@ -238,9 +238,9 @@ export function generateToolExamples(
   /* Vector search */
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rows.push(
-      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "vectorFileSearch",\n    "parameters": {\n      "query": "visa requirements italy to indonesia",\n      "vectorStoreIds": ' +
+      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "vectorFileSearch",\n    "parameters": {\n      "query": "remote work policy",\n      "vectorStoreIds": ' +
         JSON.stringify(vectorStoreIds) +
-        '\n    },\n    "reasoning": "Retrieve official visa requirement document." \n  }\n]\n```'
+        '\n    },\n    "reasoning": "Retrieve internal policy document." \n  }\n]\n```'
     );
   }
 
@@ -254,7 +254,7 @@ export function generateToolExamples(
   /* Synthesis tools */
   if (registry.getAvailableCategories().includes("synthesis")) {
     rows.push(
-      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "synthesizeChat",\n    "parameters": {\n      "userMessage": "Summarize the current conversation.",\n      "chatHistory": [...],\n      "toolCalls": [...],\n      "previousSteps": [...],\n      "model": "gpt-4.1"\n    },\n    "reasoning": "Provide a concise context summary for the next steps."\n  }\n]\n```'
+      '```json\nCALL_TOOLS:\n[\n  {\n    "name": "synthesizeChat",\n    "parameters": {\n      "userMessage": "Summarize the current conversation.",\n      "chatHistory": [...],\n      "toolCalls": [...],\n      "previousSteps": [...],\n      "model": "gpt-5"\n    },\n    "reasoning": "Provide a concise context summary for the next steps."\n  }\n]\n```'
     );
   }
 
@@ -288,6 +288,9 @@ export function generatePriorityOrder(registry: ToolRegistry): string {
   const cat = registry.getAvailableCategories();
   const parts: string[] = ["**CATEGORY PRIORITY**"];
 
+  // Prefer MCP filesystem tools when available for local/project file tasks
+  if (cat.includes("mcp-filesystem")) parts.push("1. MCP Filesystem tools");
+
   if (cat.includes("file-search")) parts.push("1. File search tools");
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch"))
     parts.push(`${parts.length}. 2. Knowledge (vectorFileSearch)`);
@@ -307,22 +310,32 @@ export function generateDecisionRules(registry: ToolRegistry): string {
   let n = 1;
   const rules: string[] = [];
 
+  if (cat.includes("mcp-filesystem")) {
+    rules.push(
+      `${n++}. For reading project/local files → prefer MCP filesystem tools (list_directory → read_file/read_text_file).`,
+      `${n++}. Never invent file paths. Always use exact paths returned by list_directory or from prior tool outputs.`,
+      `${n++}. Avoid internal searchFiles unless user has uploaded files; use MCP filesystem for repository files instead.`
+    );
+  }
+
   if (cat.includes("calendar")) {
     rules.push(
       `${n++}. **Calendar queries** → ALWAYS use \`searchEvents\` or \`getEvents\` before answering.`,
-      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`
+      `${n++}. **Event creation / changes** → MUST call \`createEvent\`, \`updateEvent\` or \`deleteEvent\` accordingly.`,
+      `${n++}. **Before creating** → check for likely duplicates with \`searchEvents\` when possible to avoid duplicates.`
     );
   }
 
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rules.push(
-      `${n++}. **Documentation / visa / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
+      `${n++}. **Documentation / policy / general knowledge** → use \`vectorFileSearch\`. Include the \`vectorStoreIds\` array every time.`
     );
   }
 
   if (cat.includes("passport")) {
     rules.push(
-      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`
+      `${n++}. **Passport image / data operations** → use passport tools (\`createPassport\`, \`getPassports\`, etc.).`,
+      `${n++}. **Dependency ordering** → if later steps require DB data (IDs, numbers), plan a \`getPassports\` step first to retrieve them.`
     );
   }
 
@@ -341,7 +354,8 @@ export function generateDecisionRules(registry: ToolRegistry): string {
 
   rules.push(
     `${n++}. If unsure which tool yields the required info, ask for clarification.`,
-    `${n++}. If no tool can help and you have sufficient info to answer user's question, reply with **SUFFICIENT_INFO** explaining why.`
+    `${n++}. If no tool can help and you have sufficient info to answer user's question, reply with **SUFFICIENT_INFO** explaining why.`,
+    `${n++}. Avoid inserting extremely sensitive PII into calendar descriptions or public outputs unless explicitly required by the user.`
   );
 
   return `**DECISION RULES**\n${rules.map((r) => `- ${r}`).join("\n")}\n`;
@@ -380,15 +394,25 @@ export function generateCompactRules(registry: ToolRegistry): string {
   const rules: string[] = [];
 
   if (cat.includes("calendar"))
-    rules.push("- Calendar queries → use searchEvents/getEvents first");
+    rules.push(
+      "- Calendar queries → use searchEvents/getEvents first",
+      "- Before creating events, search for duplicates when possible"
+    );
   if (cat.includes("file-search"))
     rules.push("- File operations → use searchFiles with query parameter");
   if (cat.includes("passport"))
-    rules.push("- Passport data → use passport tools, translate to English");
+    rules.push(
+      "- Passport data → use passport tools, translate to English",
+      "- When an action depends on data from DB, plan a retrieval step first (get → then act)"
+    );
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     rules.push("- Knowledge queries → use vectorFileSearch");
   }
-  rules.push("- If unsure → ask for clarification");
+  rules.push(
+    "- Sequence steps by dependency: collect identifiers/data first, then perform actions",
+    "- Avoid inserting extremely sensitive PII into public artifacts unless explicitly required",
+    "- If unsure → ask for clarification"
+  );
 
   return rules.join("\n");
 }
@@ -416,7 +440,7 @@ export function generateCompactExamples(registry: ToolRegistry): string {
   }
   if (registry.getAvailableTools().some((t) => t.name === "vectorFileSearch")) {
     examples.push(
-      'vectorFileSearch: {query: "visa requirements", vectorStoreIds: [...] }'
+      'vectorFileSearch: {query: "remote work policy", vectorStoreIds: [...] }'
     );
   }
   if (cat.includes("web")) {

@@ -45,6 +45,8 @@ next-env.d.ts
 settings/allowed-emails.json
 settings/client_secret_*
 settings/gptcalendarintegration*
+settings/mcp.json
 tmp/
 tmp_data/
 .vscode/
+.kiro/

@@ -40,7 +40,8 @@ export class AIService {
   async processMessage(
     message: string,
     existingEvents?: CalendarEvent[],
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     providerConfig?: AIProviderConfig
   ): Promise<CalendarAction> {
     const systemPrompt = this.loadSystemPrompt();
@@ -56,14 +57,6 @@ export class AIService {
     }
 
     try {
-      // Use temperature only for models that support it (some reasoning models don't support temperature)
-      const supportsTemperature = ![
-        "o4-mini",
-        "o4-mini-high",
-        "o3",
-        "o3-mini",
-      ].includes(model);
-
       const { text } = await generateTextWithProvider(
         message,
         providerConfig || {
@@ -76,7 +69,6 @@ export class AIService {
             { role: "system", content: systemContent },
             { role: "user", content: message },
           ],
-          temperature: supportsTemperature ? 0.1 : undefined,
         }
       );
 
@@ -121,7 +113,8 @@ export class AIService {
     company: string,
     startDate: string,
     endDate: string,
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     userName: string = "User",
     providerConfig?: AIProviderConfig
   ): Promise<string> {
@@ -142,7 +135,8 @@ export class AIService {
     startDate: string,
     endDate: string,
     reportType: "weekly" | "monthly" | "quarterly",
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     userName: string = "User",
     providerConfig?: AIProviderConfig
   ): Promise<string> {
@@ -163,7 +157,8 @@ export class AIService {
     message: string,
     chatHistory: ChatHistory,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = "gpt-4.1-mini",
+    orchestratorModel: ModelType = (process.env
+      .OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini",
     developmentMode: boolean = false,
     processedFiles: Array<ProcessedFile> = []
   ): Promise<{
@@ -177,6 +172,14 @@ export class AIService {
     try {
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import("@/services/orchestrator/core");
+      const { initializeMCP } = await import("@/services/mcp/mcp-api");
+
+      // Initialize MCP if not already done
+      try {
+        await initializeMCP();
+      } catch (error) {
+        console.warn("MCP initialization failed, continuing without MCP:", error);
+      }
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -230,7 +233,8 @@ export class AIService {
     message: string,
     chatHistory: ChatHistory,
     toolRegistry: unknown,
-    orchestratorModel: ModelType = "gpt-4.1-mini",
+    orchestratorModel: ModelType = (process.env
+      .OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini",
     processedFiles: Array<ProcessedFile> = [],
     developmentMode: boolean = false,
     progressCallback: (data: {
@@ -249,6 +253,14 @@ export class AIService {
     try {
       // Dynamic import to avoid circular dependencies
       const { ToolOrchestrator } = await import("@/services/orchestrator/core");
+      const { initializeMCP } = await import("@/services/mcp/mcp-api");
+
+      // Initialize MCP if not already done
+      try {
+        await initializeMCP();
+      } catch (error) {
+        console.warn("MCP initialization failed, continuing without MCP:", error);
+      }
 
       const orchestrator = new ToolOrchestrator(process.env.OPENAI_API_KEY!);
 
@@ -343,13 +355,8 @@ Default rules:
 Return ONLY the JSON object, no other text.`;
 
     try {
-      const model = "gpt-4.1-mini";
-      const supportsTemperature = ![
-        "o4-mini",
-        "o4-mini-high",
-        "o3",
-        "o3-mini",
-      ].includes(model);
+      const model =
+        (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini";
 
       const { text } = await generateTextWithProvider(
         message,
@@ -360,7 +367,6 @@ Return ONLY the JSON object, no other text.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: message },
           ],
-          temperature: supportsTemperature ? 0.1 : undefined,
         }
       );
 
@@ -711,13 +717,8 @@ Please create an appropriate response based on the user's request.`;
     );
 
     try {
-      const model = "gpt-4.1-mini";
-      const supportsTemperature = ![
-        "o4-mini",
-        "o4-mini-high",
-        "o3",
-        "o3-mini",
-      ].includes(model);
+      const model =
+        (process.env.OPENAI_DEFAULT_MODEL as ModelType) || "gpt-5-mini";
 
       const { text } = await generateTextWithProvider(
         userPrompt,
@@ -728,7 +729,6 @@ Please create an appropriate response based on the user's request.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          temperature: supportsTemperature ? 0.3 : undefined,
         }
       );
 
@@ -759,7 +759,8 @@ Please create an appropriate response based on the user's request.`;
 
   async translateToEnglish(
     text: string,
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     providerConfig?: AIProviderConfig
   ): Promise<string> {
     // If text is already in English or looks like English, don't translate
@@ -771,13 +772,6 @@ Please create an appropriate response based on the user's request.`;
     const systemPrompt = `Translate the following text to English. If the text is already in English, return it EXACTLY as provided without any modifications or comments about the language.`;
 
     try {
-      const supportsTemperature = ![
-        "o4-mini",
-        "o4-mini-high",
-        "o3",
-        "o3-mini",
-      ].includes(model);
-
       const { text: translatedText } = await generateTextWithProvider(
         text,
         providerConfig || {
@@ -790,7 +784,6 @@ Please create an appropriate response based on the user's request.`;
             { role: "system", content: systemPrompt },
             { role: "user", content: text },
           ],
-          temperature: supportsTemperature ? 0.1 : undefined,
         }
       );
 
@@ -811,7 +804,8 @@ Please create an appropriate response based on the user's request.`;
   // Method for processing messages with uploaded files using OpenAI Assistant API
   async processMessageWithFiles(
     message: string,
-    model: ModelType = "gpt-4.1-mini",
+    model: ModelType = (process.env.OPENAI_DEFAULT_MODEL as ModelType) ||
+      "gpt-5-mini",
     processedFiles?: Array<ProcessedFile>
   ): Promise<string> {
     try {

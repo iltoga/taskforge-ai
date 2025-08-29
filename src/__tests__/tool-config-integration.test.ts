@@ -45,7 +45,7 @@ describe("Tool Configuration Integration", () => {
     );
 
     // Should only have calendar tools enabled based on current config
-    expect(availableCategories).toEqual(["calendar"]);
+    expect(availableCategories).toEqual(["calendar", "synthesis"]);
 
     const calendarTools = registry.getToolsByCategory("calendar");
     expect(calendarTools).toHaveLength(5);

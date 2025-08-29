@@ -145,6 +145,7 @@ const toolRegistry = createToolRegistry(
 The system is designed for easy extensibility. To add a new tool category:
 
 1. **Create the tool class** following the pattern:
+
    ```typescript
    export class NewCategoryTools {
      async someAction(parameters: SomeParams): Promise<ToolResult> {
@@ -154,6 +155,7 @@ The system is designed for easy extensibility. To add a new tool category:
    ```
 
 2. **Define tool schemas** in `tool-definitions.ts`:
+
    ```typescript
    export const newCategoryToolDefinitions = {
      someAction: {
@@ -166,6 +168,7 @@ The system is designed for easy extensibility. To add a new tool category:
    ```
 
 3. **Register tools** in `tool-registry.ts`:
+
    ```typescript
    export function createToolRegistry(
      calendarTools: CalendarTools,
@@ -193,7 +196,7 @@ const orchestrator = new ToolOrchestrator(apiKey);
 const result = await orchestrator.orchestrate(
   "Research TypeScript best practices, save findings to a file, and email summary to team",
   toolRegistry,
-  'gpt-4.1-mini',
+  'gpt-5-mini',
   { developmentMode: true }
 );
 
