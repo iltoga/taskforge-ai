@@ -41,7 +41,7 @@ export class MCPApi {
    */
   async addServer(name: string, config: MCPServerConfig): Promise<void> {
     this.configManager.addOrUpdateServer(name, config);
-    
+
     // Reload servers to pick up the new configuration
     await this.serverManager.reload();
   }
@@ -51,7 +51,7 @@ export class MCPApi {
    */
   async removeServer(name: string): Promise<void> {
     this.configManager.removeServer(name);
-    
+
     // Reload servers to remove the server
     await this.serverManager.reload();
   }
@@ -62,14 +62,14 @@ export class MCPApi {
   async toggleServer(name: string, enabled: boolean): Promise<void> {
     const config = this.configManager.loadConfiguration();
     const serverConfig = config.mcpServers[name];
-    
+
     if (!serverConfig) {
       throw new Error(`Server '${name}' not found`);
     }
-    
+
     serverConfig.disabled = !enabled;
     this.configManager.addOrUpdateServer(name, serverConfig);
-    
+
     // Reload servers to apply the change
     await this.serverManager.reload();
   }
@@ -80,7 +80,8 @@ export class MCPApi {
   getServerStatus() {
     const enabledServers = this.serverManager.getEnabledServers();
     return {
-      configured: Object.keys(this.configManager.loadConfiguration().mcpServers).length,
+      configured: Object.keys(this.configManager.loadConfiguration().mcpServers)
+        .length,
       enabled: Object.keys(enabledServers).length,
       servers: Object.entries(enabledServers).map(([name, config]) => ({
         name,
@@ -100,7 +101,7 @@ export class MCPApi {
   /**
    * Execute a tool on an MCP server
    */
-  async executeTool(toolName: string, args: Record<string, any>) {
+  async executeTool(toolName: string, args: Record<string, unknown>) {
     return await this.serverManager.executeMCPTool(toolName, args);
   }
 
@@ -115,14 +116,14 @@ export class MCPApi {
     try {
       const { RealMCPServerConnection } = await import("./mcp-connection");
       const connection = new RealMCPServerConnection("test", config);
-      
+
       await connection.connect();
       const tools = await connection.listTools();
       await connection.disconnect();
-      
+
       return {
         success: true,
-        tools: tools.map(t => t.name),
+        tools: tools.map((t) => t.name),
       };
     } catch (error) {
       return {
