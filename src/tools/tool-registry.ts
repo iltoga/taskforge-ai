@@ -1,6 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { z } from "zod";
+import { getMCPApi } from "../services/mcp/mcp-api";
+import { MCPTool, MCPToolResult } from "../services/mcp/types";
 import { CalendarTools } from "./calendar-tools";
 import { EmailTools } from "./email-tools";
 import { FileSearchTools } from "./file-search-tools";
@@ -12,8 +14,6 @@ import { registerPassportTools } from "./register-passport-tools";
 import { registerSynthesisTools } from "./register-synthesis-tools";
 import { registerWebTools } from "./register-web-tools";
 import { WebTools } from "./web-tools";
-import { getMCPApi } from "../services/mcp/mcp-api";
-import { MCPTool } from "../services/mcp/types";
 
 // Base interfaces for tools
 export interface ToolDefinition {
@@ -74,7 +74,7 @@ export class DefaultToolRegistry implements ToolRegistry {
     this.enableMCP = enableMCP;
     // Initialize MCP cache in background
     if (this.enableMCP) {
-      this.refreshMCPCache().catch(error => {
+      this.refreshMCPCache().catch((error) => {
         console.warn("Failed to initialize MCP cache:", error);
       });
     }
@@ -86,13 +86,15 @@ export class DefaultToolRegistry implements ToolRegistry {
 
   getAvailableTools(): ToolDefinition[] {
     // Get internal tools
-    const internalTools = Array.from(this.tools.values()).map((tool) => tool.definition);
-    
+    const internalTools = Array.from(this.tools.values()).map(
+      (tool) => tool.definition
+    );
+
     // Add cached MCP tools if available and not stale
     if (this.enableMCP && this.isMCPCacheValid()) {
       return [...internalTools, ...this.mcpToolsCache];
     }
-    
+
     return internalTools;
   }
 
@@ -110,12 +112,12 @@ export class DefaultToolRegistry implements ToolRegistry {
     // Get internal tool categories
     const categories = new Set<string>();
     this.tools.forEach((tool) => categories.add(tool.definition.category));
-    
+
     // Add cached MCP categories if available and not stale
     if (this.enableMCP && this.isMCPCacheValid()) {
-      this.mcpCategoriesCache.forEach(category => categories.add(category));
+      this.mcpCategoriesCache.forEach((category) => categories.add(category));
     }
-    
+
     return Array.from(categories).sort();
   }
 
@@ -124,13 +126,15 @@ export class DefaultToolRegistry implements ToolRegistry {
    */
   async getAllAvailableTools(): Promise<ToolDefinition[]> {
     // Get internal tools
-    const internalTools = Array.from(this.tools.values()).map((tool) => tool.definition);
-    
+    const internalTools = Array.from(this.tools.values()).map(
+      (tool) => tool.definition
+    );
+
     // Refresh MCP cache if needed
     if (this.enableMCP && !this.isMCPCacheValid()) {
       await this.refreshMCPCache();
     }
-    
+
     return [...internalTools, ...this.mcpToolsCache];
   }
 
@@ -141,7 +145,7 @@ export class DefaultToolRegistry implements ToolRegistry {
     // Get categories from internal tools
     const categories = new Set<string>();
     this.tools.forEach((tool) => categories.add(tool.definition.category));
-    
+
     // Add MCP categories
     if (this.enableMCP) {
       try {
@@ -155,7 +159,7 @@ export class DefaultToolRegistry implements ToolRegistry {
         console.warn("Failed to get MCP tool categories:", error);
       }
     }
-    
+
     return Array.from(categories).sort();
   }
 
@@ -176,7 +180,7 @@ export class DefaultToolRegistry implements ToolRegistry {
   /**
    * Convert MCP result to internal ToolResult format
    */
-  private convertMCPResultToToolResult(mcpResult: any): ToolResult {
+  private convertMCPResultToToolResult(mcpResult: MCPToolResult): ToolResult {
     if (mcpResult.isError) {
       return {
         success: false,
@@ -186,8 +190,8 @@ export class DefaultToolRegistry implements ToolRegistry {
 
     // Extract text content from MCP result
     const textContent = mcpResult.content
-      ?.filter((item: any) => item.type === "text")
-      ?.map((item: any) => item.text)
+      ?.filter((item) => item.type === "text")
+      ?.map((item) => item.text)
       ?.join("\n");
 
     return {
@@ -209,14 +213,16 @@ export class DefaultToolRegistry implements ToolRegistry {
   /**
    * Convert JSON Schema to Zod schema (simplified implementation)
    */
-  private jsonSchemaToZod(schema: any): z.ZodSchema<unknown> {
+  private jsonSchemaToZod(
+    schema: Record<string, unknown>
+  ): z.ZodSchema<unknown> {
     if (schema.type === "object") {
       const shape: Record<string, z.ZodSchema<unknown>> = {};
-      
+
       for (const [key, prop] of Object.entries(schema.properties || {})) {
-        const propSchema = prop as any;
+        const propSchema = prop as Record<string, unknown>;
         let zodSchema: z.ZodSchema<unknown>;
-        
+
         switch (propSchema.type) {
           case "string":
             zodSchema = z.string();
@@ -233,21 +239,21 @@ export class DefaultToolRegistry implements ToolRegistry {
           default:
             zodSchema = z.unknown();
         }
-        
+
         if (propSchema.description) {
-          zodSchema = zodSchema.describe(propSchema.description);
+          zodSchema = zodSchema.describe(propSchema.description as string);
         }
-        
-        if (!schema.required?.includes(key)) {
+
+        if (!(schema.required as string[] | undefined)?.includes(key)) {
           zodSchema = zodSchema.optional();
         }
-        
+
         shape[key] = zodSchema;
       }
-      
+
       return z.object(shape);
     }
-    
+
     return z.unknown();
   }
 
@@ -263,14 +269,16 @@ export class DefaultToolRegistry implements ToolRegistry {
    */
   private async refreshMCPCache(): Promise<void> {
     if (!this.enableMCP) return;
-    
+
     try {
       const mcpApi = getMCPApi();
       const mcpToolList = await mcpApi.getAvailableTools();
-      
+
       // Update tools cache
-      this.mcpToolsCache = mcpToolList.map(this.convertMCPToolToDefinition.bind(this));
-      
+      this.mcpToolsCache = mcpToolList.map(
+        this.convertMCPToolToDefinition.bind(this)
+      );
+
       // Update categories cache
       const categories = new Set<string>();
       mcpToolList.forEach((tool) => {
@@ -278,9 +286,11 @@ export class DefaultToolRegistry implements ToolRegistry {
         categories.add(category);
       });
       this.mcpCategoriesCache = Array.from(categories);
-      
+
       this.lastMCPUpdate = Date.now();
-      console.log(`Updated MCP cache: ${this.mcpToolsCache.length} tools, ${this.mcpCategoriesCache.length} categories`);
+      console.log(
+        `Updated MCP cache: ${this.mcpToolsCache.length} tools, ${this.mcpCategoriesCache.length} categories`
+      );
     } catch (error) {
       console.warn("Failed to refresh MCP cache:", error);
     }
@@ -402,7 +412,7 @@ export function createToolRegistry(
   if (enableMCP) {
     console.log("MCP integration enabled in tool registry");
     // Trigger initial MCP cache refresh in background
-    (registry as DefaultToolRegistry).refreshMCP().catch(error => {
+    (registry as DefaultToolRegistry).refreshMCP().catch((error) => {
       console.warn("Initial MCP refresh failed:", error);
     });
   }
@@ -424,18 +434,17 @@ export function toolDefinitionsToAIFunctions(tools: ToolDefinition[]) {
 }
 
 // Helper function to convert Zod schema to JSON schema (simplified)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function zodSchemaToJsonSchema(schema: z.ZodSchema<any>): any {
+function zodSchemaToJsonSchema(
+  schema: z.ZodSchema<unknown>
+): Record<string, unknown> {
   // This is a simplified conversion - in a production app you might want to use
   // a library like zod-to-json-schema for more complete conversion
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: any = {};
+    const properties: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(shape)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties[key] = zodSchemaToJsonSchema(value as z.ZodSchema<any>);
+      properties[key] = zodSchemaToJsonSchema(value as z.ZodSchema<unknown>);
     }
 
     return {
@@ -451,13 +460,15 @@ function zodSchemaToJsonSchema(schema: z.ZodSchema<any>): any {
   } else if (schema instanceof z.ZodArray) {
     return {
       type: "array",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      items: zodSchemaToJsonSchema(schema.element as z.ZodType<any, any, any>),
+      items: zodSchemaToJsonSchema(
+        schema.element as z.ZodType<unknown, z.ZodTypeDef, unknown>
+      ),
       description: schema.description,
     };
   } else if (schema instanceof z.ZodOptional) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return zodSchemaToJsonSchema(schema.unwrap() as z.ZodType<any, any, any>);
+    return zodSchemaToJsonSchema(
+      schema.unwrap() as z.ZodType<unknown, z.ZodTypeDef, unknown>
+    );
   } else if (schema instanceof z.ZodEnum) {
     return {
       type: "string",
@@ -470,8 +481,7 @@ function zodSchemaToJsonSchema(schema: z.ZodSchema<any>): any {
 }
 
 // Helper function to get required properties from Zod schema
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getRequiredProperties(schema: z.ZodSchema<any>): string[] {
+function getRequiredProperties(schema: z.ZodSchema<unknown>): string[] {
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape;
     const required: string[] = [];

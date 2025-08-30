@@ -4,7 +4,12 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { MCPServerConnection, MCPServerConfig, MCPTool, MCPToolResult } from "./types";
+import {
+  MCPServerConfig,
+  MCPServerConnection,
+  MCPTool,
+  MCPToolResult,
+} from "./types";
 
 export class RealMCPServerConnection implements MCPServerConnection {
   name: string;
@@ -12,7 +17,7 @@ export class RealMCPServerConnection implements MCPServerConnection {
   isConnected = false;
   tools: MCPTool[] = [];
   lastError?: string;
-  
+
   private client?: Client;
   private transport?: StdioClientTransport;
 
@@ -28,7 +33,11 @@ export class RealMCPServerConnection implements MCPServerConnection {
         command: this.config.command,
         args: this.config.args,
         env: {
-          ...process.env,
+          ...(Object.fromEntries(
+            Object.entries(process.env).filter(
+              ([, value]) => value !== undefined
+            )
+          ) as Record<string, string>),
           ...this.config.env,
         },
       });
@@ -48,24 +57,33 @@ export class RealMCPServerConnection implements MCPServerConnection {
 
       // Connect to the server
       await this.client.connect(this.transport);
-      
+
       // List available tools
       const toolsResponse = await this.client.listTools();
-      this.tools = toolsResponse.tools.map(tool => ({
+      this.tools = toolsResponse.tools.map((tool) => ({
         name: tool.name,
         description: tool.description || "",
-        inputSchema: tool.inputSchema as any,
+        inputSchema: tool.inputSchema as {
+          type: "object";
+          properties: Record<string, unknown>;
+          required?: string[];
+        },
         serverName: this.name,
       }));
 
       this.isConnected = true;
       this.lastError = undefined;
-      
-      console.log(`✅ Connected to MCP server '${this.name}' with ${this.tools.length} tools`);
+
+      console.log(
+        `✅ Connected to MCP server '${this.name}' with ${this.tools.length} tools`
+      );
     } catch (error) {
       this.lastError = error instanceof Error ? error.message : String(error);
       this.isConnected = false;
-      console.error(`❌ Failed to connect to MCP server '${this.name}':`, this.lastError);
+      console.error(
+        `❌ Failed to connect to MCP server '${this.name}':`,
+        this.lastError
+      );
       throw error;
     }
   }
@@ -78,19 +96,25 @@ export class RealMCPServerConnection implements MCPServerConnection {
       if (this.transport) {
         await this.transport.close();
       }
-      
+
       this.isConnected = false;
       this.tools = [];
       this.client = undefined;
       this.transport = undefined;
-      
+
       console.log(`🔌 Disconnected from MCP server '${this.name}'`);
     } catch (error) {
-      console.error(`⚠️ Error disconnecting from MCP server '${this.name}':`, error);
+      console.error(
+        `⚠️ Error disconnecting from MCP server '${this.name}':`,
+        error
+      );
     }
   }
 
-  async callTool(name: string, args: Record<string, any>): Promise<MCPToolResult> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<MCPToolResult> {
     if (!this.client || !this.isConnected) {
       throw new Error(`MCP server '${this.name}' is not connected`);
     }
@@ -102,16 +126,22 @@ export class RealMCPServerConnection implements MCPServerConnection {
       });
 
       return {
-        content: response.content || [],
-        isError: response.isError || false,
+        content: Array.isArray(response.content) ? response.content : [],
+        isError:
+          typeof response.isError === "boolean" ? response.isError : false,
       };
     } catch (error) {
-      console.error(`❌ MCP tool '${name}' execution failed on server '${this.name}':`, error);
+      console.error(
+        `❌ MCP tool '${name}' execution failed on server '${this.name}':`,
+        error
+      );
       return {
         content: [
           {
             type: "text",
-            text: `Error executing tool '${name}': ${error instanceof Error ? error.message : String(error)}`,
+            text: `Error executing tool '${name}': ${
+              error instanceof Error ? error.message : String(error)
+            }`,
           },
         ],
         isError: true,

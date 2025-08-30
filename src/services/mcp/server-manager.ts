@@ -1,6 +1,12 @@
 import * as fs from "fs";
 import * as path from "path";
-import { MCPConfiguration, MCPServerConfig, MCPServerConnection, MCPTool } from "./types";
+import {
+  MCPConfiguration,
+  MCPServerConfig,
+  MCPServerConnection,
+  MCPTool,
+  MCPToolResult,
+} from "./types";
 
 /**
  * Manages MCP server connections and configurations
@@ -19,18 +25,24 @@ export class MCPServerManager {
   private loadConfiguration(): void {
     try {
       // Try workspace config first
-      const workspaceConfigPath = path.resolve(process.cwd(), ".kiro/settings/mcp.json");
+      const workspaceConfigPath = path.resolve(
+        process.cwd(),
+        ".kiro/settings/mcp.json"
+      );
       let workspaceConfig: MCPConfiguration = { mcpServers: {} };
-      
+
       if (fs.existsSync(workspaceConfigPath)) {
         const content = fs.readFileSync(workspaceConfigPath, "utf-8");
         workspaceConfig = JSON.parse(content);
       }
 
       // Try user config
-      const userConfigPath = path.resolve(process.env.HOME || "~", ".kiro/settings/mcp.json");
+      const userConfigPath = path.resolve(
+        process.env.HOME || "~",
+        ".kiro/settings/mcp.json"
+      );
       let userConfig: MCPConfiguration = { mcpServers: {} };
-      
+
       if (fs.existsSync(userConfigPath)) {
         const content = fs.readFileSync(userConfigPath, "utf-8");
         userConfig = JSON.parse(content);
@@ -44,7 +56,11 @@ export class MCPServerManager {
         },
       };
 
-      console.log(`Loaded MCP configuration with ${Object.keys(this.config.mcpServers).length} servers`);
+      console.log(
+        `Loaded MCP configuration with ${
+          Object.keys(this.config.mcpServers).length
+        } servers`
+      );
     } catch (error) {
       console.warn("Failed to load MCP configuration:", error);
       this.config = { mcpServers: {} };
@@ -64,7 +80,7 @@ export class MCPServerManager {
   getEnabledServers(): Record<string, MCPServerConfig> {
     const servers = this.getConfiguredServers();
     return Object.fromEntries(
-      Object.entries(servers).filter(([_, config]) => !config.disabled)
+      Object.entries(servers).filter((entry) => !entry[1].disabled)
     );
   }
 
@@ -73,7 +89,7 @@ export class MCPServerManager {
    */
   async initializeServers(): Promise<void> {
     const enabledServers = this.getEnabledServers();
-    
+
     const connectionPromises = Object.entries(enabledServers).map(
       async ([name, config]) => {
         try {
@@ -107,14 +123,17 @@ export class MCPServerManager {
    */
   async getAllMCPTools(): Promise<MCPTool[]> {
     const tools: MCPTool[] = [];
-    
+
     for (const [serverName, connection] of Array.from(this.servers.entries())) {
       if (connection.isConnected) {
         try {
           const serverTools = await connection.listTools();
           tools.push(...serverTools);
         } catch (error) {
-          console.error(`Failed to get tools from MCP server ${serverName}:`, error);
+          console.error(
+            `Failed to get tools from MCP server ${serverName}:`,
+            error
+          );
         }
       }
     }
@@ -125,18 +144,27 @@ export class MCPServerManager {
   /**
    * Execute a tool on the appropriate MCP server
    */
-  async executeMCPTool(toolName: string, args: Record<string, any>): Promise<any> {
+  async executeMCPTool(
+    toolName: string,
+    args: Record<string, unknown>
+  ): Promise<MCPToolResult> {
     for (const [serverName, connection] of Array.from(this.servers.entries())) {
-      if (connection.isConnected && connection.tools.some(t => t.name === toolName)) {
+      if (
+        connection.isConnected &&
+        connection.tools.some((t) => t.name === toolName)
+      ) {
         try {
           return await connection.callTool(toolName, args);
         } catch (error) {
-          console.error(`Failed to execute MCP tool ${toolName} on server ${serverName}:`, error);
+          console.error(
+            `Failed to execute MCP tool ${toolName} on server ${serverName}:`,
+            error
+          );
           throw error;
         }
       }
     }
-    
+
     throw new Error(`MCP tool '${toolName}' not found on any connected server`);
   }
 
@@ -145,9 +173,9 @@ export class MCPServerManager {
    */
   async shutdown(): Promise<void> {
     const disconnectPromises = Array.from(this.servers.values()).map(
-      connection => connection.disconnect()
+      (connection) => connection.disconnect()
     );
-    
+
     await Promise.allSettled(disconnectPromises);
     this.servers.clear();
   }
@@ -166,7 +194,7 @@ export class MCPServerManager {
  * Mock MCP server connection for development/testing
  * Replace this with actual MCP client implementation
  */
-class MockMCPServerConnection implements MCPServerConnection {
+export class MockMCPServerConnection implements MCPServerConnection {
   name: string;
   config: MCPServerConfig;
   isConnected = false;
@@ -188,12 +216,12 @@ class MockMCPServerConnection implements MCPServerConnection {
         inputSchema: {
           type: "object",
           properties: {
-            query: { type: "string", description: "Query parameter" }
+            query: { type: "string", description: "Query parameter" },
           },
-          required: ["query"]
+          required: ["query"],
         },
-        serverName: this.name
-      }
+        serverName: this.name,
+      },
     ];
   }
 
@@ -202,15 +230,18 @@ class MockMCPServerConnection implements MCPServerConnection {
     this.tools = [];
   }
 
-  async callTool(name: string, args: Record<string, any>): Promise<any> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<MCPToolResult> {
     // Mock tool execution
     return {
       content: [
         {
           type: "text",
-          text: `Mock response from ${name} with args: ${JSON.stringify(args)}`
-        }
-      ]
+          text: `Mock response from ${name} with args: ${JSON.stringify(args)}`,
+        },
+      ],
     };
   }
 
